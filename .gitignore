@@ -1,0 +1,32 @@
+#OS junk files
+[Tt]humbs.db
+*.DS_Store
+
+#Visual Studio files
+*.[Oo]bj
+*.user
+*.suo
+*.bak
+*.[Cc]ache
+*.log
+*.lib
+obj/
+[Bb]in
+[Dd]ebug*/
+[Rr]elease*/
+Output
+
+#MonoDevelop
+*.pidb
+*.userprefs
+
+#Tooling
+_ReSharper*/
+*.resharper
+
+
+*.dat
+
+*.class
+
+*.MF
