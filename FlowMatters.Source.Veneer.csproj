@@ -36,6 +36,7 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="Ionic.Zip, Version=1.9.1.5, Culture=neutral, PublicKeyToken=edbe51ad942a3f5c, processorArchitecture=MSIL" />
     <Reference Include="Newtonsoft.Json, Version=4.5.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
       <HintPath>..\packages\Newtonsoft.Json.5.0.6\lib\net40\Newtonsoft.Json.dll</HintPath>
     </Reference>
@@ -45,9 +46,19 @@
     <Reference Include="RiverSystem">
       <HintPath>C:\Program Files\eWater\Source 3.4.3.540\RiverSystem.dll</HintPath>
     </Reference>
+    <Reference Include="RiverSystem.ApplicationLayer.Consumer, Version=3.4.3.540, Culture=neutral, processorArchitecture=MSIL" />
+    <Reference Include="RiverSystem.ApplicationLayer.Consumer.Forms, Version=3.4.3.540, Culture=neutral, processorArchitecture=MSIL" />
+    <Reference Include="RiverSystem.ApplicationLayer.Interfaces, Version=3.4.3.540, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\..\Program Files\eWater\Source 3.4.3.540\RiverSystem.ApplicationLayer.Interfaces.dll</HintPath>
+    </Reference>
     <Reference Include="RiverSystem.Controls">
       <HintPath>C:\Program Files\eWater\Source 3.4.3.540\RiverSystem.Controls.dll</HintPath>
     </Reference>
+    <Reference Include="RiverSystem.Forms">
+      <HintPath>..\..\..\Program Files\eWater\Source 3.4.3.540\RiverSystem.Forms.exe</HintPath>
+    </Reference>
+    <Reference Include="RiverSystem.Simulation, Version=3.4.3.540, Culture=neutral, processorArchitecture=MSIL" />
     <Reference Include="ScenarioManagement">
       <HintPath>C:\Program Files\eWater\Source 3.4.3.540\ScenarioManagement.dll</HintPath>
     </Reference>
@@ -69,6 +80,8 @@
     <Reference Include="TIME">
       <HintPath>C:\Program Files\eWater\Source 3.4.3.540\TIME.dll</HintPath>
     </Reference>
+    <Reference Include="TIME.Tools, Version=3.4.3.540, Culture=neutral, processorArchitecture=MSIL" />
+    <Reference Include="TIME.Winforms, Version=3.4.3.540, Culture=neutral, processorArchitecture=MSIL" />
     <Reference Include="WindowsBase" />
     <Reference Include="PresentationCore" />
     <Reference Include="PresentationFramework" />
@@ -85,6 +98,7 @@
     <Compile Include="GeoJSONNetwork.cs" />
     <Compile Include="ISourceService.cs" />
     <Compile Include="ProcessRequests\ParseDataRequests.cs" />
+    <Compile Include="ScenarioInvoker.cs" />
     <Compile Include="SourceHTTPServer.cs" />
     <Compile Include="SourceRESTfulService.cs" />
     <Compile Include="SourceService.cs" />

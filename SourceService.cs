@@ -4,13 +4,18 @@ using System.Drawing.Imaging;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Reflection;
+using System.Runtime.Serialization;
 using System.ServiceModel;
 using System.ServiceModel.Channels;
 using System.ServiceModel.Web;
 using System.Text;
+using System.Windows.Forms;
 using System.Xml;
+using FlowMatters.Source.Veneer;
 using FlowMatters.Source.WebServer.ExchangeObjects;
+using Ionic.Zip;
 using RiverSystem;
 using TIME.DataTypes;
 using TIME.Management;
@@ -36,6 +41,30 @@ namespace FlowMatters.Source.WebServer
             WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Origin", "*");
             Log("Requested /");
             return "Root node of service";
+        }
+
+        [OperationContract]
+        [WebInvoke(Method = "GET", UriTemplate = "/{fn}.zip")]
+        public Stream GetAllDataZipped(string fn)
+        {
+            ZipFile zf = new ZipFile();
+            
+//            WebOperationContext.Current.OutgoingResponse.ContentType = 
+            throw new NotImplementedException();
+        }
+
+        [OperationContract]
+        [WebInvoke(Method = "GET", UriTemplate = UriTemplates.FilesD)]
+        public Stream GetFileD(string dir, string fn)
+        {
+            return GetFile(dir + "/" + fn);
+        }
+
+        [OperationContract]
+        [WebInvoke(Method = "GET", UriTemplate = UriTemplates.FilesDD)]
+        public Stream GetFileDD(string dir1, string dir2, string fn)
+        {
+            return GetFile(dir1 + "/" + dir2 + "/" + fn);
         }
 
         [OperationContract]
@@ -138,6 +167,21 @@ namespace FlowMatters.Source.WebServer
         }
 
         [OperationContract]
+        [WebInvoke(Method = "POST", UriTemplate = UriTemplates.Runs)]
+        public void TriggerRun()
+        {
+            ScenarioInvoker si = new ScenarioInvoker{Scenario=Scenario};
+            si.RunScenario();
+            Run r = RunForId("latest");
+
+            WebOperationContext.Current.OutgoingResponse.StatusCode = HttpStatusCode.Redirect;
+            WebOperationContext.Current.OutgoingResponse.Headers.Add("Location",
+                                                                     WebOperationContext.Current.IncomingRequest.Headers
+                                                                         ["Location"] +
+                                                                     String.Format("/runs/{0}", r.RunNumber));
+        }
+
+        [OperationContract]
         [WebInvoke(Method = "GET", ResponseFormat = WebMessageFormat.Json, UriTemplate = UriTemplates.RunResults)]
         public RunSummary GetRunResults(string runId)
         {
@@ -189,6 +233,44 @@ namespace FlowMatters.Source.WebServer
 
             result = AggregateTimeSeries(result, aggregation);
             return SimpleTimeSeries(result);
+        }
+
+        [OperationContract]
+        [WebInvoke(Method="PUT",UriTemplate = "/Functions/{functionName}",RequestFormat = WebMessageFormat.Json)]
+        public void SetFunction(string functionName, FunctionValue value)
+        {
+            functionName = "$" + functionName;
+            var function = Scenario.Network.FunctionManager.Functions.FirstOrDefault(f => f.Name == functionName);
+            if (function != null)
+            {
+                Log(String.Format("Setting ${0}={1}", functionName, value.Expression));
+                function.Expression = value.Expression;
+            }
+            else
+            {
+                Log(String.Format("Function not found {0}", functionName));
+                Log("Available Functions:");
+                foreach (var fn in Scenario.Network.FunctionManager.Functions)
+                {
+                    Log(String.Format("Name={0} / FullName = {1}", fn.Name, fn.FullName));
+                }
+            }
+        }
+
+        [OperationContract]
+        [WebInvoke(Method = "GET", UriTemplate = "/functions", ResponseFormat = WebMessageFormat.Json)]
+        public FunctionValue[] GetFunctionList()
+        {
+            FunctionValue[] result = new FunctionValue[Scenario.Network.FunctionManager.Functions.Count];
+            for (var i = 0; i < result.Count(); i++)
+            {
+                var fn = Scenario.Network.FunctionManager.Functions[i];
+                FunctionValue fv = new FunctionValue();
+                fv.Name = fn.Name;
+                fv.Expression = fn.Expression;
+                result[i] = fv;
+            }
+            return result;
         }
 
         private TimeSeries AggregateTimeSeries(TimeSeries result, string aggregation)
@@ -253,5 +335,12 @@ namespace FlowMatters.Source.WebServer
             if (LogGenerator != null)
                 LogGenerator(this, query);
         }
+    }
+
+    [DataContract]
+    public class FunctionValue
+    {
+        [DataMember] public string Name;
+        [DataMember] public string Expression;
     }
 }
