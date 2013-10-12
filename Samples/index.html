@@ -1,0 +1,27 @@
+<html>
+<head>
+
+</head>
+
+<body>
+	<h1>Instructions for tesing out the Web server / reporting components</h1>
+	<p></p>
+	<ol>
+		<li>Unzip the Web Server plugin into your Source\Plugins folder (this version is built against 3.2.6.33 and will only work with that version</li>
+		<li>Run a Windows Command Prompt <em>as administrator</em>. (For example, in Windows 7, press the Windows key then type cmd into the search box, then right click on the cmd icon and select run as administrator</li>
+		<li>In the command prompt, run the command <code>netsh http add urlacl url=http://+:9876/ user=joel</code> (substituting in your windows user name</li>
+		<li>Start source and load the <code>flowmatters.source.webserverpanel.dll</code> plugin (before loading any project).</li>
+		<li>Load a <em>catchments</em> project.</li>
+		<li>Load the Web Server from <code>Tools|Plugins|FlowMatters.Source.WebServerPanel|Web Server Monitoring</code>. You should see a window appear with the message <code>Started Source RESTful Service</code></li>
+		<li>Start Firefox (or possibly IE10, but <em>NOT Chrome!</em>) and load this file
+	</ol>
+
+	<h1>Examples</h1>
+	<ul>
+		<li><a href="simple_ts.html">Simple time series graph (hard coded to work for an AWBM example project) (D3.js)</a></li>
+		<li><a href="menu.html">List and view scenario results (D3.js)</a></li>
+		<li><a href="google_chart_timeseries.html">Select and view time series with interactive google chart</a></li>
+		<li><a href="pie_chart.html">Simple pie chart showing contribution of sediment from each catchment (expects a constituent named TSS)</a></li>
+	</ul>
+</body>
+</html>

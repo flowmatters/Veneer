@@ -1,0 +1,96 @@
+<html>
+  <head>
+    <!--Load the AJAX API-->
+	<script src="js/d3.v2.js"></script>
+	<script src="js/source_helpers.js"></script>
+    <script type="text/javascript" src="https://www.google.com/jsapi"></script>
+    <script type="text/javascript">
+	   var resultList;
+	   var run_url,server;
+	   var aggregation = "none";
+      // Load the Visualization API and the piechart package.
+      google.load('visualization', '1.0', {'packages':['corechart','annotatedtimeline']});
+
+    function populate_run_info(data)
+	{
+		"use strict";
+
+		var counter=0;
+		d3.select("#selection")
+			.append("form")
+			.append("select")
+				.attr("class", "timeSeriesSelection")
+				.attr("id", "timeSeriesSelectionItem")
+				.attr("onchange","presentTimeSeries(this.value)")
+			.selectAll("option")
+			.data(data.Results)
+				.enter()
+				.append("option")				
+					.attr("class","timeSeriesOption")
+					.attr("id", function(d) {counter++; return "result_link_"+counter;})
+					.attr("value", function(d) { return server + d.TimeSeriesUrl; })
+					.text(function(d) { return d.TimeSeriesName; });
+	}
+
+	function presentTimeSeries(tsUrl)
+	{
+		d3.json(tsUrl + "/aggregated/" + aggregation, showTimeSeries);
+	}
+
+	function showTimeSeries(jsonData)
+	{
+		var dataArray = new Array(jsonData.Events.length)
+		for( var i = 0; i < dataArray.length; i++ )
+		{
+			dataArray[i] = new Array(2)
+			dataArray[i][0] = new Date(jsonData.Events[i].Date)
+			dataArray[i][1] = jsonData.Events[i].Value
+		}
+
+		var data = new google.visualization.DataTable();
+        data.addColumn('datetime', 'When');
+        data.addColumn('number', 'Value');
+
+        data.addRows(dataArray);
+
+        var options = {
+        	title: jsonData.Name
+        };
+
+        var chart = new google.visualization.AnnotatedTimeLine(document.getElementById('chart_div'));
+        chart.draw(data,options);
+	}
+
+	function changedAggregation(selected)
+	{
+		aggregation = selected;
+		presentTimeSeries(document.getElementById("timeSeriesSelectionItem").value);
+	}
+
+	</script>
+	</head>
+	<body>
+		<div id="selection">
+		</div>
+
+		<div id="aggregation_option">
+			<form>
+				<input type="radio" name="aggregation" value="none" onchange="changedAggregation(this.value);">None</input>
+				<input type="radio" name="aggregation" value="monthly" onchange="changedAggregation(this.value);">Monthly</input>
+				<input type="radio" name="aggregation" value="annual" onchange="changedAggregation(this.value);">Annual</input>				
+			</form>
+		</div>
+		<div id="chart_div" style="width:800px; height:500px;">
+
+		</div>
+
+	<script>
+		server = "http://localhost:9876";
+		run_url = server + "/runs/latest";
+		d3.json(run_url,populate_run_info);
+
+
+
+	</script>
+	</body>
+</html>
