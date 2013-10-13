@@ -1,0 +1,134 @@
+<!doctype html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<script src="js/d3.v2.js"></script>
+	<script src="js/source_helpers.js"></script>
+	<script>
+		var time_scale, flow_scale;
+		function draw_chart(data){ //data,error){
+		"use strict";
+
+		var container_dimensions = {width:900, height:250},
+			margins = {top:10, right:20, bottom: 30, left: 60},
+			chart_dimensions = {
+				width: container_dimensions.width - margins.left - margins.right,
+				height: container_dimensions.height - margins.top - margins.bottom
+			};
+			
+		var chart = d3.select("#timeseries")
+			.append("svg")
+				.attr("width", container_dimensions.width)
+				.attr("height", container_dimensions.height)
+			.append("g")
+				.attr("transform","translate( " + margins.left + "," + margins.top + ")")
+				.attr("id","chart");
+				
+		flow_scale = d3.scale.linear()
+			.range([chart_dimensions.height,0])
+			.domain([0,data.Max]);
+			
+		time_scale = d3.time.scale()
+			.range([0,chart_dimensions.width])
+			.domain([Date.parse(data.StartDate), Date.parse(data.EndDate)]);
+			
+		var time_axis = d3.svg.axis()
+			.scale(time_scale);
+			
+		var pc_axis = d3.svg.axis()
+			.scale(flow_scale)
+			.orient("left");
+			
+		chart.append("g")
+			.attr("class", "x axis")
+			.attr("transform", "translate(0," + chart_dimensions.height + ")")
+			.call(time_axis);
+			
+		chart.append("g")
+			.attr("class", "y axis")
+			.call(pc_axis);
+			
+		d3.select(".y.axis")
+			.append("text")
+				.attr("text-anchor","middle")
+				.text("flow")
+				.attr("transform", "rotate(-270,0,0)")
+				.attr("x",container_dimensions.height/2)
+				.attr("y",50);
+
+		draw_timeseries(data,data.Name);
+	}
+	
+	function get_time_on_scale(jsonObject)
+	{
+		newDate = new Date(jsonObject.Date);
+		return time_scale(newDate);
+	}
+	
+	function draw_timeseries(data, id){
+		var line = d3.svg.line()
+			.x(function(d){return get_time_on_scale(d)})
+			.y(function(d){return flow_scale(d.Value)})
+			.interpolate("linear");
+			
+		var g = d3.select("#chart")
+			.append("g")
+				.attr("id", id + "_path")
+				.attr("class", "timeseries Line_" + id.split("_")[1]);
+				
+		g.append("path")
+			.attr("d", line(data.Events));
+	}
+
+	</script>
+	<style>
+		.axis path, line{
+			stroke:black;
+		}
+		.line {
+			float:left;
+		}
+		.line_container{
+			width:150px;
+			height:20px;
+		}
+		path{
+			stroke:blue;
+			fill:none;
+		}
+		#timeseries{
+			float:left;
+		}
+		.timeseries path{
+			stroke-width:3px;
+		}
+		.timeseries circle{
+			stroke:white;
+		}
+		.timeseries text{
+			fill:white;
+		}
+		#TS1_path path{
+			stroke:blue;
+		}
+		#TS2_path path{
+			stroke:red;
+		}
+		#TS3_path path{
+			stroke:gray;
+		}
+	</style>
+</head>
+<body>
+	<div id="timeseries">
+	</div>
+	
+	<script>
+		args = urlArgs();
+		server = "";//http://localhost:9876";
+		url = server + args.url;
+		aggregate = ""; "/aggregated/Monthly"
+		d3.json(url + aggregate, draw_chart);
+	</script>
+</body>
+</html>

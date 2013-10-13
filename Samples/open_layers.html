@@ -1,0 +1,157 @@
+<!doctype html>
+<html>
+<head>
+ 	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+ 	<link rel="stylesheet" href="http://openlayers.org/dev/theme/default/style.css" type="text/css">
+  	<link rel="stylesheet" href="http://openlayers.org/dev/examples/style.css" type="text/css">
+    <script type="text/javascript" src="http://svn.osgeo.org/metacrs/proj4js/trunk/lib/proj4js-compressed.js"></script>
+    <script type="text/javascript" src="http://spatialreference.org/ref/epsg/32755/proj4js/"></script>
+    <script src="js/OpenLayers.debug.js"></script>
+	<script src="http://code.jquery.com/jquery-1.10.1.min.js"></script>
+	<script src="js/source_helpers.js"></script>
+	<script>
+	function build_layer(data,label) {
+		//spherical_merc = new OpenLayers.Projection("EPSG:900913");
+    	var geojson_format = new OpenLayers.Format.GeoJSON({
+			internalProjection:spherical_merc,
+        	externalProjection:utm,
+    	});
+    	var vector_layer = new OpenLayers.Layer.Vector(label);
+    	var geojsonified = geojson_format.read(data);
+//    	console.log(geojsonified);
+    	bounds = new OpenLayers.Bounds();
+    	for(i in geojsonified) {
+    		var b = geojsonified[i].geometry.getBounds();
+    		bounds.extend(b);
+    	}
+//    	console.log(bounds);
+    	vector_layer.addFeatures(geojsonified);
+//    	vector_layer.units = 'm';
+    	return vector_layer;
+	}
+
+	function open_chart(link) {
+		url = link.href;
+		window.open(url,'_tswindow','height=400,width=800,top=20,left=100,scrollbars=0,toolbar=0,status=0,menubar=0,location=0');
+	}
+
+	function onPopupClose(evt) {
+		drawControls.select.unselect(selectedFeature);
+	}
+
+	function onFeatureSelect(feature) {
+		selectedFeature = feature;
+		div_id = "popup_for_" + feature.id;
+
+		popup = new OpenLayers.Popup.FramedCloud("chicken", 
+			feature.geometry.getBounds().getCenterLonLat(),
+			null,
+			"<div id='"+div_id+"' style='font-size:.8em'>Feature: " + feature.id +"<br>Area: " + 
+			feature.data.name+"</div>",
+			null, true, onPopupClose);
+		feature.popup = popup;
+		map.addPopup(popup);
+		jQuery.getJSON("/runs/latest",function(data) {
+			if(feature.popup==null) {
+				console.log("Has been closed before we had a chance to populate the data!");
+				return;
+			}
+			filtered_results = find_results_for(data,feature.data.name);
+			$("#"+div_id).append("<ul></ul>");
+			for( i in filtered_results) {
+				rec = filtered_results[i];
+				$("#"+div_id+" ul").append("<li><a target='_tswindow' href='time_series_chart_from_query.html?url=" + rec.TimeSeriesUrl +"' onclick='open_chart(this)'>" +rec.RecordingElement + " " + rec.RecordingVariable+"</a></li>");
+			}
+		})
+	}
+	function onFeatureUnselect(feature) {
+		map.removePopup(feature.popup);
+		feature.popup.destroy();
+		feature.popup = null;
+	}
+
+	jQuery(function() { jQuery.getJSON("/network", function(data) {	
+		utm = new OpenLayers.Projection("EPSG:32755");
+		spherical_merc = new OpenLayers.Projection("EPSG:900913");
+//		wgs84 = new OpenLayers.Projection("EPSG:4326");
+		map = new OpenLayers.Map("map");
+		var osm = new OpenLayers.Layer.OSM();
+		map.addLayer(osm);
+		map.displayProjection = spherical_merc;
+
+		layers = [];
+		layers.push(build_layer(catchments_from_network(data),"Subcatchments"));
+    	var nodes_layer = build_layer(nodes_from_network(data),"Nodes");
+
+    	var context = {
+    		getSize : function(feature) {
+    			return Math.min(7500 / feature.layer.map.getResolution(),35);
+    		}
+    	};
+
+    	var template = {
+    		externalGraphic: "${icon}",
+    		graphicWidth: "${getSize}",
+    		graphicHeight: "${getSize}"
+    	};
+
+    	var style = new OpenLayers.Style(template,{context:context});
+    	nodes_layer.styleMap = new OpenLayers.StyleMap(style);
+    	layers.push(nodes_layer);
+    	layers.push(build_layer(links_from_network(data),"Links"));
+
+    	for(i in layers)
+	    	map.addLayer(layers[i]);
+
+    	map.setBaseLayer(osm);
+    	map.addControl(new OpenLayers.Control.LayerSwitcher());
+    	map.zoomToExtent(bounds);
+
+
+    	drawControls = {
+    		select: new OpenLayers.Control.SelectFeature(
+    			layers,
+    			{
+    				clickout: false, toggle: false,
+    				multiple: false, hover: false,
+                        toggleKey: "ctrlKey", // ctrl key removes from selection
+                        multipleKey: "shiftKey", // shift key adds to selection
+                        box: false,
+                    onSelect: onFeatureSelect, onUnselect: onFeatureUnselect
+                } ) };
+
+    	for(var key in drawControls)
+        	map.addControl(drawControls[key]);
+        
+	}); });
+
+
+	function toggleControl(element) {
+    	for(key in drawControls) {
+        	var control = drawControls[key];
+            if(element.value == key && element.checked) {
+            	control.activate();
+            } else {
+            	control.deactivate();
+            }
+        }
+    }
+
+</script>
+ </head>
+<body>
+<div id="map" class="smallmap" style="width:100%; height:500px"></div>
+    <ul id="controlToggle">
+        <li>
+            <input type="radio" name="type" value="none" id="noneToggle"
+                   onclick="toggleControl(this);" checked="checked" />
+            <label for="noneToggle">navigate</label>
+        </li>
+        <li>
+            <input type="radio" name="type" value="select" id="selectToggle"
+                   onclick="toggleControl(this);" />
+            <label for="selectToggle">select feature</label>
+        </li>
+    </ul></body>
+</html>
