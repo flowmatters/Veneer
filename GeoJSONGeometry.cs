@@ -40,6 +40,7 @@ namespace FlowMatters.Source.WebServer
             var cTemp = new double[2][];
             cTemp[0] = GeoJSONPoint(link.from.location);
             cTemp[1] = GeoJSONPoint(link.to.location);
+            coordinates = new[] {cTemp[0], cTemp[1]};
         }
 
         public GeoJSONGeometry(Polygon polygon)

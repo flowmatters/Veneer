@@ -75,7 +75,7 @@ namespace FlowMatters.Source.WebServer
 
         public GeoJSONFeature(Node n)
         {           
-            id = UriTemplates.Node.Replace("{nodeId}", n.id.ToString());
+            id = NodeURL(n);
 
             properties.Add("name",n.Name);
             properties.Add(FeatureTypeProperty,"node");
@@ -86,12 +86,18 @@ namespace FlowMatters.Source.WebServer
             geometry = new GeoJSONGeometry(n.location);
         }
 
+        private static string NodeURL(INode n)
+        {
+            return UriTemplates.Node.Replace("{nodeId}", n.id.ToString());
+        }
+
         public GeoJSONFeature(Link l)
         {
             id = UriTemplates.Link.Replace("{linkId}", l.Network.links.indexOf(l).ToString());
             properties.Add("name",l.Name);
             properties.Add(FeatureTypeProperty,"link");
-
+            properties.Add("from_node", NodeURL(l.UpstreamNode));
+            properties.Add("to_node", NodeURL(l.DownstreamNode));
             geometry = new GeoJSONGeometry(l);
         }
 
