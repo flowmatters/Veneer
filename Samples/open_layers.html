@@ -33,7 +33,7 @@
 
 	function open_chart(link) {
 		url = link.href;
-		window.open(url,'_tswindow','height=400,width=800,top=20,left=100,scrollbars=0,toolbar=0,status=0,menubar=0,location=0');
+		window.open(url,'_tswindow','height=400,width=800,top=20,left=20,scrollbars=0,toolbar=0,status=0,menubar=0,location=0');
 	}
 
 	function onPopupClose(evt) {
@@ -50,6 +50,7 @@
 			"<div id='"+div_id+"' style='font-size:.8em'>Feature: " + feature.id +"<br>Area: " + 
 			feature.data.name+"</div>",
 			null, true, onPopupClose);
+		popup.autoSize = true;
 		feature.popup = popup;
 		map.addPopup(popup);
 		jQuery.getJSON("/runs/latest",function(data) {
@@ -63,6 +64,8 @@
 				rec = filtered_results[i];
 				$("#"+div_id+" ul").append("<li><a target='_tswindow' href='time_series_chart_from_query.html?url=" + rec.TimeSeriesUrl +"' onclick='open_chart(this)'>" +rec.RecordingElement + " " + rec.RecordingVariable+"</a></li>");
 			}
+
+			feature.popup.updateSize();
 		})
 	}
 	function onFeatureUnselect(feature) {
