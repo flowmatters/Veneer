@@ -17,6 +17,7 @@ using FlowMatters.Source.Veneer;
 using FlowMatters.Source.WebServer.ExchangeObjects;
 using Ionic.Zip;
 using RiverSystem;
+using RiverSystem.Controls.Icons;
 using TIME.DataTypes;
 using TIME.Management;
 using TIME.ScenarioManagement;
@@ -90,7 +91,8 @@ namespace FlowMatters.Source.WebServer
             Log(string.Format("Requested resource {0}", resourceName));
             MemoryStream ms = new MemoryStream();
             Assembly rsFormsAssembly = Assembly.GetEntryAssembly();
-            Bitmap resource = FindByName(resourceName + "240");
+
+            Bitmap resource = FindByName(resourceName);
 
             resource.Save(ms, ImageFormat.Png);
             ms.Position = 0;
@@ -100,13 +102,21 @@ namespace FlowMatters.Source.WebServer
 
         private Bitmap FindByName(string s)
         {
-            Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
-            Assembly assembly = assemblies.Where(a => a.FullName.Contains("RiverSystem.Controls")).FirstOrDefault();
-            Type resourcesType = assembly.GetType("RiverSystem.Controls.Properties.Resources");
-            PropertyInfo resourceProperty = resourcesType.GetProperty(s, BindingFlags.Public | BindingFlags.Static);
-            Bitmap result = (Bitmap) resourceProperty.GetValue(null, new object[0]);
+            Type modelType = Finder.typesInherting(typeof (NodeModel)).Where(t => t.Name == s).FirstOrDefault();
 
-            return result;
+            if (modelType == null)
+            {
+                s += "240";
+                Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
+                Assembly assembly = assemblies.First(a => a.FullName.Contains("RiverSystem.Controls"));
+                Type resourcesType = assembly.GetType("RiverSystem.Controls.Properties.Resources");
+                PropertyInfo resourceProperty = resourcesType.GetProperty(s, BindingFlags.Public | BindingFlags.Static);
+                Bitmap result = (Bitmap) resourceProperty.GetValue(null, new object[0]);
+
+                return result;
+            }
+
+            return (Bitmap) IconLookup.GetIcon(modelType);
         }
 
         [OperationContract]
@@ -118,6 +128,19 @@ namespace FlowMatters.Source.WebServer
             return new GeoJSONNetwork(Scenario.Network);
         }
 
+        [OperationContract]
+        [WebInvoke(Method = "GET", ResponseFormat = WebMessageFormat.Json, UriTemplate = UriTemplates.Node)]
+        public GeoJSONFeature GetNode(string nodeId)
+        {
+            return null;                
+        }
+
+        [OperationContract]
+        [WebInvoke(Method = "GET", ResponseFormat = WebMessageFormat.Json, UriTemplate = UriTemplates.Link)]
+        public GeoJSONFeature GetLink(string linkId)
+        {
+            return null;
+        }
         private static string ContentTypeForFilename(string fn)
         {
             string contentType = "";
@@ -304,7 +327,7 @@ namespace FlowMatters.Source.WebServer
 
             if (row == null) return null;
 
-            return row.ElementRecorder.GetResultList().FirstOrDefault(er => er.Key.KeyString == variable).Value;            
+            return row.ElementRecorder.GetResultList().FirstOrDefault(er => URLSafeString(er.Key.KeyString) == URLSafeString(variable)).Value;            
         }
 
         private SimpleTimeSeries TimeSeriesNotFound()

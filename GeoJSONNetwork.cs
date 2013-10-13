@@ -5,6 +5,7 @@ using System.Linq;
 using System.Runtime.Serialization;
 using RiverSystem;
 using RiverSystem.Catchments;
+using RiverSystem.Controls.Icons;
 using TIME.DataTypes.Polygons;
 using Network = RiverSystem.Network;
 
@@ -19,6 +20,12 @@ namespace FlowMatters.Source.WebServer
 
             List<GeoJSONFeature> featureList = new List<GeoJSONFeature>();
             featureList.AddRange(from Node n in source.nodes select new GeoJSONFeature(n));
+            foreach (Link link in source.links)
+            {
+                if (link.Network == null)
+                    link.Network = source;
+            }
+
             featureList.AddRange(from Link l in source.links select new GeoJSONFeature(l));
             featureList.AddRange(catchments.Select(c => new GeoJSONFeature((Catchment)c,source.Scenario.BoundaryForCatchment(c))));
             features = featureList.ToArray();
@@ -41,6 +48,7 @@ namespace FlowMatters.Source.WebServer
     public class GeoJSONFeature
     {
         private const string FeatureTypeProperty = "feature_type";
+        private const string ResourceProperty = "icon";
 
         [DataMember]
         public string type
@@ -71,6 +79,9 @@ namespace FlowMatters.Source.WebServer
 
             properties.Add("name",n.Name);
             properties.Add(FeatureTypeProperty,"node");
+
+            properties.Add(ResourceProperty,
+                           UriTemplates.Resources.Replace("{resourceName}", n.NodeModels[0].GetType().Name));
 
             geometry = new GeoJSONGeometry(n.location);
         }
