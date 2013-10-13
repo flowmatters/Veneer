@@ -30,3 +30,5 @@ _ReSharper*/
 *.class
 
 *.MF
+
+*.pyc
