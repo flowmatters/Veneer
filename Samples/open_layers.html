@@ -4,13 +4,24 @@
  	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
  	<link rel="stylesheet" href="http://openlayers.org/dev/theme/default/style.css" type="text/css">
-  	<link rel="stylesheet" href="http://openlayers.org/dev/examples/style.css" type="text/css">
+
+<!--  	<link rel="stylesheet" href="http://openlayers.org/dev/examples/style.css" type="text/css">
+-->
+  	<link rel="stylesheet" href="css/bootstrap.css" type="text/css">
+  	<link rel="stylesheet" href="css/stylesheet.css" type="text/css">
+
     <script type="text/javascript" src="http://svn.osgeo.org/metacrs/proj4js/trunk/lib/proj4js-compressed.js"></script>
+	<script src="js/d3.v2.js"></script>
     <script type="text/javascript" src="http://spatialreference.org/ref/epsg/32755/proj4js/"></script>
     <script src="js/OpenLayers.debug.js"></script>
 	<script src="http://code.jquery.com/jquery-1.10.1.min.js"></script>
 	<script src="js/source_helpers.js"></script>
+	<script src="js/landuse_pie.js"></script>
+    <script src="js/v.js"></script>
 	<script>
+    // Uncomment the next line when running with canned data (ie without
+    // a live Source model and Veneer servert)
+    //v.configure_static();
 	function build_layer(data,label) {
 		//spherical_merc = new OpenLayers.Projection("EPSG:900913");
     	var geojson_format = new OpenLayers.Format.GeoJSON({
@@ -33,16 +44,17 @@
 
 	function open_chart(link) {
 		url = link.href;
-		window.open(url,'_tswindow','height=400,width=800,top=20,left=20,scrollbars=0,toolbar=0,status=0,menubar=0,location=0');
+		window.open(url,'_tswindow','height=200,width=400,top=150,left=350,scrollbars=0,toolbar=0,status=0,menubar=0,location=0');
 	}
 
 	function onPopupClose(evt) {
-		drawControls.select.unselect(selectedFeature);
+		drawControls.select_results.unselect(selectedFeature);
+		drawControls.select_lu.unselect(selectedFeature);
 	}
 
-	function onFeatureSelect(feature) {
+	function basicFeaturePopup(feature) {
 		selectedFeature = feature;
-		div_id = "popup_for_" + feature.id;
+		var div_id = "popup_for_" + feature.id;
 
 		popup = new OpenLayers.Popup.FramedCloud("chicken", 
 			feature.geometry.getBounds().getCenterLonLat(),
@@ -53,7 +65,12 @@
 		popup.autoSize = true;
 		feature.popup = popup;
 		map.addPopup(popup);
-		jQuery.getJSON("/runs/latest",function(data) {
+		return div_id;	
+	}
+
+	function onFeatureSelect(feature) {
+		div_id = basicFeaturePopup(feature);
+		jQuery.getJSON(v.url("/runs/1"),function(data) {
 			if(feature.popup==null) {
 				console.log("Has been closed before we had a chance to populate the data!");
 				return;
@@ -62,19 +79,30 @@
 			$("#"+div_id).append("<ul></ul>");
 			for( i in filtered_results) {
 				rec = filtered_results[i];
-				$("#"+div_id+" ul").append("<li><a target='_tswindow' href='time_series_chart_from_query.html?url=" + rec.TimeSeriesUrl +"' onclick='open_chart(this)'>" +rec.RecordingElement + " " + rec.RecordingVariable+"</a></li>");
+				$("#"+div_id+" ul").append("<li><a target='_tswindow' href='time_series_chart_from_query.html?url=" + v.url(rec.TimeSeriesUrl) +"' onclick='open_chart(this)'>" +rec.RecordingElement + " " + rec.RecordingVariable+"</a></li>");
 			}
 
 			feature.popup.updateSize();
 		})
 	}
+
+	function onFeatureSelect_LU(feature) {
+		div_id = basicFeaturePopup(feature);
+		landuse_pie(find_areas_for(feature),"#"+div_id);
+		feature.popup.updateSize();
+	}
+
+
 	function onFeatureUnselect(feature) {
 		map.removePopup(feature.popup);
 		feature.popup.destroy();
 		feature.popup = null;
 	}
 
-	jQuery(function() { jQuery.getJSON("/network", function(data) {	
+	jQuery(function() { jQuery.getJSON(v.url("/network"), function(data) {
+			jQuery.getJSON(v.url("/functions"), function(fn_data) {
+
+		source_functions = fn_data;
 		utm = new OpenLayers.Projection("EPSG:32755");
 		spherical_merc = new OpenLayers.Projection("EPSG:900913");
 //		wgs84 = new OpenLayers.Projection("EPSG:4326");
@@ -90,11 +118,14 @@
     	var context = {
     		getSize : function(feature) {
     			return Math.min(7500 / feature.layer.map.getResolution(),35);
-    		}
+    		},
+            imgUrl : function(feature) {
+                return v.img_url(feature.data.icon);
+            }
     	};
 
     	var template = {
-    		externalGraphic: "${icon}",
+    		externalGraphic: "${imgUrl}",
     		graphicWidth: "${getSize}",
     		graphicHeight: "${getSize}"
     	};
@@ -113,7 +144,7 @@
 
 
     	drawControls = {
-    		select: new OpenLayers.Control.SelectFeature(
+    		select_results: new OpenLayers.Control.SelectFeature(
     			layers,
     			{
     				clickout: false, toggle: false,
@@ -122,12 +153,22 @@
                         multipleKey: "shiftKey", // shift key adds to selection
                         box: false,
                     onSelect: onFeatureSelect, onUnselect: onFeatureUnselect
-                } ) };
+                } ),
+            select_lu: new OpenLayers.Control.SelectFeature(
+            	layers[0],
+            	{
+    				clickout: false, toggle: true,
+    				multiple: false, hover: false,
+                        toggleKey: "ctrlKey", // ctrl key removes from selection
+                        multipleKey: "shiftKey", // shift key adds to selection
+                        box: false,
+                    onSelect: onFeatureSelect_LU, onUnselect: onFeatureUnselect
+            	}  	) };
 
     	for(var key in drawControls)
         	map.addControl(drawControls[key]);
         
-	}); });
+	}); }); });
 
 
 	function toggleControl(element) {
@@ -144,17 +185,29 @@
 </script>
  </head>
 <body>
-<div id="map" class="smallmap" style="width:100%; height:500px"></div>
-    <ul id="controlToggle">
-        <li>
-            <input type="radio" name="type" value="none" id="noneToggle"
+<h1>Veneer Example with OpenLayers and D3.JS</h1>
+<div id="map" class="smallmap" style="width:100%; height:450px"></div>
+<!--    <ul id="controlToggle">-->
+<div class="radio">
+            <label for="noneToggle"><input type="radio" name="type" value="none" id="noneToggle"
                    onclick="toggleControl(this);" checked="checked" />
-            <label for="noneToggle">navigate</label>
-        </li>
-        <li>
-            <input type="radio" name="type" value="select" id="selectToggle"
+            navigate</label>
+            <label for="selectResultsToggle"><input type="radio" name="type" value="select_results" id="selectResultsToggle"
                    onclick="toggleControl(this);" />
-            <label for="selectToggle">select feature</label>
-        </li>
-    </ul></body>
+            select feature and view results</label>
+            <label for="selectLUToggle"><input type="radio" name="type" value="select_lu" id="selectLUToggle"
+                   onclick="toggleControl(this);" />
+            select catchment and view land use</label>
+</div>
+        <h2>Veneer</h2>
+        <p>This is a simple demonstration of Veneer: A system for building new front ends on top of eWater Source.</p>
+        <p>This example uses the 'canned' mode of Veneer: All model results have been saved and Source is not running live. Veneer can also work with a live instance of Source and can be used to modify parameters and rerun simulations.</p>
+    <p>See also:</p>
+    <ul>
+    <li><a href="google_chart_timeseries.html">Time Series Visualisation using Google Charts</a></li>
+    <li><a href="pie_chart.html">Pie chart summary of sediment results using Google Charts</a></li>
+    </ul>
+    <hr>
+        <p>For more information on Veneer, contact <a href="http://www.flowmatters.com.au">Flow Matters</a>.</p>
+</body>
 </html>

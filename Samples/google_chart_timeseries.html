@@ -1,14 +1,22 @@
 <html>
   <head>
     <!--Load the AJAX API-->
+ 	<meta charset="utf-8">
+  	<link rel="stylesheet" href="css/bootstrap.css" type="text/css">
+  	<link rel="stylesheet" href="css/stylesheet.css" type="text/css">
 	<script src="js/d3.v2.js"></script>
 	<script src="js/source_helpers.js"></script>
     <script type="text/javascript" src="https://www.google.com/jsapi"></script>
+    <script src="js/v.js"></script>
     <script type="text/javascript">
 	   var resultList;
-	   var run_url,server;
+	   var run_url;
 	   var aggregation = "none";
       // Load the Visualization API and the piechart package.
+     
+      // Uncomment the next line when running with canned data (ie without
+      // a live Source model and Veneer servert)
+      //v.configure_static();
       google.load('visualization', '1.0', {'packages':['corechart','annotatedtimeline']});
 
     function populate_run_info(data)
@@ -28,13 +36,19 @@
 				.append("option")				
 					.attr("class","timeSeriesOption")
 					.attr("id", function(d) {counter++; return "result_link_"+counter;})
-					.attr("value", function(d) { return server + d.TimeSeriesUrl; })
+					.attr("value", function(d) { return d.TimeSeriesUrl; })
 					.text(function(d) { return d.TimeSeriesName; });
 	}
 
 	function presentTimeSeries(tsUrl)
 	{
-		d3.json(tsUrl + "/aggregated/" + aggregation, showTimeSeries);
+		var url = "";
+		if(aggregation=="none")
+			url = v.url(tsUrl);
+		else
+			url = v.url(tsUrl+"/aggregated/" + aggregation);
+
+		d3.json(url, showTimeSeries);
 	}
 
 	function showTimeSeries(jsonData)
@@ -70,9 +84,11 @@
 	</script>
 	</head>
 	<body>
+		<h1>Time Series Results Viewer using Google Charts</h1>
 		<div id="selection">
 		</div>
 
+		<h2>Select Data Aggregation (Performed Server Side)</h2>
 		<div id="aggregation_option">
 			<form>
 				<input type="radio" name="aggregation" value="none" onchange="changedAggregation(this.value);">None</input>
@@ -80,13 +96,22 @@
 				<input type="radio" name="aggregation" value="annual" onchange="changedAggregation(this.value);">Annual</input>				
 			</form>
 		</div>
-		<div id="chart_div" style="width:800px; height:500px;">
+		<div id="chart_div" style="width:800px; height:400px;">
 
 		</div>
 
+		<h2>Veneer</h2>
+		<p>This is a simple demonstration of Veneer: A system for building new front ends on top of eWater Source.</p>
+        <p>This example uses the 'canned' mode of Veneer: All model results have been saved and Source is not running live. Veneer can also work with a live instance of Source and can be used to modify parameters and rerun simulations.</p>
+    <p>See also:</p>
+    <ul>
+    <li><a href="open_layers.html">Spatial visualisation using Open Layers, Time Series results and Land Use Characteristics using d3.js</a></li>
+    <li><a href="pie_chart.html">Pie chart summary of sediment results using Google Charts</a></li>
+    </ul>
+    <hr>
+		<p>For more information on Veneer, contact <a href="http://www.flowmatters.com.au">Flow Matters</a>.</p>
 	<script>
-		server = "http://localhost:9876";
-		run_url = server + "/runs/latest";
+		run_url = v.url("/runs/1");
 		d3.json(run_url,populate_run_info);
 
 

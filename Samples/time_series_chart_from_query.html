@@ -6,18 +6,29 @@
 	<script src="js/source_helpers.js"></script>
 	<script>
 		var time_scale, flow_scale;
+
+		var chart_data;
+
+		function resize() {
+			d3.select("#timeseries")
+				.selectAll("svg")
+				.remove();
+			draw_chart(chart_data);
+		}
+
 		function draw_chart(data){ //data,error){
 		"use strict";
 
-		var container_dimensions = {width:900, height:250},
-			margins = {top:10, right:20, bottom: 30, left: 60},
+		chart_data = data;	
+		var ts = d3.select("#timeseries");
+		var container_dimensions = {width:parseInt(ts.style('width')), height:document.documentElement.clientHeight};
+
+		var	margins = {top:10, right:20, bottom: 30, left: 60},
 			chart_dimensions = {
 				width: container_dimensions.width - margins.left - margins.right,
 				height: container_dimensions.height - margins.top - margins.bottom
 			};
-			
-		var chart = d3.select("#timeseries")
-			.append("svg")
+		var chart = ts.append("svg")
 				.attr("width", container_dimensions.width)
 				.attr("height", container_dimensions.height)
 			.append("g")
@@ -57,6 +68,13 @@
 				.attr("y",50);
 
 		draw_timeseries(data,data.Name);
+
+		if(parseInt(ts.style('width'))<600)
+			ts.selectAll('.axis')
+				.style('font-size','6pt');
+		else
+			ts.selectAll('.axis')
+				.style('font-size','8pt');
 	}
 	
 	function get_time_on_scale(jsonObject)
@@ -85,6 +103,9 @@
 		.axis path, line{
 			stroke:black;
 		}
+		.axis {
+			font-size: 8pt;
+		}
 		.line {
 			float:left;
 		}
@@ -93,11 +114,14 @@
 			height:20px;
 		}
 		path{
-			stroke:blue;
+			stroke:red;
 			fill:none;
 		}
 		#timeseries{
 			float:left;
+			display:block;
+			width:100%;
+			height:100%;
 		}
 		.timeseries path{
 			stroke-width:3px;
@@ -123,6 +147,7 @@
 		url = server + args.url;
 		aggregate = ""; "/aggregated/Monthly"
 		d3.json(url + aggregate, draw_chart);
+		d3.select(window).on('resize',resize);
 	</script>
 </body>
 </html>

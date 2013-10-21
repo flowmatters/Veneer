@@ -1,0 +1,215 @@
+body {
+	padding-top:100px;
+	max-width: 900px;
+	margin-left: auto;
+	margin-right: auto;
+}
+
+@media (max-width: 979px) {
+  body {
+    padding-top: 0px;
+  }
+}
+
+.navbar-inverse {
+	z-index: 10000;
+   overflow: visible;
+}
+
+.navbar-inverse .navbar-inner {
+	background-color:<%= @item[:fmGrey]%>;
+    background-image: none;
+    background-repeat: no-repeat;
+    filter: none;	
+}
+
+.post {
+	border-bottom-width:5px;
+	border-bottom-style:solid;
+	border-bottom-color:<%= @item[:fmGrey]%>;
+}
+
+.date-posted{
+	margin-bottom: 12px;
+	font-weight:bold;
+}
+
+p {
+	text-align: justify;
+}
+
+p.fp_aligned {
+	min-height:90px;
+}
+
+.navbar-inverse .nav > li > a {
+/*	padding:0px 15px; */
+	font-size:24px;
+	line-height:48px;
+	color:<%= @item[:link] %>;
+}
+
+.navbar-inverse .nav > li > a.active{
+ color: <%= @item[:header]%>;
+}
+
+/*body {
+  font-family: Verdana, "Bitstream Vera Sans", sans-serif;
+}
+*/
+
+/* Headings
+ * --------------------------------------------------------------------- */
+h1,h2 { color: <%= @item[:header] %>; }
+
+h3,h4,h5,h6 { color: <%= @item[:fmGrey] %>; }
+/*h1{
+	font-size:24px
+}
+
+h2{
+	font-size:18px;
+	margin-bottom:6px;
+}
+*/
+
+/* Text Elements
+ * --------------------------------------------------------------------- */
+/*a                 { color: <%= @item[:link]%>; } 
+a:visited         { color: <%= @item[:link]%>; } 
+a:hover           { color: <%= @item[:hover] %>; }
+*/
+
+/*
+body{
+	font-size:12px;
+	color:#000;
+}
+*/
+/*
+#page{
+	display:block;
+}
+*/
+/*
+#page, #banner, #menubar, #footer
+{
+	width:900px;
+	margin: 0px auto;
+}
+*/
+/*
+body{
+	background-color:#FFFFFF;
+}
+*/
+/*
+.hf_wrap, #banner, #menubar, #footer{
+	background-color:#2D3B46;	
+}
+*/
+
+/*
+#logo{
+	vertical-align:-24px;
+}
+*/
+/*
+.hf_wrap{
+	float:left;
+	width:100%;
+}
+*/
+/*
+#banner, #menubar{
+	display:block;
+	margin: 0px auto;
+}
+*/
+/*
+#body {
+	min-height:600px;
+}
+*/
+/*
+#body #mainbody{
+	width:900px;
+	float:left;
+}
+*/
+/*
+#footer{
+	clear:both;
+	height:30px;
+}
+*/
+/*
+.post{
+	border-bottom-width: 3px;
+	border-bottom-style: solid;
+	border-bottom-color: black;
+}
+*/
+/*
+.post h1{
+	margin-top: 0px;
+}
+*/
+
+.centered {
+  vertical-align: middle;
+  text-align:center;
+}
+
+@media (min-width: 768px) {
+	.blockcolumn {
+		display:table-cell;
+		float:none;
+		height:100%;
+	}
+
+	.tab {
+		display:table;
+		height:100%;
+		width:100%;
+	}	
+}
+
+.em {
+	font-style:italic;
+}
+
+section.anchored {
+	padding-top: 100px;
+	margin-top: -100px;
+}
+
+@media (min-width: 979px) {
+	.btn-resp {
+		height: 20px;
+		font-size: 18px;
+		vertical-align: middle;
+		padding-top: 11px;
+		padding-bottom: 11px;
+	}
+}
+
+/* Workaround webkit bug with navbar disappearing when jumping to anchor links */
+.affix,.navbar-fixed-top{
+-webkit-transform: scale3d(1,1,1);
+}
+
+.fifty img {
+	width: 50%;
+}
+
+.twentyfive img {
+	width: 25%;
+}
+
+.post img{
+	display:block;
+	margin-left:auto;
+	margin-right:auto;
+	text-align: center;
+}
