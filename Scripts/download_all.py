@@ -15,11 +15,11 @@ protocol = "http"
 retrieve_daily = retreive_monthly = retrieve_annual = True
 
 # Output
-destination = "C:\\temp\\veneer_download\\"
+destination = "C:\\temp\\veneer_openlayers_demo\\"
 zip_destination = "C:\\temp\\veneer_download.zip"
 
 # Misc
-print_all = True 
+print_all = False 
 print_urls = True
 
 def mkdirs(directory):
@@ -70,7 +70,8 @@ def retrieve_runs():
 			if retrieve_annual:
 				retrieve_json(ts_url + "/aggregated/annual")
 
-# retrieve_runs()
+retrieve_runs()
+retrieve_json("/functions")
 
 network = retrieve_json("/network")
 for f in network['features']:
