@@ -165,6 +165,9 @@ namespace FlowMatters.Source.WebServer
                 case ".js":
                     contentType = "application/javascript";
                     break;
+                case ".css":
+                    contentType = "text/css";
+                    break;
             }
             return contentType;
         }
