@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -61,7 +62,6 @@ namespace FlowMatters.Source.WebServerPanel
         {
             Form parent = FindParent();
             ToolStripMenuItem reportMenu = FindReportMenu(parent);
-
         }
 
         private Form FindParent()
@@ -101,6 +101,10 @@ namespace FlowMatters.Source.WebServerPanel
                     item.Click += (eventSender, eventArgs) => Launch(fn);
                 }
             }
+            ToolStripItem veneer = reportMenu.DropDownItems.Add("");
+            veneer.BackgroundImage = Veneer.Properties.Resources.Logo_RGB;
+            veneer.BackgroundImageLayout = ImageLayout.Zoom;
+            veneer.Click += (eventSender, eventArgs) => Process.Start("http://www.flowmatters.com.au");
         }
 
         private string NiceName(string reportFn)
