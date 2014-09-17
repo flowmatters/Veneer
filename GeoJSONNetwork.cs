@@ -81,7 +81,7 @@ namespace FlowMatters.Source.WebServer
             properties.Add(FeatureTypeProperty,"node");
 
             properties.Add(ResourceProperty,
-                           UriTemplates.Resources.Replace("{resourceName}", n.NodeModels[0].GetType().Name));
+                           UriTemplates.Resources.Replace("{resourceName}", n.NodeModel.GetType().Name));
 
             geometry = new GeoJSONGeometry(n.location);
         }
