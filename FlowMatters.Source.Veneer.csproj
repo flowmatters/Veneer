@@ -160,6 +160,15 @@
   <ItemGroup>
     <Folder Include="SerializeData\" />
   </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Logo_RGB.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\Icon_Only_RGB_for_LI.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\FM.ico" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

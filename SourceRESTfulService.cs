@@ -34,6 +34,7 @@ namespace FlowMatters.Source.WebServer
             _host.AddServiceEndpoint(typeof(SourceService), binding, string.Format("http://localhost:{0}/", _port));
             
             _host.Open();
+            Log("Veneer, by Flow Matters: http://www.flowmatters.com.au");
             Log(string.Format("Started Source RESTful Service on port:{0}",_port));
         }
 

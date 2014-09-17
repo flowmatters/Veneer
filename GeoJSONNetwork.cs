@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Runtime.Serialization;
+using Microsoft.CSharp.RuntimeBinder;
 using RiverSystem;
 using RiverSystem.Catchments;
 using RiverSystem.Controls.Icons;
@@ -80,10 +81,20 @@ namespace FlowMatters.Source.WebServer
             properties.Add("name",n.Name);
             properties.Add(FeatureTypeProperty,"node");
 
-            properties.Add(ResourceProperty,
-                           UriTemplates.Resources.Replace("{resourceName}", n.NodeModel.GetType().Name));
-
+            properties.Add(ResourceProperty,UriTemplates.Resources.Replace("{resourceName}", RetrieveNodeModel(n).GetType().Name));
             geometry = new GeoJSONGeometry(n.location);
+        }
+
+        private static NodeModel RetrieveNodeModel(dynamic n)
+        {
+            try
+            {
+                return n.NodeModel;
+            }
+            catch (RuntimeBinderException)
+            {
+                return n.NodeModels[0];
+            }
         }
 
         private static string NodeURL(INode n)
