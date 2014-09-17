@@ -3,10 +3,10 @@
 <head>
  	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
- 	<link rel="stylesheet" href="http://openlayers.org/dev/theme/default/style.css" type="text/css">
-
-<!--  	<link rel="stylesheet" href="http://openlayers.org/dev/examples/style.css" type="text/css">
+<!-- 	<link rel="stylesheet" href="http://openlayers.org/dev/theme/default/style.css" type="text/css">
 -->
+
+  	<link rel="stylesheet" href="http://dev.openlayers.org/theme/default/style.css" type="text/css">
   	<link rel="stylesheet" href="css/bootstrap.css" type="text/css">
   	<link rel="stylesheet" href="css/stylesheet.css" type="text/css">
 
@@ -70,16 +70,16 @@
 
 	function onFeatureSelect(feature) {
 		div_id = basicFeaturePopup(feature);
-		jQuery.getJSON(v.url("/runs/1"),function(data) {
+		jQuery.getJSON(v.data_url("/runs/1"),function(data) {
 			if(feature.popup==null) {
-				console.log("Has been closed before we had a chance to populate the data!");
+//				console.log("Has been closed before we had a chance to populate the data!");
 				return;
 			}
 			filtered_results = find_results_for(data,feature.data.name);
 			$("#"+div_id).append("<ul></ul>");
 			for( i in filtered_results) {
 				rec = filtered_results[i];
-				$("#"+div_id+" ul").append("<li><a target='_tswindow' href='time_series_chart_from_query.html?url=" + v.url(rec.TimeSeriesUrl) +"' onclick='open_chart(this)'>" +rec.RecordingElement + " " + rec.RecordingVariable+"</a></li>");
+				$("#"+div_id+" ul").append("<li><a target='_tswindow' href='time_series_chart_from_query.html?url=" + v.data_url(rec.TimeSeriesUrl) +"' onclick='open_chart(this)'>" +rec.RecordingElement + " " + rec.RecordingVariable+"</a></li>");
 			}
 
 			feature.popup.updateSize();
@@ -99,8 +99,8 @@
 		feature.popup = null;
 	}
 
-	jQuery(function() { jQuery.getJSON(v.url("/network"), function(data) {
-			jQuery.getJSON(v.url("/functions"), function(fn_data) {
+	jQuery(function() { jQuery.getJSON(v.data_url("/network"), function(data) {
+			jQuery.getJSON(v.data_url("/functions"), function(fn_data) {
 
 		source_functions = fn_data;
 		utm = new OpenLayers.Projection("EPSG:32755");
@@ -110,6 +110,7 @@
 		var osm = new OpenLayers.Layer.OSM();
 		map.addLayer(osm);
 		map.displayProjection = spherical_merc;
+        console.log(osm);
 
 		layers = [];
 		layers.push(build_layer(catchments_from_network(data),"Subcatchments"));
@@ -135,6 +136,7 @@
     	layers.push(nodes_layer);
     	layers.push(build_layer(links_from_network(data),"Links"));
 
+        console.log(layers);
     	for(i in layers)
 	    	map.addLayer(layers[i]);
 

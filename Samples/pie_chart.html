@@ -12,7 +12,7 @@
      var run_url;
      var pieValues;
       // Load the Visualization API and the piechart package.
-      v.configure_static();
+//      v.configure_static();
       google.load('visualization', '1.0', {'packages':['corechart']});
 
       function populate_run_info(data)
@@ -24,7 +24,7 @@
         for( i in catchmentTSSExports)
         {
           (function(x){
-            d3.json(v.url(catchmentTSSExports[i].TimeSeriesUrl),
+            d3.json(v.data_url(catchmentTSSExports[i].TimeSeriesUrl),
               function(data){
                 pieValues[x] = new Array(2);
                 pieValues[x][0] = data.Name;
@@ -73,7 +73,7 @@
     <p>For more information on Veneer, contact <a href="http://www.flowmatters.com.au">Flow Matters</a>.</p>
     </ul>
   <script>
-    run_url = v.url("/runs/1");
+    run_url = v.data_url("/runs/1");
     d3.json(run_url,populate_run_info);
   </script>
 </body>

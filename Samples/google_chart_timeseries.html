@@ -44,9 +44,9 @@
 	{
 		var url = "";
 		if(aggregation=="none")
-			url = v.url(tsUrl);
+			url = v.data_url(tsUrl);
 		else
-			url = v.url(tsUrl+"/aggregated/" + aggregation);
+			url = v.data_url(tsUrl+"/aggregated/" + aggregation);
 
 		d3.json(url, showTimeSeries);
 	}
@@ -111,7 +111,7 @@
     <hr>
 		<p>For more information on Veneer, contact <a href="http://www.flowmatters.com.au">Flow Matters</a>.</p>
 	<script>
-		run_url = v.url("/runs/1");
+		run_url = v.data_url("/runs/1");
 		d3.json(run_url,populate_run_info);
 
 
