@@ -38,7 +38,7 @@
   <ItemGroup>
     <Reference Include="Ionic.Zip, Version=1.9.1.5, Culture=neutral, PublicKeyToken=edbe51ad942a3f5c, processorArchitecture=MSIL" />
     <Reference Include="Newtonsoft.Json, Version=4.5.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
-      <HintPath>..\packages\Newtonsoft.Json.5.0.6\lib\net40\Newtonsoft.Json.dll</HintPath>
+      <HintPath>packages\Newtonsoft.Json.5.0.6\lib\net40\Newtonsoft.Json.dll</HintPath>
     </Reference>
     <Reference Include="nunit.framework">
       <HintPath>References\nunit.framework.dll</HintPath>
@@ -46,9 +46,13 @@
     <Reference Include="RiverSystem">
       <HintPath>References\RiverSystem.dll</HintPath>
     </Reference>
-    <Reference Include="RiverSystem.ApplicationLayer.Consumer, Version=3.4.3.540, Culture=neutral, processorArchitecture=MSIL" />
-    <Reference Include="RiverSystem.ApplicationLayer.Consumer.Forms, Version=3.4.3.540, Culture=neutral, processorArchitecture=MSIL" />
-    <Reference Include="RiverSystem.ApplicationLayer.Interfaces, Version=3.4.3.540, Culture=neutral, processorArchitecture=MSIL">
+    <Reference Include="RiverSystem.ApplicationLayer.Consumer, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>References\RiverSystem.ApplicationLayer.Consumer.dll</HintPath>
+    </Reference>
+    <Reference Include="RiverSystem.ApplicationLayer.Consumer.Forms, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>References\RiverSystem.ApplicationLayer.Consumer.Forms.dll</HintPath>
+    </Reference>
+    <Reference Include="RiverSystem.ApplicationLayer.Interfaces, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>References\RiverSystem.ApplicationLayer.Interfaces.dll</HintPath>
     </Reference>
@@ -58,10 +62,13 @@
     <Reference Include="RiverSystem.Forms">
       <HintPath>References\RiverSystem.Forms.exe</HintPath>
     </Reference>
-    <Reference Include="RiverSystem.Simulation, Version=3.4.3.540, Culture=neutral, processorArchitecture=MSIL" />
-    <Reference Include="ScenarioManagement">
+    <Reference Include="RiverSystem.Simulation, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>References\RiverSystem.Simulation.dll</HintPath>
+    </Reference>
+<!--    <Reference Include="ScenarioManagement">
       <HintPath>References\ScenarioManagement.dll</HintPath>
     </Reference>
+-->
     <Reference Include="System" />
     <Reference Include="System.Data" />
     <Reference Include="System.Drawing" />
@@ -80,8 +87,15 @@
     <Reference Include="TIME">
       <HintPath>References\TIME.dll</HintPath>
     </Reference>
-    <Reference Include="TIME.Tools, Version=3.4.3.540, Culture=neutral, processorArchitecture=MSIL" />
-    <Reference Include="TIME.Winforms, Version=3.4.3.540, Culture=neutral, processorArchitecture=MSIL" />
+    <Reference Include="TIME.ScenarioManagement">
+      <HintPath>References\TIME.ScenarioManagement.dll</HintPath>
+    </Reference>
+    <Reference Include="TIME.Tools, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>References\TIME.Tools.dll</HintPath>
+    </Reference>
+    <Reference Include="TIME.Winforms, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>References\TIME.Winforms.dll</HintPath>
+    </Reference>
     <Reference Include="WindowsBase" />
     <Reference Include="PresentationCore" />
     <Reference Include="PresentationFramework" />
