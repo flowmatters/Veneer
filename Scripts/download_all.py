@@ -4,14 +4,10 @@ Download all data from a running Veneer server.
 Intended to allow offline development and publication of Veneer sites, including web reporting
 """
 from urllib2 import urlopen, quote
-import json
+import veneer as v
 import os
 
 ### Settings
-# Source
-port = 9876
-host = "localhost"
-protocol = "http"
 retrieve_daily = retreive_monthly = retrieve_annual = True
 
 # Output
@@ -34,26 +30,17 @@ def save_data(base_name,data,ext,mode=""):
 	f.write(data)
 	f.close()
 
-def retrieve_json(url):
-	if print_urls:
-		print "*** %s ***" % (url)
-
-	text = urlopen(base_url + quote(url)).read()
-	save_data(url[1:],text,"json")
-
-	if print_all:
-		print json.loads(text)
-		print ""
-	return json.loads(text)
-
 def retrieve_resource(url,ext):
 	if print_urls:
 		print "*** %s ***" % (url)
 
 	save_data(url[1:],urlopen(base_url+quote(url)).read(),ext,mode="b")
 
+def retrieve_local(url):
+	text = v.retrieve_json(url)
+	save_data(url[1:],text,"json")
+	return text
 
-base_url = "%s://%s:%d" % (protocol,host,port)
 mkdirs(destination)
 
 # Process Run list and results
