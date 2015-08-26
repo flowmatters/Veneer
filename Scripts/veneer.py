@@ -1,4 +1,8 @@
-from urllib2 import urlopen, quote
+try:
+	from urllib2 import urlopen, quote
+except:
+	from urllib.request import urlopen, quote
+
 import json
 
 # Source
@@ -27,13 +31,13 @@ def initialise(port=9876,host='localhost',protocol='http',prefix='',live=True):
 
 def retrieve_json(url):
 	if PRINT_URLS:
-		print "*** %s ***" % (url)
+		print("*** %s ***" % (url))
 
-	text = urlopen(BASE_URL + quote(url+DATA_EXT)).read()
+	text = urlopen(BASE_URL + quote(url+DATA_EXT)).read().decode('utf-8')
 	
 	if PRINT_ALL:
-		print json.loads(text)
-		print ""
+		print(json.loads(text))
+		print("")
 	return json.loads(text)
 
 def retrieve_run(run='latest'):

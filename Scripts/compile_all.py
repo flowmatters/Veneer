@@ -75,8 +75,8 @@ parser.add_argument('solution',help="Path to Solution (.sln) file")
 args = parser.parse_args()
 
 all_versions = sorted(glob(args.ewater + os.path.sep + "Source*"))
-print "*** FOUND %d INSTALLED VERSIONS OF SOURCE" % (len(all_versions))
-print "\n".join(all_versions)
+print("*** FOUND %d INSTALLED VERSIONS OF SOURCE" % (len(all_versions)))
+print("\n".join(all_versions))
 
 ignore_fn = args.solution + ".ignore"
 ignored = []
@@ -85,18 +85,18 @@ if os.path.exists(ignore_fn):
 	for ip in ignore_patterns:
 		ignored += glob(args.ewater + os.path.sep + "Source " + ip.strip())
 	ignored = sorted(set(ignored))
-	print "*** IGNORING %d VERSIONS ***" % (len(ignored))
-	print "\n".join(ignored)
+	print("*** IGNORING %d VERSIONS ***" % (len(ignored)))
+	print("\n".join(ignored))
 
 versions_to_compile = sorted(set(all_versions) - set(ignored))
 shortnames = [os.path.basename(v) for v in versions_to_compile]
 
-print "*** COMPILING AGAINST %d VERSIONS ***" % (len(versions_to_compile))
-print "\n".join(shortnames)
+print("*** COMPILING AGAINST %d VERSIONS ***" % (len(versions_to_compile)))
+print("\n".join(shortnames))
 
 results = {}
 for (fullpath,version) in zip(versions_to_compile,shortnames):
-	print "*** COMPILING AGAINST %s" % (version)
+	print("*** COMPILING AGAINST %s" % (version))
 	references = copy_references(fullpath,args.refpath)
 	results[version] = os.system(args.msbuild + " " + args.solution)
 	if results[version] == 0:
@@ -108,8 +108,8 @@ for (fullpath,version) in zip(versions_to_compile,shortnames):
 
 failures = sorted([k for (k,v) in results.items() if v > 0])
 successes = sorted([k for (k,v) in results.items() if v == 0])
-print "*** RESULTS ***"
-print "%d successful builds out of %d versions" % (len(successes),len(versions_to_compile))
+print("*** RESULTS ***")
+print("%d successful builds out of %d versions" % (len(successes),len(versions_to_compile)))
 if failures:
-	print "FAILED TO BUILD AGAINST %d VERSIONS" % (len(failures))
-	print "\n".join(failures)
+	print("FAILED TO BUILD AGAINST %d VERSIONS" % (len(failures)))
+	print("\n".join(failures))

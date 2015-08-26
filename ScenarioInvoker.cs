@@ -1,24 +1,16 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Data.SqlTypes;
-using System.Linq;
-using System.Reflection;
-using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using RiverSystem;
 using RiverSystem.ApplicationLayer.Consumer.Forms;
 using RiverSystem.Controls;
 using RiverSystem.Controls.ModelRun;
-using RiverSystem.Controls.ScenarioConfiguration;
-using RiverSystem.Forms;
-using RiverSystem.MultiRunning;
-using RiverSystem.Simulation.Engine;
-using RiverSystemGUI_II;
-using TIME.Management;
+using RiverSystem.Tracking;
+using TIME.DataTypes;
+using TIME.ScenarioManagement.Execution;
 using TIME.ScenarioManagement.RunManagement;
 using TIME.Winforms.Utils;
-using TIME.Winforms.WPF.ManagedExtensions;
 
 namespace FlowMatters.Source.Veneer
 {
@@ -29,11 +21,11 @@ namespace FlowMatters.Source.Veneer
         private bool running;
         public RiverSystemScenario Scenario { set; get; }
 
-        private ScenarioJobRunner JobRunner
+        private IRunManager JobRunner
         {
             get
             {
-                return ProjectManager.Instance.CurrentScenarioJobRunner;
+                return ProjectManager.Instance.CurrentRiverSystemScenarioProxy.riverSystemScenario.RunManager;
             }
         }
 
@@ -50,30 +42,59 @@ namespace FlowMatters.Source.Veneer
 
             if (IsRunnable())
             {
-//                JobRunner.BeforeRun += new BeforeTemporalRunHandler(JobRunner_BeforeRun);
-                JobRunner.AfterRun += new EventHandler(JobRunner_AfterRun);
-                //if so then run
-                running = true;
+               
+                //                JobRunner.BeforeRun += new BeforeTemporalRunHandler(JobRunner_BeforeRun);
+                Scenario.RunManager.UpdateEvent = new EventHandler<JobRunEventArgs>(JobRunner_Update);
 
-                runControl = new ScenarioRunWindow(JobRunner);
-                runControl.SetOwner(MainForm.Instance);
-                runControl.Show();
+                var runWindow = new ScenarioRunWindow(Scenario);
+                //runWindow.SetOwner(this);
+                //runWindow.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+                //Enabled = false;
+                runWindow.Show();
 
-//                lock (lockObj)
-//                {
-                while (running)
+                var startOfRun = DateTime.Now;
+                ProjectManager.Instance.SaveAuditLogMessage("Run started at " + DateTime.Now);
+
+                Task x = Task.Factory.StartNew(() => Scenario.RunManager.Execute());
+                while (!x.IsCompleted)
                 {
                     Thread.Sleep(50);
                     Application.DoEvents();
-                    //Monitor.Wait(lockObj);
                 }
+
+                RunTracker.RunCompleted((RiverSystemProject) Scenario.Project, startOfRun);
+                ProjectManager.Instance.SaveAuditLogMessage("Run finished at " + DateTime.Now + " and took " + TimeTools.TimeSpanString(DateTime.Now - startOfRun));
+                runWindow.Close();
+                runWindow.Dispose();
+                //if so then run
+                //running = true;
+
+                //runControl = new ScenarioRunWindow(Scenario);
+                //runControl.SetOwner(MainForm.Instance);
+                //runControl.Show();
+
+                //Scenario.RunManager.Execute();
+//                lock (lockObj)
+//                {
+                //while (running)
+                //{
+                //    Thread.Sleep(50);
+                //    Application.DoEvents();
+                //    //Monitor.Wait(lockObj);
+                //}
 //                }
 
-                runControl.Close();
-                runControl.Dispose();
+                //runControl.Close();
+                //runControl.Dispose();
             }
 
 //            ProjectManager.Instance.SaveAuditLogMessage("Close run scenario window");
+        }
+
+        private void JobRunner_Update(object sender, JobRunEventArgs e)
+        {
+            if (e.State==JobRunningState.Finished)
+                JobRunner_AfterRun(sender,e);
         }
 
         //void JobRunner_BeforeRun(object sender, TemporalRunArgs args)
@@ -90,67 +111,67 @@ namespace FlowMatters.Source.Veneer
 
         private bool IsRunnable()
         {
-            if(JobRunner==null)
-                ConfigureScenario();
+//            if(JobRunner==null)
+//                ConfigureScenario();
 
             //Todo Need to do the cleanup tasks with applicationLayer
-            ProjectManager.Instance.RefreshScenario((RiverSystemScenario)JobRunner.Scenario);
+//            ProjectManager.Instance.RefreshScenario((RiverSystemScenario)JobRunner.Scenario);
 
             string message;
-            bool runnable = JobRunner.IsRunnable(out message);
+            bool runnable = JobRunner.IsRunnable(Scenario.Network,out message);
 
             // Update the Scenario Start and End for consistency, when saved this is used as a consistencey
             // check for running in the commandline as well (the extents of the scenaro are not well defined when there are no timeseries)
-            if (runnable)
-            {
-                if (Scenario.Start > Scenario.CurrentConfiguration.StartDate)
-                    Scenario.Start = Scenario.CurrentConfiguration.StartDate;
-                if (Scenario.End < Scenario.CurrentConfiguration.EndDate)
-                    Scenario.End = Scenario.CurrentConfiguration.EndDate;
+            //if (runnable)
+            //{
+            //    if (Scenario.Start > Scenario.CurrentConfiguration.StartDate)
+            //        Scenario.Start = Scenario.CurrentConfiguration.StartDate;
+            //    if (Scenario.End < Scenario.CurrentConfiguration.EndDate)
+            //        Scenario.End = Scenario.CurrentConfiguration.EndDate;
 
-                runnable = Scenario.CurrentConfiguration.IsRunnable(out message, JobRunner);
-            }
+            //    runnable = Scenario.CurrentConfiguration.IsRunnable(out message, JobRunner);
+            //}
 
             return runnable;
         }
 
-        private void ConfigureScenario()
-        {
-            try
-            {
-                if (Scenario.RunningConfigurations == null )
-                    return;
+        //private void ConfigureScenario()
+        //{
+        //    try
+        //    {
+        //        if (Scenario.CurrentConfiguration == null )
+        //            return;
 
-                ConfigurationRunningPair currentConfigPair = ConfigPair();
-                ProjectManager.Instance.CurrentScenarioJobRunner = currentConfigPair.JobRunner;
-                if (ProjectManager.Instance.CurrentScenarioJobRunner == null)
-                {
-                    var srtc =
-                        new ScenarioRunTemporalCharacteristics(Scenario.TemporalSystemRunner,
-                                                               SqlDateTime.MinValue.Value,
-                                                               SqlDateTime.MaxValue.Value);
-                    //                                                                  DateTimePicker.MinDateTime.AddYears(1),
-                    //                                                                  DateTimePicker.MaxDateTime.AddYears(-1), true);
-                    ProjectManager.Instance.CurrentScenarioJobRunner = new ScenarioJobRunner(Scenario, srtc);
-                    currentConfigPair.JobRunner = ProjectManager.Instance.CurrentScenarioJobRunner;
-                }
+        //        RunningConfiguration currentConfigPair = Scenario.CurrentConfiguration;//ConfigPair();
+        //        ProjectManager.Instance.CurrentScenarioJobRunner = currentConfigPair.JobRunner;
+        //        if (ProjectManager.Instance.CurrentScenarioJobRunner == null)
+        //        {
+        //            var srtc =
+        //                new ScenarioRunTemporalCharacteristics(Scenario.TemporalSystemRunner,
+        //                                                       SqlDateTime.MinValue.Value,
+        //                                                       SqlDateTime.MaxValue.Value);
+        //            //                                                                  DateTimePicker.MinDateTime.AddYears(1),
+        //            //                                                                  DateTimePicker.MaxDateTime.AddYears(-1), true);
+        //            ProjectManager.Instance.CurrentScenarioJobRunner = new ScenarioJobRunner(Scenario, srtc);
+        //            currentConfigPair.JobRunner = ProjectManager.Instance.CurrentScenarioJobRunner;
+        //        }
 
-                ProjectManager.Instance.RefreshScenario(Scenario);
-                ProjectManager.Instance.RefreshJobRunner(true);
-            }
-            catch (Exception ex)
-            {
-                Log.WriteError(this, "Error occured while trying to configure the scenario for running \n" + ex);
-                throw;
-            }
-        }
+        //        ProjectManager.Instance.RefreshScenario(Scenario);
+        //        ProjectManager.Instance.RefreshJobRunner(true);
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        Log.WriteError(this, "Error occured while trying to configure the scenario for running \n" + ex);
+        //        throw;
+        //    }
+        //}
 
-        private static ConfigurationRunningPair ConfigPair()
-        {
-            Type mf = MainForm.Instance.GetType();
-            FieldInfo toolStripField = mf.GetField("toolStripAnalysisList", BindingFlags.NonPublic | BindingFlags.Instance);
-            ToolStripComboBox list = (ToolStripComboBox) toolStripField.GetValue(MainForm.Instance );
-            return (ConfigurationRunningPair)list.SelectedItem;
-        }
+        //private static ConfigurationRunningPair ConfigPair()
+        //{
+        //    Type mf = MainForm.Instance.GetType();
+        //    FieldInfo toolStripField = mf.GetField("toolStripAnalysisList", BindingFlags.NonPublic | BindingFlags.Instance);
+        //    ToolStripComboBox list = (ToolStripComboBox) toolStripField.GetValue(MainForm.Instance );
+        //    return (ConfigurationRunningPair)list.SelectedItem;
+        //}
     }
 }

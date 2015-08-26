@@ -15,7 +15,6 @@ using System.Windows.Forms;
 using System.Xml;
 using FlowMatters.Source.Veneer;
 using FlowMatters.Source.WebServer.ExchangeObjects;
-using Ionic.Zip;
 using RiverSystem;
 using RiverSystem.Controls.Icons;
 using TIME.DataTypes;
@@ -42,16 +41,6 @@ namespace FlowMatters.Source.WebServer
             WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Origin", "*");
             Log("Requested /");
             return "Root node of service";
-        }
-
-        [OperationContract]
-        [WebInvoke(Method = "GET", UriTemplate = "/{fn}.zip")]
-        public Stream GetAllDataZipped(string fn)
-        {
-            ZipFile zf = new ZipFile();
-            
-//            WebOperationContext.Current.OutgoingResponse.ContentType = 
-            throw new NotImplementedException();
         }
 
         [OperationContract]
