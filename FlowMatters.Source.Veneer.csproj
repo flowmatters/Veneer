@@ -66,6 +66,14 @@
     <Reference Include="RiverSystem.Forms">
       <HintPath>References\RiverSystem.Forms.exe</HintPath>
     </Reference>
+    <Reference Include="RiverSystem.Persistence, Version=3.8.14.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>References\RiverSystem.Persistence.dll</HintPath>
+    </Reference>
+    <Reference Include="RiverSystem.ScenarioExplorer, Version=3.8.14.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>References\RiverSystem.ScenarioExplorer.dll</HintPath>
+    </Reference>
     <Reference Include="RiverSystem.Simulation, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>References\RiverSystem.Simulation.dll</HintPath>
     </Reference>
@@ -121,6 +129,7 @@
     <Compile Include="SourceRESTfulService.cs" />
     <Compile Include="SourceService.cs" />
     <Compile Include="UriTemplates.cs" />
+    <Compile Include="VariableSummary.cs" />
     <Compile Include="WebServerStatusPanel.cs">
       <SubType>UserControl</SubType>
     </Compile>

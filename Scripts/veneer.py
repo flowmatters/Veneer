@@ -53,7 +53,7 @@ def result_matches_criteria(result,criteria):
 		if not re.match(pattern,result[key]):
 			return False
 	return True
-
+	
 def name_time_series(result):
 	return result['TimeSeriesName']
 

@@ -17,6 +17,9 @@ using FlowMatters.Source.Veneer;
 using FlowMatters.Source.WebServer.ExchangeObjects;
 using RiverSystem;
 using RiverSystem.Controls.Icons;
+using RiverSystem.DataManagement.DataManager;
+using RiverSystem.Functions.Variables;
+using RiverSystem.ScenarioExplorer.ParameterSet;
 using TIME.DataTypes;
 using TIME.Management;
 using TIME.ScenarioManagement;
@@ -288,6 +291,65 @@ namespace FlowMatters.Source.WebServer
             return result;
         }
 
+        [OperationContract]
+        [WebInvoke(Method = "GET", UriTemplate = "/variables", ResponseFormat = WebMessageFormat.Json)]
+        public VariableSummary[] GetInputList()
+        {
+            VariableSummary[] result = new VariableSummary[Scenario.Network.FunctionManager.Variables.Count];
+            for (var i = 0; i < result.Count(); i++)
+                result[i] = new VariableSummary(Scenario.Network.FunctionManager.Variables[i],Scenario);
+            return result;
+        }
+
+        [OperationContract]
+        [WebInvoke(Method="GET",UriTemplate="/variables/{variableName}",ResponseFormat=WebMessageFormat.Json)]
+        public VariableSummary GetInput(string variableName)
+        {
+            return new VariableSummary(Scenario.Network.FunctionManager.Variables.FirstOrDefault(v => v.FullName == ("$"+variableName)),Scenario);
+        }
+
+        [OperationContract]
+        [WebInvoke(Method = "GET", UriTemplate = "/variables/{variableName}/TimeSeries", ResponseFormat = WebMessageFormat.Json)]
+        public SimpleTimeSeries GetInputTimeSeries(string variableName)
+        {
+            return (new VariableSummary(Scenario.Network.FunctionManager.Variables.FirstOrDefault(v => v.FullName == ("$" + variableName)), Scenario)).TimeSeries;
+        }
+
+        [OperationContract]
+        [WebInvoke(Method = "PUT", UriTemplate = "/variables/{variableName}/TimeSeries",
+            RequestFormat = WebMessageFormat.Json)]
+        public void ChangeInputTimeSeries(string variableName, SimpleTimeSeries newTimeSeries)
+        {
+            VariableSummary summ =
+                new VariableSummary(
+                    Scenario.Network.FunctionManager.Variables.FirstOrDefault(v => v.FullName == ("$" + variableName)),
+                    Scenario);
+            summ.UpdateTimeSeries(newTimeSeries);
+        }
+
+        [OperationContract]
+        [WebInvoke(Method="GET",UriTemplate="/inputSets",ResponseFormat = WebMessageFormat.Json)]
+        public InputSetSummary[] InputSetShenanigans()
+        {
+            ParameterSetManager Manager = Scenario.PluginDataModels.OfType<ParameterSetManager>().First();
+            InputSetSummary[] result = new InputSetSummary[Scenario.Network.InputSets.Count];
+            for (int i = 0; i < result.Length; i++)
+            {
+                InputSet inputSet = Scenario.Network.InputSets[i];
+                InputSetParameterSet ps = Manager.ParameterSets.First(x => x.InputSet == Scenario.Network.InputSets[i]);
+
+                result[i] = new InputSetSummary
+                {
+                    Name = inputSet.Name,
+                    Default = inputSet.IsDefault,
+                    Configuration = ps.Parameters.Configuration.Instructions.Split(Environment.NewLine.ToCharArray())
+                };
+
+                
+            }
+            return result;
+        }
+
         private TimeSeries AggregateTimeSeries(TimeSeries result, string aggregation)
         {
             if (result == null)
@@ -350,6 +412,14 @@ namespace FlowMatters.Source.WebServer
             if (LogGenerator != null)
                 LogGenerator(this, query);
         }
+    }
+
+    [DataContract]
+    public class InputSetSummary
+    {
+        [DataMember] public string Name;
+        [DataMember] public bool Default;
+        [DataMember] public string[] Configuration;
     }
 
     [DataContract]

@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Runtime.Serialization;
@@ -9,6 +10,8 @@ namespace FlowMatters.Source.WebServer.ExchangeObjects
     [DataContract]
     public class SimpleTimeSeries
     {
+        public SimpleTimeSeries() { }
+
         public SimpleTimeSeries(TimeSeries source)
         {
             Name = source.name;
@@ -30,6 +33,11 @@ namespace FlowMatters.Source.WebServer.ExchangeObjects
                     });
 
             Events = eventList.ToArray();
+        }
+
+        public DateTime AsDate(string text)
+        {
+            return DateTime.Parse(text, CultureInfo.InvariantCulture.DateTimeFormat);
         }
 
         [DataMember]

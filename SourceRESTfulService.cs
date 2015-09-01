@@ -22,6 +22,7 @@ namespace FlowMatters.Source.WebServer
         public override void Start()
         {
             WebHttpBinding binding = new WebHttpBinding();
+            binding.MaxReceivedMessageSize = 1024*1024;
             _singletonInstance = new SourceService();
             _singletonInstance.LogGenerator += _singletonInstance_LogGenerator;
             _singletonInstance.Scenario = Scenario;
