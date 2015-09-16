@@ -104,13 +104,20 @@ namespace FlowMatters.Source.WebServer
             return UriTemplates.Node.Replace("{nodeId}", n.id.ToString());
         }
 
+        private static string LinkURL(ILink l)
+        {
+            Link link = (Link) l;
+            return UriTemplates.Link.Replace("{linkId}", link.Network.links.indexOf(link).ToString());
+        }
+
         public GeoJSONFeature(Link l)
         {
-            id = UriTemplates.Link.Replace("{linkId}", l.Network.links.indexOf(l).ToString());
+            id = LinkURL(l);
             properties.Add("name",l.Name);
             properties.Add(FeatureTypeProperty,"link");
             properties.Add("from_node", NodeURL(l.UpstreamNode));
             properties.Add("to_node", NodeURL(l.DownstreamNode));
+            
             geometry = new GeoJSONGeometry(l);
         }
 
@@ -119,7 +126,7 @@ namespace FlowMatters.Source.WebServer
             id = UriTemplates.Catchment.Replace("{catchmentId}", c.id.ToString());
             properties.Add("name", c.Name);
             properties.Add(FeatureTypeProperty,"catchment");
-
+            properties.Add("link",LinkURL(c.DownstreamLink));
             geometry = new GeoJSONGeometry(region);
         }
     }
