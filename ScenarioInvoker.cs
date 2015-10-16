@@ -1,11 +1,17 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using FlowMatters.Source.WebServer;
 using RiverSystem;
 using RiverSystem.ApplicationLayer.Consumer.Forms;
 using RiverSystem.Controls;
 using RiverSystem.Controls.ModelRun;
+using RiverSystem.DataManagement.DataManager;
 using RiverSystem.Tracking;
 using TIME.DataTypes;
 using TIME.ScenarioManagement.Execution;
@@ -29,7 +35,7 @@ namespace FlowMatters.Source.Veneer
             }
         }
 
-        public void RunScenario()
+        public void RunScenario(RunParameters parameters)
         {
             if (Scenario == null)
             {
@@ -40,6 +46,7 @@ namespace FlowMatters.Source.Veneer
 //            ProjectManager.Instance.SaveAuditLogMessage("Open run scenario window");
 //            Scenario.outputManager = new Obsolete.Recording.OutputManager();
 
+            ApplyRunParameters(parameters);
             if (IsRunnable())
             {
                
@@ -89,6 +96,30 @@ namespace FlowMatters.Source.Veneer
             }
 
 //            ProjectManager.Instance.SaveAuditLogMessage("Close run scenario window");
+        }
+
+        private void ApplyRunParameters(RunParameters parameters)
+        {
+            RunningConfiguration configuration = Scenario.CurrentConfiguration;
+            Type configType = configuration.GetType();
+            foreach (var entry in parameters.Params)
+            {
+                var prop = configType.GetProperty(entry.Key, BindingFlags.Instance | BindingFlags.Public);
+                if (prop.PropertyType == typeof (DateTime))
+                {
+                    DateTime dt = DateTime.ParseExact(entry.Value.ToString(), "dd/MM/yyyy", CultureInfo.InvariantCulture);
+                    prop.SetValue(configuration,dt);
+                }
+                else if (prop.PropertyType == typeof (InputSet))
+                {
+                    InputSet set = Scenario.Network.InputSets.FirstOrDefault(ipSet => ipSet.Name == (string)entry.Value);
+                    prop.SetValue(configuration,set);
+                }
+                else
+                {
+                    prop.SetValue(configuration, entry.Value);
+                }
+            }
         }
 
         private void JobRunner_Update(object sender, JobRunEventArgs e)

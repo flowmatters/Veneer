@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Globalization;
@@ -186,11 +187,11 @@ namespace FlowMatters.Source.WebServer
         }
 
         [OperationContract]
-        [WebInvoke(Method = "POST", UriTemplate = UriTemplates.Runs)]
-        public void TriggerRun()
+        [WebInvoke(Method = "POST", UriTemplate = UriTemplates.Runs, RequestFormat = WebMessageFormat.Json)]
+        public void TriggerRun(RunParameters parameters)
         {
             ScenarioInvoker si = new ScenarioInvoker{Scenario=Scenario};
-            si.RunScenario();
+            si.RunScenario(parameters);
             Run r = RunForId("latest");
 
             WebOperationContext.Current.OutgoingResponse.StatusCode = HttpStatusCode.Redirect;
@@ -413,6 +414,43 @@ namespace FlowMatters.Source.WebServer
             if (LogGenerator != null)
                 LogGenerator(this, query);
         }
+    }
+
+    [Serializable]
+    public class RunParameters : ISerializable
+    {
+        public RunParameters()
+        {
+                
+        }
+
+        public RunParameters(SerializationInfo info, StreamingContext context)
+        {
+            foreach (var entry in info)
+            {
+                properties.Add(entry.Name, entry.Value);
+            }
+        }
+
+        private Dictionary<string,object> properties = new Dictionary<string, object>();
+        public Dictionary<string, object> Params { get { return properties; } }
+        
+        public void Add(string key, object value)
+        {
+            properties[key] = value;
+        }
+
+        public void GetObjectData(SerializationInfo info, StreamingContext context)
+        {
+            foreach (KeyValuePair<string, object> kvp in properties)
+                info.AddValue(kvp.Key,kvp.Value);
+        }
+
+        //[DataMember] public string Start;
+        //[DataMember] public string End;
+        //[DataMember] public int ForecastLength;
+        //[DataMember] public string InputSet;
+
     }
 
     [DataContract]

@@ -4,6 +4,7 @@ except:
 	from urllib.request import urlopen, quote
 
 import json
+import http.client as hc
 
 # Source
 PORT = 9876
@@ -29,6 +30,12 @@ def initialise(port=9876,host='localhost',protocol='http',prefix='',live=True):
 	else:
 		DATA_EXT='.json'
 
+def retrieve_resource(url,ext):
+	if print_urls:
+		print("*** %s ***" % (url))
+
+	save_data(url[1:],urlopen(base_url+quote(url)).read(),ext,mode="b")
+
 def retrieve_json(url):
 	if PRINT_URLS:
 		print("*** %s ***" % (url))
@@ -39,6 +46,12 @@ def retrieve_json(url):
 		print(json.loads(text))
 		print("")
 	return json.loads(text)
+
+def run_model(params={}):
+	conn = hc.HTTPConnection('localhost',port=9876)
+#	conn.request('POST','/runs',json.dumps({'parameters':params}),headers={'Content-type':'application/json','Accept':'application/json'})
+	conn.request('POST','/runs',json.dumps(params),headers={'Content-type':'application/json','Accept':'application/json'})
+	return conn # conn.getresponse()
 
 def retrieve_run(run='latest'):
 	if run=='latest' and not LIVE_SOURCE:
