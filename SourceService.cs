@@ -20,6 +20,7 @@ using RiverSystem.Controls.Icons;
 using RiverSystem.DataManagement.DataManager;
 using RiverSystem.Functions.Variables;
 using RiverSystem.ScenarioExplorer.ParameterSet;
+using TIME.Core;
 using TIME.DataTypes;
 using TIME.Management;
 using TIME.ScenarioManagement;
@@ -94,7 +95,7 @@ namespace FlowMatters.Source.WebServer
 
         private Bitmap FindByName(string s)
         {
-            Type modelType = Finder.typesInherting(typeof (NodeModel)).Where(t => t.Name == s).FirstOrDefault();
+            Type modelType = Finder.typesInherting(typeof(IDomainObject)).Where(t => t.Name == s).FirstOrDefault();
 
             if (modelType == null)
             {

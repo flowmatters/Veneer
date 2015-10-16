@@ -82,9 +82,15 @@ namespace FlowMatters.Source.WebServer
             properties.Add(FeatureTypeProperty,"node");
 
             properties.Add(ResourceProperty,
-                           UriTemplates.Resources.Replace("{resourceName}", RetrieveNodeModel(n).GetType().Name));
+                           UriTemplates.Resources.Replace("{resourceName}", ResourceName(n)));
 
             geometry = new GeoJSONGeometry(n.location);
+        }
+
+        private static string ResourceName(Node n)
+        {
+            object o = RetrieveNodeModel(n) ?? (object) n.FlowPartitioning;
+            return o.GetType().Name;
         }
 
         private static NodeModel RetrieveNodeModel(dynamic n)
