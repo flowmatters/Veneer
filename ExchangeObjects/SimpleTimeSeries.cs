@@ -14,6 +14,13 @@ namespace FlowMatters.Source.WebServer.ExchangeObjects
 
         public SimpleTimeSeries(TimeSeries source)
         {
+            if (source == null)
+            {
+                Name = "No Data";
+                Events = new TimeSeriesEvent[0];
+                return;
+            }
+
             Name = source.name;
             Units = source.units.ShortName;
             NoDataValue = source.NullValue;

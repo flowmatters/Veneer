@@ -249,7 +249,7 @@ namespace FlowMatters.Source.WebServer
         public SimpleTimeSeries GetAggregatedTimeSeries(string runId, string networkElement, string recordingElement,
                                               string variable, string aggregation)
         {
-            TimeSeries result = MatchTimeSeries(runId, networkElement, recordingElement, variable);
+            TimeSeries result = MatchTimeSeries(runId, WebUtility.HtmlDecode(networkElement), WebUtility.HtmlDecode(recordingElement), WebUtility.HtmlDecode(variable));
 
             result = AggregateTimeSeries(result, aggregation);
             return SimpleTimeSeries(result);
@@ -425,7 +425,7 @@ namespace FlowMatters.Source.WebServer
 
         public static string URLSafeString(string src)
         {
-            return src.Replace("#","");
+            return src.Replace("#","").Replace("/","%2F");
         }
 
         protected void Log(string query)
