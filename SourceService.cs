@@ -330,6 +330,25 @@ namespace FlowMatters.Source.WebServer
         }
 
         [OperationContract]
+        [WebInvoke(Method = "GET", UriTemplate = "/variables/{variableName}/Piecewise", ResponseFormat = WebMessageFormat.Json)]
+        public SimplePiecewise GetPiecewiseLinear(string variableName)
+        {
+            return (new VariableSummary(Scenario.Network.FunctionManager.Variables.FirstOrDefault(v => v.FullName == ("$" + variableName)), Scenario)).PiecewiseFunction;
+        }
+
+        [OperationContract]
+        [WebInvoke(Method = "PUT", UriTemplate = "/variables/{variableName}/Piecewise",
+            RequestFormat = WebMessageFormat.Json)]
+        public void ChangePiecewiseLinear(string variableName, SimplePiecewise newPiecewise)
+        {
+            VariableSummary summ =
+                new VariableSummary(
+                    Scenario.Network.FunctionManager.Variables.FirstOrDefault(v => v.FullName == ("$" + variableName)),
+                    Scenario);
+            summ.UpdatePiecewise(newPiecewise);
+        }
+
+        [OperationContract]
         [WebInvoke(Method="GET",UriTemplate="/inputSets",ResponseFormat = WebMessageFormat.Json)]
         public InputSetSummary[] InputSetShenanigans()
         {

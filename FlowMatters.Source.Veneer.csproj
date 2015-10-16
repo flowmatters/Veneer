@@ -125,6 +125,7 @@
     <Compile Include="ISourceService.cs" />
     <Compile Include="ProcessRequests\ParseDataRequests.cs" />
     <Compile Include="ScenarioInvoker.cs" />
+    <Compile Include="SimplePiecewise.cs" />
     <Compile Include="SourceHTTPServer.cs" />
     <Compile Include="SourceRESTfulService.cs" />
     <Compile Include="SourceService.cs" />

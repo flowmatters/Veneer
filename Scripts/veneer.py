@@ -47,6 +47,13 @@ def retrieve_json(url):
 		print("")
 	return json.loads(text)
 
+def update_json(url,data):
+	conn = hc.HTTPConnection('localhost',port=9876)
+	conn.request('PUT',url,json.dumps(data),headers={'Content-type':'application/json','Accept':'application/json'})
+#	resp = conn.getresponse()
+#	resp.code
+	return conn
+
 def run_model(params={}):
 	conn = hc.HTTPConnection('localhost',port=9876)
 #	conn.request('POST','/runs',json.dumps({'parameters':params}),headers={'Content-type':'application/json','Accept':'application/json'})

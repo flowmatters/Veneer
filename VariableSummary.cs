@@ -42,7 +42,8 @@ namespace FlowMatters.Source.Veneer
             }
             else if (v is LinearVariable)
             {
-                VeneerSupported = false;
+                VeneerSupported = true;
+                PiecewiseFunction = new SimplePiecewise(v as LinearVariable);
             }
             else if (v is TimeSeriesVariable)
             {
@@ -53,6 +54,7 @@ namespace FlowMatters.Source.Veneer
                 TimeSeries = new SimpleTimeSeries(FindTimeSeries());
             }
         }
+
 
         private RiverSystemScenario Scenario;
 
@@ -85,6 +87,12 @@ namespace FlowMatters.Source.Veneer
             }
         }
 
+        public void UpdatePiecewise(SimplePiecewise newPiecewise)
+        {
+            LinearVariable linV = (LinearVariable) Variable;
+            newPiecewise.ApplyTo(linV);
+        }
+
         private string kvp(string key, string val)
         {
             return key + '=' + val + ';';
@@ -96,6 +104,8 @@ namespace FlowMatters.Source.Veneer
         [DataMember] public bool VeneerSupported;
         [DataMember] public string VeneerDebugInfo;
         [DataMember] public SimpleTimeSeries TimeSeries;
+        [DataMember] public SimplePiecewise PiecewiseFunction { get; set; }
+
         private AbstractFunctionVariable Variable;
     }
 }
