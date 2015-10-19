@@ -256,7 +256,7 @@ namespace FlowMatters.Source.WebServer
         }
 
         [OperationContract]
-        [WebInvoke(Method="PUT",UriTemplate = "/Functions/{functionName}",RequestFormat = WebMessageFormat.Json)]
+        [WebInvoke(Method="PUT",UriTemplate = "/functions/{functionName}",RequestFormat = WebMessageFormat.Json)]
         public void SetFunction(string functionName, FunctionValue value)
         {
             functionName = "$" + functionName;
@@ -314,7 +314,7 @@ namespace FlowMatters.Source.WebServer
         [WebInvoke(Method = "GET", UriTemplate = "/variables/{variableName}/TimeSeries", ResponseFormat = WebMessageFormat.Json)]
         public SimpleTimeSeries GetInputTimeSeries(string variableName)
         {
-            return (new VariableSummary(Scenario.Network.FunctionManager.Variables.FirstOrDefault(v => v.FullName == ("$" + variableName)), Scenario)).TimeSeries;
+            return (new VariableSummary(Scenario.Network.FunctionManager.Variables.FirstOrDefault(v => v.FullName == ("$" + variableName)), Scenario)).TimeSeriesData;
         }
 
         [OperationContract]
@@ -333,7 +333,7 @@ namespace FlowMatters.Source.WebServer
         [WebInvoke(Method = "GET", UriTemplate = "/variables/{variableName}/Piecewise", ResponseFormat = WebMessageFormat.Json)]
         public SimplePiecewise GetPiecewiseLinear(string variableName)
         {
-            return (new VariableSummary(Scenario.Network.FunctionManager.Variables.FirstOrDefault(v => v.FullName == ("$" + variableName)), Scenario)).PiecewiseFunction;
+            return (new VariableSummary(Scenario.Network.FunctionManager.Variables.FirstOrDefault(v => v.FullName == ("$" + variableName)), Scenario)).PiecewiseFunctionData;
         }
 
         [OperationContract]

@@ -72,11 +72,19 @@ class VeneerRetriever(object):
 				if self.retrieve_annual:
 					self.retrieve_json(ts_url + "/aggregated/annual")
 	
+	def retrieve_variables(self):
+		variables = self.retrieve_json("/variables")
+		for var in variables:
+			if var['TimeSeries']: self.retrieve_json(var['TimeSeries'])
+			if var['PiecewiseFunction']: self.retrieve_json(var['PiecewiseFunction'])
+
 	def retrieve_all(self,destination,**kwargs):
 		self.mkdirs(self.destination)
 		self.retrieve_runs()
 		self.retrieve_json("/functions")
-	
+		self.retrieve_variables()
+		self.retrieve_json("/inputSets")
+		self.retrieve_json("/")
 		network = self.retrieve_json("/network")
 		for f in network['features']:
 			#retrieve_json(f['id'])

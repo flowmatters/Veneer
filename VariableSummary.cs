@@ -43,7 +43,8 @@ namespace FlowMatters.Source.Veneer
             else if (v is LinearVariable)
             {
                 VeneerSupported = true;
-                PiecewiseFunction = new SimplePiecewise(v as LinearVariable);
+                PiecewiseFunctionData = new SimplePiecewise(v as LinearVariable);
+                PiecewiseFunction = String.Format("/variables/{0}/Piecewise", FullName.Replace("$", ""));
             }
             else if (v is TimeSeriesVariable)
             {
@@ -51,7 +52,8 @@ namespace FlowMatters.Source.Veneer
                 var tsV = (TimeSeriesVariable) v;
                 VeneerDebugInfo += kvp("DisplayName", tsV.DisplayName) +
                                    kvp("ResultUnit", tsV.ResultUnit.Name);
-                TimeSeries = new SimpleTimeSeries(FindTimeSeries());
+                TimeSeriesData = new SimpleTimeSeries(FindTimeSeries());
+                TimeSeries = String.Format("/variables/{0}/TimeSeries", FullName.Replace("$", ""));
             }
         }
 
@@ -103,8 +105,10 @@ namespace FlowMatters.Source.Veneer
         [DataMember] public int ID;
         [DataMember] public bool VeneerSupported;
         [DataMember] public string VeneerDebugInfo;
-        [DataMember] public SimpleTimeSeries TimeSeries;
-        [DataMember] public SimplePiecewise PiecewiseFunction { get; set; }
+        [DataMember] public string TimeSeries;
+        [DataMember] public string PiecewiseFunction;
+        public SimpleTimeSeries TimeSeriesData;
+        public SimplePiecewise PiecewiseFunctionData { get; set; }
 
         private AbstractFunctionVariable Variable;
     }

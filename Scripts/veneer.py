@@ -58,7 +58,11 @@ def run_model(params={}):
 	conn = hc.HTTPConnection('localhost',port=9876)
 #	conn.request('POST','/runs',json.dumps({'parameters':params}),headers={'Content-type':'application/json','Accept':'application/json'})
 	conn.request('POST','/runs',json.dumps(params),headers={'Content-type':'application/json','Accept':'application/json'})
-	return conn # conn.getresponse()
+	resp = conn.getresponse()
+	if resp.getcode()==302:
+		return resp.getcode(),resp.getheader('Location')
+	else:
+		return resp.getcode(),None
 
 def retrieve_run(run='latest'):
 	if run=='latest' and not LIVE_SOURCE:
