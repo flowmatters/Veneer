@@ -17,7 +17,7 @@ namespace FlowMatters.Source.WebServer
         public const string RunResults = "/runs/{runId}";
         public const string Runs = "/runs";
 
-        public const string Files = "/doc/{fn}";
+        public const string Files = "/doc/{*fn}";
 
         public const string FilesD = "/doc/{dir}/{fn}";
 

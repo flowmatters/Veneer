@@ -69,7 +69,7 @@ namespace FlowMatters.Source.Veneer
                     Application.DoEvents();
                 }
 
-                RunTracker.RunCompleted((RiverSystemProject) Scenario.Project, startOfRun);
+                LogRunEnd(startOfRun);
                 ProjectManager.Instance.SaveAuditLogMessage("Run finished at " + DateTime.Now + " and took " + TimeTools.TimeSpanString(DateTime.Now - startOfRun));
                 runWindow.Close();
                 runWindow.Dispose();
@@ -96,6 +96,21 @@ namespace FlowMatters.Source.Veneer
             }
 
 //            ProjectManager.Instance.SaveAuditLogMessage("Close run scenario window");
+        }
+
+        private void LogRunEnd(DateTime startOfRun)
+        {
+            Type t = typeof (RunTracker);
+            MethodInfo method = t.GetMethod("RunCompleted", BindingFlags.Public | BindingFlags.Static);
+
+            try
+            {
+                method.Invoke(null, new object[] {Scenario.Project, Scenario, startOfRun});
+            }
+            catch(Exception)
+            {
+                method.Invoke(null, new object[] { Scenario.Project, startOfRun });
+            }
         }
 
         private void ApplyRunParameters(RunParameters parameters)

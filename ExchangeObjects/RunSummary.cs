@@ -23,14 +23,14 @@ namespace FlowMatters.Source.WebServer.ExchangeObjects
             List<TimeSeriesLink> result = new List<TimeSeriesLink>();
             foreach (ProjectViewRow row in rows)
             {
-                var rowResults = row.ElementRecorder.GetResultList();
+                Dictionary<AttributeRecordingState, TimeSeries> rowResults = row.ElementRecorder.GetResultList();
                 foreach (var key in rowResults.Keys)
                 {
                     TimeSeries ts = rowResults[key];
                     if(ts != null)
                         result.Add(new TimeSeriesLink
                             {
-                                TimeSeriesName = rowResults[key].name,
+                                TimeSeriesName = ts.name,
                                 TimeSeriesUrl = BuildTimeSeriesUrl(row,key),
                                 NetworkElement = row.NetworkElementName,
                                 RecordingElement = row.ElementName,

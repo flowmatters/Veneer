@@ -19,6 +19,7 @@ using FlowMatters.Source.WebServer.ExchangeObjects;
 using RiverSystem;
 using RiverSystem.Controls.Icons;
 using RiverSystem.DataManagement.DataManager;
+using RiverSystem.Functions;
 using RiverSystem.Functions.Variables;
 using RiverSystem.ScenarioExplorer.ParameterSet;
 using TIME.Core;
@@ -48,19 +49,21 @@ namespace FlowMatters.Source.WebServer
             return "Root node of service";
         }
 
-        [OperationContract]
-        [WebInvoke(Method = "GET", UriTemplate = UriTemplates.FilesD)]
-        public Stream GetFileD(string dir, string fn)
-        {
-            return GetFile(dir + "/" + fn);
-        }
+        //[OperationContract]
+        //[WebInvoke(Method = "GET", UriTemplate = UriTemplates.FilesD)]
+        //public Stream GetFileD(string dir, string fn)
+        //{
+        //    Log("Requested File: " + dir + "/" + fn);
+        //    return GetFile(dir + "/" + fn);
+        //}
 
-        [OperationContract]
-        [WebInvoke(Method = "GET", UriTemplate = UriTemplates.FilesDD)]
-        public Stream GetFileDD(string dir1, string dir2, string fn)
-        {
-            return GetFile(dir1 + "/" + dir2 + "/" + fn);
-        }
+        //[OperationContract]
+        //[WebInvoke(Method = "GET", UriTemplate = UriTemplates.FilesDD)]
+        //public Stream GetFileDD(string dir1, string dir2, string fn)
+        //{
+        //    Log(string.Format("Requested File: {0}/{1}/{2}",dir1,dir2,fn));
+        //    return GetFile(dir1 + "/" + dir2 + "/" + fn);
+        //}
 
         [OperationContract]
         [WebInvoke(Method = "GET", UriTemplate = UriTemplates.Files)]
@@ -126,6 +129,7 @@ namespace FlowMatters.Source.WebServer
         [WebInvoke(Method = "GET", ResponseFormat = WebMessageFormat.Json, UriTemplate = UriTemplates.Node)]
         public GeoJSONFeature GetNode(string nodeId)
         {
+            Log(string.Format("Requested node {0} (NOT IMPLEMENTED)", nodeId));
             return null;                
         }
 
@@ -133,6 +137,7 @@ namespace FlowMatters.Source.WebServer
         [WebInvoke(Method = "GET", ResponseFormat = WebMessageFormat.Json, UriTemplate = UriTemplates.Link)]
         public GeoJSONFeature GetLink(string linkId)
         {
+            Log(string.Format("Requested link {0} (NOT IMPLEMENTED)", linkId));
             return null;
         }
         private static string ContentTypeForFilename(string fn)
@@ -170,6 +175,7 @@ namespace FlowMatters.Source.WebServer
         [WebInvoke(Method = "GET", ResponseFormat = WebMessageFormat.Json, UriTemplate = UriTemplates.Runs)]
         public RunLink[] GetRunList()
         {
+            Log("Requested run list");
             WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Origin", "*");
             var runs = Scenario.Project.ResultManager.AllRuns().ToArray();
             RunLink[] links = new RunLink[runs.Length];
@@ -190,7 +196,8 @@ namespace FlowMatters.Source.WebServer
         [WebInvoke(Method = "POST", UriTemplate = UriTemplates.Runs, RequestFormat = WebMessageFormat.Json)]
         public void TriggerRun(RunParameters parameters)
         {
-            ScenarioInvoker si = new ScenarioInvoker{Scenario=Scenario};
+            Log("Triggering a run.");
+            ScenarioInvoker si = new ScenarioInvoker { Scenario = Scenario };
             si.RunScenario(parameters);
             Run r = RunForId("latest");
 
@@ -198,13 +205,14 @@ namespace FlowMatters.Source.WebServer
             WebOperationContext.Current.OutgoingResponse.Headers.Add("Location",
                                                                      WebOperationContext.Current.IncomingRequest.Headers
                                                                          ["Location"] +
-                                                                     String.Format("/runs/{0}", r.RunNumber));
+                                                                     String.Format("runs/{0}", r.RunNumber));
         }
 
         [OperationContract]
         [WebInvoke(Method = "GET", ResponseFormat = WebMessageFormat.Json, UriTemplate = UriTemplates.RunResults)]
         public RunSummary GetRunResults(string runId)
         {
+            Log(String.Format("Requested run results ({0})",runId));
             WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Origin", "*");
             string msg = "";
             if (runId.ToLower() == "latest")
@@ -238,6 +246,7 @@ namespace FlowMatters.Source.WebServer
         public SimpleTimeSeries GetTimeSeries(string runId, string networkElement, string recordingElement,
                                               string variable)
         {
+            Log(String.Format("Requested time series {0}/{1}/{2}/{3}",runId,networkElement,recordingElement,variable));
             TimeSeries result = MatchTimeSeries(runId, networkElement, recordingElement, variable);
 
             return SimpleTimeSeries(result);
@@ -249,6 +258,7 @@ namespace FlowMatters.Source.WebServer
         public SimpleTimeSeries GetAggregatedTimeSeries(string runId, string networkElement, string recordingElement,
                                               string variable, string aggregation)
         {
+            Log(String.Format("Requested {4} time series {0}/{1}/{2}/{3}", runId, networkElement, recordingElement, variable,aggregation));
             TimeSeries result = MatchTimeSeries(runId, WebUtility.HtmlDecode(networkElement), WebUtility.HtmlDecode(recordingElement), WebUtility.HtmlDecode(variable));
 
             result = AggregateTimeSeries(result, aggregation);
@@ -259,6 +269,7 @@ namespace FlowMatters.Source.WebServer
         [WebInvoke(Method="PUT",UriTemplate = "/functions/{functionName}",RequestFormat = WebMessageFormat.Json)]
         public void SetFunction(string functionName, FunctionValue value)
         {
+            Log(String.Format("Updating function {0}", functionName));
             functionName = "$" + functionName;
             var function = Scenario.Network.FunctionManager.Functions.FirstOrDefault(f => f.Name == functionName);
             if (function != null)
@@ -281,10 +292,11 @@ namespace FlowMatters.Source.WebServer
         [WebInvoke(Method = "GET", UriTemplate = "/functions", ResponseFormat = WebMessageFormat.Json)]
         public FunctionValue[] GetFunctionList()
         {
+            Log("Requested function list");
             FunctionValue[] result = new FunctionValue[Scenario.Network.FunctionManager.Functions.Count];
             for (var i = 0; i < result.Count(); i++)
             {
-                var fn = Scenario.Network.FunctionManager.Functions[i];
+                Function fn = Scenario.Network.FunctionManager.Functions[i];
                 FunctionValue fv = new FunctionValue();
                 fv.Name = fn.Name;
                 fv.Expression = fn.Expression;
@@ -297,6 +309,7 @@ namespace FlowMatters.Source.WebServer
         [WebInvoke(Method = "GET", UriTemplate = "/variables", ResponseFormat = WebMessageFormat.Json)]
         public VariableSummary[] GetInputList()
         {
+            Log("Requested Variable List");
             VariableSummary[] result = new VariableSummary[Scenario.Network.FunctionManager.Variables.Count];
             for (var i = 0; i < result.Count(); i++)
                 result[i] = new VariableSummary(Scenario.Network.FunctionManager.Variables[i],Scenario);
@@ -307,13 +320,15 @@ namespace FlowMatters.Source.WebServer
         [WebInvoke(Method="GET",UriTemplate="/variables/{variableName}",ResponseFormat=WebMessageFormat.Json)]
         public VariableSummary GetInput(string variableName)
         {
-            return new VariableSummary(Scenario.Network.FunctionManager.Variables.FirstOrDefault(v => v.FullName == ("$"+variableName)),Scenario);
+            Log("Requested Variable : " + variableName);
+            return new VariableSummary(Scenario.Network.FunctionManager.Variables.FirstOrDefault(v => v.FullName == ("$" + variableName)), Scenario);
         }
 
         [OperationContract]
         [WebInvoke(Method = "GET", UriTemplate = "/variables/{variableName}/TimeSeries", ResponseFormat = WebMessageFormat.Json)]
         public SimpleTimeSeries GetInputTimeSeries(string variableName)
         {
+            Log(String.Format("Requested time series for {0}", variableName));
             return (new VariableSummary(Scenario.Network.FunctionManager.Variables.FirstOrDefault(v => v.FullName == ("$" + variableName)), Scenario)).TimeSeriesData;
         }
 
@@ -322,6 +337,7 @@ namespace FlowMatters.Source.WebServer
             RequestFormat = WebMessageFormat.Json)]
         public void ChangeInputTimeSeries(string variableName, SimpleTimeSeries newTimeSeries)
         {
+            Log(String.Format("Updating time series for {0}", variableName));
             VariableSummary summ =
                 new VariableSummary(
                     Scenario.Network.FunctionManager.Variables.FirstOrDefault(v => v.FullName == ("$" + variableName)),
@@ -333,6 +349,7 @@ namespace FlowMatters.Source.WebServer
         [WebInvoke(Method = "GET", UriTemplate = "/variables/{variableName}/Piecewise", ResponseFormat = WebMessageFormat.Json)]
         public SimplePiecewise GetPiecewiseLinear(string variableName)
         {
+            Log(String.Format("Requested piecewise linear function for {0}", variableName));
             return (new VariableSummary(Scenario.Network.FunctionManager.Variables.FirstOrDefault(v => v.FullName == ("$" + variableName)), Scenario)).PiecewiseFunctionData;
         }
 
@@ -341,6 +358,7 @@ namespace FlowMatters.Source.WebServer
             RequestFormat = WebMessageFormat.Json)]
         public void ChangePiecewiseLinear(string variableName, SimplePiecewise newPiecewise)
         {
+            Log(String.Format("Updating  piecewise linear function for {0}", variableName));
             VariableSummary summ =
                 new VariableSummary(
                     Scenario.Network.FunctionManager.Variables.FirstOrDefault(v => v.FullName == ("$" + variableName)),
@@ -352,6 +370,7 @@ namespace FlowMatters.Source.WebServer
         [WebInvoke(Method="GET",UriTemplate="/inputSets",ResponseFormat = WebMessageFormat.Json)]
         public InputSetSummary[] InputSetShenanigans()
         {
+            Log("Requested input sets");
             ParameterSetManager Manager = Scenario.PluginDataModels.OfType<ParameterSetManager>().First();
             InputSetSummary[] result = new InputSetSummary[Scenario.Network.InputSets.Count];
             for (int i = 0; i < result.Length; i++)
