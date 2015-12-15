@@ -371,6 +371,56 @@ namespace FlowMatters.Source.WebServer
             return result;
         }
 
+        [OperationContract]
+        [WebInvoke(Method = "PUT", UriTemplate = "/recorders", RequestFormat = WebMessageFormat.Json)]
+        public void UpdateRecorders(RecordingInstructions ri)
+        {
+
+            Log("Updating recorders");
+            ProjectViewTable table = Scenario.ProjectViewTable();
+
+            foreach (string s in ri.RecordNone)
+            {
+                Log("OFF: " + s);
+                SwitchRecording(ri.Parse(s), false);
+            }
+            foreach (string s in ri.RecordAll)
+            {
+                Log("ON: " + s);
+                SwitchRecording(ri.Parse(s), true);
+            }
+        }
+
+        private void SwitchRecording(TimeSeriesLink query, bool record)
+        {
+            Dictionary<ProjectViewRow.RecorderFields, object> constraint = new Dictionary<ProjectViewRow.RecorderFields, object>();
+
+            if (query.NetworkElement.Length > 0)
+            {
+                constraint[ProjectViewRow.RecorderFields.NetworkElementName] = query.NetworkElement;
+            }
+
+            if (query.RecordingElement.Length > 0)
+            {
+                constraint[ProjectViewRow.RecorderFields.ElementName] = query.RecordingElement;
+            }
+
+            var table = Scenario.ProjectViewTable();
+            var rows = table.Select(constraint);
+            var state = record ? RecordingStates.RecordAll : RecordingStates.RecordNone;
+            foreach (var row in rows)
+            {
+                foreach (var recordable in row.ElementRecorder.RecordableAttributes)
+                {
+                    if ((query.RecordingVariable.Length == 0) ||
+                        (recordable.FullKeyString.IndexOf(query.RecordingVariable, StringComparison.Ordinal) >= 0))
+                    {
+                        row.ElementRecorder.SetRecordingState(recordable.KeyString,recordable.KeyObject,state);
+                    }
+                }
+            }
+        }
+
         private TimeSeries AggregateTimeSeries(TimeSeries result, string aggregation)
         {
             if (result == null)

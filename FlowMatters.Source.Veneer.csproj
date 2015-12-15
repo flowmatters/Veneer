@@ -125,6 +125,7 @@
     <Compile Include="GeoJSONNetwork.cs" />
     <Compile Include="ISourceService.cs" />
     <Compile Include="ProcessRequests\ParseDataRequests.cs" />
+    <Compile Include="RecordingInstructions.cs" />
     <Compile Include="ScenarioInvoker.cs" />
     <Compile Include="SimplePiecewise.cs" />
     <Compile Include="SourceHTTPServer.cs" />
