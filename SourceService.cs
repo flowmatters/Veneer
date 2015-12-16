@@ -82,6 +82,13 @@ namespace FlowMatters.Source.WebServer
         }
 
         [OperationContract]
+        [WebInvoke(Method = "GET", UriTemplate = UriTemplates.FilesQuery)]
+        public Stream GetFileQuery(string fn, string version)
+        {
+            return GetFile(fn);
+        }
+
+        [OperationContract]
         [WebInvoke(Method="GET",UriTemplate = UriTemplates.Resources)]
         public Stream GetResources(string resourceName)
         {

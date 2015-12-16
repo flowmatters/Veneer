@@ -23,6 +23,8 @@ namespace FlowMatters.Source.WebServer
 
         public const string FilesDD = "/doc/{dir1}/{dir2}/{fn}";
 
+        public const string FilesQuery = "/doc/{*fn}?v={version}";
+
         public const string Resources = "/resources/{resourceName}";
 
         public const string Network = "/network";
