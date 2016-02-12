@@ -15,6 +15,7 @@ using System.Text;
 using System.Windows.Forms;
 using System.Xml;
 using FlowMatters.Source.Veneer;
+using FlowMatters.Source.Veneer.RemoteScripting;
 using FlowMatters.Source.WebServer.ExchangeObjects;
 using RiverSystem;
 using RiverSystem.Controls.Icons;
@@ -37,8 +38,15 @@ namespace FlowMatters.Source.WebServer
     class SourceService //: ISourceService
     {
         public RiverSystemScenario Scenario { get; set; }
+        public bool AllowScript { get; set; }
+        private ScriptRunner scriptRunner = new ScriptRunner();
 
         public event ServerLogListener LogGenerator;
+
+        public SourceService()
+        {
+            AllowScript = false;
+        }
 
         [OperationContract]
         [WebGet(UriTemplate = "/", ResponseFormat = WebMessageFormat.Json)]
@@ -415,6 +423,22 @@ namespace FlowMatters.Source.WebServer
                 Log("ON: " + s);
                 SwitchRecording(ri.Parse(s), true);
             }
+        }
+
+        [OperationContract]
+        [WebInvoke(Method = "POST", UriTemplate = "/ironpython", 
+            RequestFormat = WebMessageFormat.Json, ResponseFormat = WebMessageFormat.Json)]
+        public IronPythonResponse RunIronPython(IronPythonScript script)
+        {
+            if (!AllowScript)
+            {
+                Log(String.Format("Attempt to run IronPython script, but AllowScript=false. Script:\n{0}", script.Script));
+                WebOperationContext.Current.OutgoingResponse.StatusCode = HttpStatusCode.Forbidden;
+                return null;
+            }
+            Log(String.Format("Running IronyPython script:\n{0}",(script.Script.Length>80)?(script.Script.Substring(0,75)+"..."):script.Script));
+            scriptRunner.Scenario = Scenario;
+            return scriptRunner.Run(script);
         }
 
         private void SwitchRecording(TimeSeriesLink query, bool record)

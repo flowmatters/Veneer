@@ -1,11 +1,12 @@
 ﻿using System.Runtime.Serialization;
+using FlowMatters.Source.Veneer.ExchangeObjects;
 using RiverSystem.Functions.Variables;
 using TIME.Core;
 
 namespace FlowMatters.Source.Veneer
 {
     [DataContract]
-    public class SimplePiecewise
+    public class SimplePiecewise : VeneerResponse
     {
         public SimplePiecewise() { }
 

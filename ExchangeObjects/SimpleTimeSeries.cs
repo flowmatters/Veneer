@@ -3,12 +3,13 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Runtime.Serialization;
+using FlowMatters.Source.Veneer.ExchangeObjects;
 using TIME.DataTypes;
 
 namespace FlowMatters.Source.WebServer.ExchangeObjects
 {
     [DataContract]
-    public class SimpleTimeSeries
+    public class SimpleTimeSeries : VeneerResponse
     {
         public SimpleTimeSeries() { }
 

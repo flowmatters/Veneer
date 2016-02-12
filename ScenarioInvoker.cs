@@ -22,9 +22,9 @@ namespace FlowMatters.Source.Veneer
 {
     class ScenarioInvoker
     {
-        private ScenarioRunWindow runControl;
+        //private ScenarioRunWindow runControl;
         private object lockObj = new object();
-        private bool running;
+        //private bool running;
         public RiverSystemScenario Scenario { set; get; }
 
         private IRunManager JobRunner
@@ -150,7 +150,7 @@ namespace FlowMatters.Source.Veneer
 
         void JobRunner_AfterRun(object sender, EventArgs e)
         {
-            running = false;
+//            running = false;
 //            Monitor.PulseAll(lockObj);
 //            Monitor.Exit(lockObj);
         }
