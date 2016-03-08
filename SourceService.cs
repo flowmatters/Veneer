@@ -15,6 +15,7 @@ using System.Text;
 using System.Windows.Forms;
 using System.Xml;
 using FlowMatters.Source.Veneer;
+using FlowMatters.Source.Veneer.ExchangeObjects;
 using FlowMatters.Source.Veneer.RemoteScripting;
 using FlowMatters.Source.WebServer.ExchangeObjects;
 using RiverSystem;
@@ -35,11 +36,12 @@ namespace FlowMatters.Source.WebServer
     [ServiceKnownType(typeof(double[][]))]
     [ServiceKnownType(typeof(double[][][]))]
     [ServiceKnownType(typeof(double[][][][]))]
-    class SourceService //: ISourceService
+    public class SourceService //: ISourceService
     {
         public RiverSystemScenario Scenario { get; set; }
-        public bool AllowScript { get; set; }
         private ScriptRunner scriptRunner = new ScriptRunner();
+
+        public bool AllowScript { get; set; }
 
         public event ServerLogListener LogGenerator;
 

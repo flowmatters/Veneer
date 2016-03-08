@@ -36,6 +36,7 @@ namespace FlowMatters.Source.WebServerPanel
             Port = 9876;
             InitializeComponent();
             _originalContext = SynchronizationContext.Current;
+            this.DataContext = this;
         }
 
         public RiverSystemScenario Scenario
@@ -132,7 +133,31 @@ namespace FlowMatters.Source.WebServerPanel
 
         private AbstractSourceServer _server;
 
-        public int Port { get; set; }
+        private int _port;
+
+        private bool _allowScripts;
+        public bool AllowScripts
+        {
+            get { return _allowScripts; }
+            set
+            {
+                _allowScripts = value;
+                if (_server != null) _server.Service.AllowScript = value;
+            }
+        }
+        public int Port
+        {
+            get { return _port; }
+            set
+            {
+                _port = value;
+                if (_server != null)
+                {
+                    StopServer();
+                    StartServer();
+                }
+            }
+        }
 
         private void StartServer()
         {
@@ -140,6 +165,12 @@ namespace FlowMatters.Source.WebServerPanel
             _server.Scenario = Scenario;
             _server.LogGenerator += ServerLogEvent;
             _server.Start();
+        }
+
+        public bool NotRunning { get { return !Running; } }
+        public bool Running
+        {
+            get { return (_server != null); }
         }
 
         void ServerLogEvent(object sender, string msg)
@@ -158,6 +189,27 @@ namespace FlowMatters.Source.WebServerPanel
         public void Dispose()
         {
             StopServer();
+        }
+
+        private void ClearBtn_OnClick(object sender, RoutedEventArgs e)
+        {
+            LogBox.Clear();
+        }
+
+        private void StartBtn_OnClick(object sender, RoutedEventArgs e)
+        {
+            StartServer();
+        }
+
+        private void StopBtn_OnClick(object sender, RoutedEventArgs e)
+        {
+            StopServer();
+        }
+
+        private void RestartBtn_OnClick(object sender, RoutedEventArgs e)
+        {
+            StopServer();
+            StartServer();
         }
     }
 }

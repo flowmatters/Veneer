@@ -14,7 +14,7 @@ using TIME.Tools.Reflection;
 namespace FlowMatters.Source.Veneer
 {
     [DataContract]
-    class VariableSummary
+    public class VariableSummary
     {
         public VariableSummary(AbstractFunctionVariable v,RiverSystemScenario scenario)
         {
@@ -23,7 +23,8 @@ namespace FlowMatters.Source.Veneer
             Name = v.Name;
             FullName = v.FullName;
             ID = v.id;
-
+            VariableType = v.GetType().Name;
+ 
             if (v is BilinearVariable)
             {
                 VeneerSupported = false;
@@ -102,6 +103,7 @@ namespace FlowMatters.Source.Veneer
 
         [DataMember] public string Name;
         [DataMember] public string FullName;
+        [DataMember] public string VariableType;
         [DataMember] public int ID;
         [DataMember] public bool VeneerSupported;
         [DataMember] public string VeneerDebugInfo;

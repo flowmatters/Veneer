@@ -7,6 +7,7 @@ namespace FlowMatters.Source.WebServer
     {
         protected int _port;
 
+        public abstract SourceService Service { get;  }
         protected AbstractSourceServer(int port)
         {
             _port = port;

@@ -20,6 +20,11 @@ namespace FlowMatters.Source.WebServer
         private RiverSystemScenario _scenario;
         private ParseDataRequests _parser;
 
+        public override SourceService Service
+        {
+            get { return null; }
+        }
+
         public SourceHTTPServer(int port):base(port)
         {
             listener.Prefixes.Add(String.Format("http://localhost:{0}/",_port));

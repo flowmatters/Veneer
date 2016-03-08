@@ -14,6 +14,11 @@ namespace FlowMatters.Source.WebServer
         private SourceService _singletonInstance;
         private RiverSystemScenario _scenario;
 
+        public override SourceService Service
+        {
+            get { return _singletonInstance; }
+        }
+
         public SourceRESTfulService(int port) : base(port)
         {
             

@@ -149,6 +149,9 @@
   <ItemGroup>
     <Compile Include="AbstractSourceServer.cs" />
     <Compile Include="ExchangeObjects\BooleanResponse.cs" />
+    <Compile Include="ExchangeObjects\GeoJSONCoverage.cs" />
+    <Compile Include="ExchangeObjects\GeoJSONFeature.cs" />
+    <Compile Include="ExchangeObjects\ListResponse.cs" />
     <Compile Include="ExchangeObjects\NumericResponse.cs" />
     <Compile Include="ExchangeObjects\RunLink.cs" />
     <Compile Include="ExchangeObjects\RunSummary.cs" />

@@ -3,17 +3,16 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Runtime.Serialization;
-using Microsoft.CSharp.RuntimeBinder;
+using FlowMatters.Source.Veneer.ExchangeObjects;
 using RiverSystem;
 using RiverSystem.Catchments;
 using RiverSystem.Controls.Icons;
-using TIME.DataTypes.Polygons;
 using Network = RiverSystem.Network;
 
 namespace FlowMatters.Source.WebServer
 {
     [DataContract]
-    public class GeoJSONNetwork
+    public class GeoJSONNetwork : GeoJSONCoverage
     {
         public GeoJSONNetwork(Network source)
         {
@@ -30,110 +29,6 @@ namespace FlowMatters.Source.WebServer
             featureList.AddRange(from Link l in source.links select new GeoJSONFeature(l));
             featureList.AddRange(catchments.Select(c => new GeoJSONFeature((Catchment)c,source.Scenario.BoundaryForCatchment(c))));
             features = featureList.ToArray();
-        }
-
-        [DataMember]
-        public string type
-        {
-            get { return _type; }
-            private set { _type = value; }
-        }
-        private string _type = "FeatureCollection";
-
-        [DataMember]
-        public GeoJSONFeature[] features;
-
-    }
-
-    [DataContract]
-    public class GeoJSONFeature
-    {
-        private const string FeatureTypeProperty = "feature_type";
-        private const string ResourceProperty = "icon";
-
-        [DataMember]
-        public string type
-        {
-            get { return _type; }
-            private set { _type = value; }
-        }
-        private string _type = "Feature";
-        private GeoJSONProperties _properties = new GeoJSONProperties();
-
-
-        [DataMember]
-        public string id { get; private set; }
-
-        [DataMember]
-        public GeoJSONGeometry geometry { get; private set; }
-
-        [DataMember]
-        public GeoJSONProperties properties
-        {
-            get { return _properties; }
-            private set { _properties = value; }
-        }
-
-        public GeoJSONFeature(Node n)
-        {           
-            id = NodeURL(n);
-
-            properties.Add("name",n.Name);
-            properties.Add(FeatureTypeProperty,"node");
-
-            properties.Add(ResourceProperty,
-                           UriTemplates.Resources.Replace("{resourceName}", ResourceName(n)));
-
-            geometry = new GeoJSONGeometry(n.location);
-        }
-
-        private static string ResourceName(Node n)
-        {
-            object o = RetrieveNodeModel(n) ?? (object) n.FlowPartitioning;
-            return o.GetType().Name;
-        }
-
-        private static NodeModel RetrieveNodeModel(dynamic n)
-        {
-            try
-            {
-                return n.NodeModel;
-            }
-            catch (RuntimeBinderException)
-            {
-                return n.NodeModels[0];
-            }
-        }
-
-        private static string NodeURL(INode n)
-        {
-            return UriTemplates.Node.Replace("{nodeId}", n.id.ToString());
-        }
-
-        private static string LinkURL(ILink l)
-        {
-            Link link = (Link) l;
-            return UriTemplates.Link.Replace("{linkId}", link.Network.links.indexOf(link).ToString());
-        }
-
-        public GeoJSONFeature(Link l)
-        {
-            id = LinkURL(l);
-            properties.Add("name",l.Name);
-            properties.Add(FeatureTypeProperty,"link");
-            properties.Add("from_node", NodeURL(l.UpstreamNode));
-            properties.Add("to_node", NodeURL(l.DownstreamNode));
-            
-            geometry = new GeoJSONGeometry(l);
-        }
-
-        public GeoJSONFeature(Catchment c,GEORegion region)
-        {
-            id = UriTemplates.Catchment.Replace("{catchmentId}", c.id.ToString());
-            properties.Add("name", c.Name);
-            properties.Add(FeatureTypeProperty,"catchment");
-            properties.Add("link",LinkURL(c.DownstreamLink));
-            geometry = new GeoJSONGeometry(region);
         }
     }
 
