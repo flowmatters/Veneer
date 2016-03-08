@@ -32,16 +32,30 @@ namespace FlowMatters.Source.WebServer
             _singletonInstance.LogGenerator += _singletonInstance_LogGenerator;
             _singletonInstance.Scenario = Scenario;
             _host = new WebServiceHost(_singletonInstance);
-            _host.Faulted += _host_Faulted;
             _host.UnknownMessageReceived += _host_UnknownMessageReceived;
             binding.CrossDomainScriptAccessEnabled = true;
             
             //AppendHeader("Access-Control-Allow-Origin", "*");
             _host.AddServiceEndpoint(typeof(SourceService), binding, string.Format("http://localhost:{0}/", _port));
-            
-            _host.Open();
-            Log("Veneer, by Flow Matters: http://www.flowmatters.com.au");
-            Log(string.Format("Started Source RESTful Service on port:{0}",_port));
+
+            try
+            {
+                _host.Open();
+                Log("Veneer, by Flow Matters: http://www.flowmatters.com.au");
+                Log(string.Format("Started Source RESTful Service on port:{0}", _port));
+            }
+            catch (AddressAlreadyInUseException)
+            {
+                _port++; // Keep retrying until we run out of allocated ports
+                Start();
+            }
+            catch (Exception e)
+            {
+                Log("COULD NOT START VENEER");
+                Log(e.Message);
+                Log(e.StackTrace);
+            }
+            _host.Faulted += _host_Faulted;
         }
 
         void _host_UnknownMessageReceived(object sender, UnknownMessageReceivedEventArgs e)
