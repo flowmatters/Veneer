@@ -19,7 +19,7 @@ namespace FlowMatters.Source.WebServer
             IList<ICatchment> catchments = new List<ICatchment>(source.Catchments);
 
             List<GeoJSONFeature> featureList = new List<GeoJSONFeature>();
-            featureList.AddRange(from Node n in source.nodes select new GeoJSONFeature(n));
+            featureList.AddRange(from Node n in source.nodes select new GeoJSONFeature(n,source.Scenario));
             foreach (Link link in source.links)
             {
                 if (link.Network == null)
