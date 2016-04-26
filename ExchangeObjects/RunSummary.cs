@@ -14,6 +14,7 @@ namespace FlowMatters.Source.WebServer.ExchangeObjects
         {
             DateRun = r.DateRun.ToString(CultureInfo.InvariantCulture);
             Name = r.Name;
+            Scenario = r.Scenario.Name;
             Number = r.RunNumber;
             Results = BuildResultsArray(r.RunParameters.GetRowsForScenario(r.Scenario.id).ToArray());
         }
@@ -53,6 +54,9 @@ namespace FlowMatters.Source.WebServer.ExchangeObjects
 
         [DataMember]
         public string Name;
+
+        [DataMember]
+        public string Scenario;
 
         [DataMember]
         public int Number;
