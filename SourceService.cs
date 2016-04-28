@@ -250,6 +250,23 @@ namespace FlowMatters.Source.WebServer
             return new RunSummary(run);
         }
 
+        [OperationContract]
+        [WebInvoke(Method = "DELETE", UriTemplate = UriTemplates.RunResults)]
+        public void DeleteRun(string runId)
+        {
+            Log(String.Format("Deleting run results ({0})", runId));
+            int id = -1;
+            if (runId == "latest")
+            {
+                id = Scenario.Project.ResultManager.AllRuns().Count();
+            }
+            else
+            {
+                id = int.Parse(runId);
+            }
+            Scenario.Project.ResultManager.RemoveRun(id);
+        }
+
         private Run RunForId(string id)
         {
             if(id.ToLower() == "latest")
