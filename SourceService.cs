@@ -521,7 +521,9 @@ namespace FlowMatters.Source.WebServer
 
             if (row == null) return null;
 
-            return row.ElementRecorder.GetResultList().FirstOrDefault(er => URLSafeString(er.Key.KeyString) == URLSafeString(variable)).Value;            
+            return row.ElementRecorder.GetResultList().FirstOrDefault(er => 
+                (URLSafeString(er.Key.KeyString) == URLSafeString(variable))||
+                ((er.Key.KeyString=="")&&(row.ElementName==variable))).Value;            
         }
 
         private SimpleTimeSeries TimeSeriesNotFound()

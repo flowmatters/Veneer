@@ -35,7 +35,7 @@ namespace FlowMatters.Source.WebServer.ExchangeObjects
                                 TimeSeriesUrl = BuildTimeSeriesUrl(row,key),
                                 NetworkElement = row.NetworkElementName,
                                 RecordingElement = row.ElementName,
-                                RecordingVariable = key.KeyString
+                                RecordingVariable = SelectRecordingVariable(key, row)
                             });
                 }
             }
@@ -43,10 +43,15 @@ namespace FlowMatters.Source.WebServer.ExchangeObjects
             return result.ToArray();
         }
 
+        private static string SelectRecordingVariable(AttributeRecordingState key, ProjectViewRow row)
+        {
+            return (key.KeyString=="")?row.ElementName:key.KeyString;
+        }
+
         private string BuildTimeSeriesUrl(ProjectViewRow row, AttributeRecordingState key)
         {
             return string.Format(UriTemplates.TimeSeries.Replace("{runId}", "{0}").Replace("{networkElement}", "{1}").Replace("{recordingElement}","{2}").Replace("{variable}", "{3}"), 
-                Number, SourceService.URLSafeString(row.NetworkElementName), SourceService.URLSafeString(row.ElementName), SourceService.URLSafeString(key.KeyString));
+                Number, SourceService.URLSafeString(row.NetworkElementName), SourceService.URLSafeString(row.ElementName), SourceService.URLSafeString(SelectRecordingVariable(key,row)));
         }
 
         [DataMember]
