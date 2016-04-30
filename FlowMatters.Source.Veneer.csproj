@@ -208,6 +208,10 @@
     <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="WebServerStatusPanel.resx">
+      <DependentUpon>WebServerStatusPanel.cs</DependentUpon>
     </EmbeddedResource>
     <None Include="Lib\abc.py" />
     <None Include="Lib\aifc.py" />
@@ -733,7 +737,7 @@
     <Resource Include="Logo_RGB.png" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="Resources\Icon_Only_RGB_for_LI.png" />
+    <Resource Include="Resources\Icon_Only_RGB_for_LI.png" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\FM.ico" />
