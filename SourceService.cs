@@ -217,7 +217,16 @@ namespace FlowMatters.Source.WebServer
         {
             Log("Triggering a run.");
             ScenarioInvoker si = new ScenarioInvoker { Scenario = Scenario };
-            si.RunScenario(parameters);
+            try
+            {
+                si.RunScenario(parameters);
+            }
+            catch (Exception e)
+            {
+                Log("Run Failed");
+                Log(e.Message);
+                Log(e.StackTrace);
+            }
             Run r = RunForId("latest");
 
             WebOperationContext.Current.OutgoingResponse.StatusCode = HttpStatusCode.Redirect;

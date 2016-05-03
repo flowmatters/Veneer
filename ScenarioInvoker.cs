@@ -120,6 +120,11 @@ namespace FlowMatters.Source.Veneer
             foreach (var entry in parameters.Params)
             {
                 var prop = configType.GetProperty(entry.Key, BindingFlags.Instance | BindingFlags.Public);
+                if (prop == null)
+                {
+                    throw new NotImplementedException(String.Format(
+                        "Running configuration doesn't have a property: {0}", entry.Key));
+                }
                 if (prop.PropertyType == typeof (DateTime))
                 {
                     DateTime dt = DateTime.ParseExact(entry.Value.ToString(), "dd/MM/yyyy", CultureInfo.InvariantCulture);
