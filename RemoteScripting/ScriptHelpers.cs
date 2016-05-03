@@ -6,10 +6,12 @@ using System.Text;
 using System.Threading.Tasks;
 using IronPython.Runtime.Operations;
 using RiverSystem;
+using RiverSystem.Constituents;
 using RiverSystem.DataManagement.DataManager;
 using RiverSystem.DataManagement.DataManager.DataDetails;
 using RiverSystem.DataManagement.DataManager.DataSources;
 using RiverSystem.ManagedExtensions;
+using RiverSystem.Quality.SourceSinkModels;
 using TIME.Core;
 using TIME.DataTypes;
 using TIME.Management;
@@ -83,6 +85,30 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
         public static bool ListContainsInstance(IEnumerable<object> theList, object example)
         {
             return theList.Any(o => o.GetType() == example.GetType());
+        }
+
+        public static void InitialiseModelsForConstituent(RiverSystemScenario s, Constituent c)
+        {
+            ConstituentsManagement cm = s.Network.ConstituentsManagement;
+            cm.Elements.OfType<NetworkElementConstituentData>().ForEachItem(d =>
+            {
+                d.Data.GetModel(c, DefaultSourceSinkType(d));
+            });
+        }
+
+        private static Type DefaultSourceSinkType(NetworkElementConstituentData data)
+        {
+            if (data is LinkElementConstituentData)
+            {
+                return typeof(NullLinkInstreamModel);
+            }
+
+            if (data is StorageElementConstituentData)
+            {
+                return typeof (StorageSourceSinkModel);
+            }
+
+            return null;
         }
     }
 }
