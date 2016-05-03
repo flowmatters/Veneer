@@ -15,6 +15,7 @@ using System.Text;
 using System.Windows.Forms;
 using System.Xml;
 using FlowMatters.Source.Veneer;
+using FlowMatters.Source.Veneer.DomainActions;
 using FlowMatters.Source.Veneer.ExchangeObjects;
 using FlowMatters.Source.Veneer.RemoteScripting;
 using FlowMatters.Source.WebServer.ExchangeObjects;
@@ -413,27 +414,32 @@ namespace FlowMatters.Source.WebServer
         }
 
         [OperationContract]
-        [WebInvoke(Method="GET",UriTemplate="/inputSets",ResponseFormat = WebMessageFormat.Json)]
+        [WebInvoke(Method="GET",UriTemplate=UriTemplates.InputSets,ResponseFormat = WebMessageFormat.Json)]
         public InputSetSummary[] InputSetShenanigans()
         {
             Log("Requested input sets");
-            ParameterSetManager Manager = Scenario.PluginDataModels.OfType<ParameterSetManager>().First();
-            InputSetSummary[] result = new InputSetSummary[Scenario.Network.InputSets.Count];
-            for (int i = 0; i < result.Length; i++)
+            var sets = new InputSets(Scenario);
+            InputSetSummary[] result = new InputSetSummary[sets.All.Count];
+            for (int i=  0; i < result.Length;i++)
             {
-                InputSet inputSet = Scenario.Network.InputSets[i];
-                InputSetParameterSet ps = Manager.ParameterSets.First(x => x.InputSet == Scenario.Network.InputSets[i]);
-
+                var inputSet = sets.All[i];
                 result[i] = new InputSetSummary
                 {
+                    URL = String.Format("{0}/{1}",UriTemplates.InputSets,URLSafeString(inputSet.Name)),
                     Name = inputSet.Name,
                     Default = inputSet.IsDefault,
-                    Configuration = ps.Parameters.Configuration.Instructions.Split(Environment.NewLine.ToCharArray())
+                    Configuration = sets.Instructions(inputSet)
                 };
-
-                
             }
             return result;
+        }
+
+        [OperationContract]
+        [WebInvoke(Method = "POST", UriTemplate = UriTemplates.RunInputSet)]
+        public void RunInputSet(string inputSetName)
+        {
+            var sets = new InputSets(Scenario);
+            sets.Run(inputSetName);
         }
 
         [OperationContract]
@@ -628,6 +634,7 @@ namespace FlowMatters.Source.WebServer
     [DataContract]
     public class InputSetSummary
     {
+        [DataMember] public string URL;
         [DataMember] public string Name;
         [DataMember] public bool Default;
         [DataMember] public string[] Configuration;

@@ -148,6 +148,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AbstractSourceServer.cs" />
+    <Compile Include="DomainActions\InputSets.cs" />
     <Compile Include="ExchangeObjects\BooleanResponse.cs" />
     <Compile Include="ExchangeObjects\GeoJSONCoverage.cs" />
     <Compile Include="ExchangeObjects\GeoJSONFeature.cs" />
