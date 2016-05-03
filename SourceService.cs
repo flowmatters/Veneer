@@ -23,6 +23,7 @@ using RiverSystem.Controls.Icons;
 using RiverSystem.DataManagement.DataManager;
 using RiverSystem.Functions;
 using RiverSystem.Functions.Variables;
+using RiverSystem.ManagedExtensions;
 using RiverSystem.ScenarioExplorer.ParameterSet;
 using TIME.Core;
 using TIME.DataTypes;
@@ -277,26 +278,37 @@ namespace FlowMatters.Source.WebServer
 
         [OperationContract]
         [WebInvoke(Method = "GET", ResponseFormat = WebMessageFormat.Json, UriTemplate = UriTemplates.TimeSeries)]
-        public SimpleTimeSeries GetTimeSeries(string runId, string networkElement, string recordingElement,
+        public TimeSeriesResponse GetTimeSeries(string runId, string networkElement, string recordingElement,
                                               string variable)
         {
             Log(String.Format("Requested time series {0}/{1}/{2}/{3}",runId,networkElement,recordingElement,variable));
-            TimeSeries result = MatchTimeSeries(runId, networkElement, recordingElement, variable);
+            Tuple<TimeSeriesLink, TimeSeries>[] result = MatchTimeSeries(runId, networkElement, recordingElement, variable);
 
-            return SimpleTimeSeries(result);
+            if (result.Length == 1) 
+                return SimpleTimeSeries(result[0].Item2);
+            return CreateMultipleTimeSeries(result);
         }
 
         [OperationContract]
         [WebInvoke(Method = "GET", ResponseFormat = WebMessageFormat.Json,
             UriTemplate = UriTemplates.AggregatedTimeSeries)]
-        public SimpleTimeSeries GetAggregatedTimeSeries(string runId, string networkElement, string recordingElement,
+        public TimeSeriesResponse GetAggregatedTimeSeries(string runId, string networkElement, string recordingElement,
                                               string variable, string aggregation)
         {
             Log(String.Format("Requested {4} time series {0}/{1}/{2}/{3}", runId, networkElement, recordingElement, variable,aggregation));
-            TimeSeries result = MatchTimeSeries(runId, WebUtility.HtmlDecode(networkElement), WebUtility.HtmlDecode(recordingElement), WebUtility.HtmlDecode(variable));
+            Tuple<TimeSeriesLink, TimeSeries>[] result = MatchTimeSeries(runId, WebUtility.HtmlDecode(networkElement), WebUtility.HtmlDecode(recordingElement), WebUtility.HtmlDecode(variable));
 
-            result = AggregateTimeSeries(result, aggregation);
-            return SimpleTimeSeries(result);
+            result = result.Select(res=>new Tuple<TimeSeriesLink,TimeSeries>(res.Item1,AggregateTimeSeries(res.Item2, aggregation))).ToArray();
+            if(result.Length==1)
+                return SimpleTimeSeries(result[0].Item2);
+            return CreateMultipleTimeSeries(result);
+        }
+
+        private TimeSeriesResponse CreateMultipleTimeSeries(Tuple<TimeSeriesLink, TimeSeries>[] result)
+        {
+            if (result.Length == 0)
+                return TimeSeriesNotFound();
+            return new MultipleTimeSeries(result);
         }
 
         [OperationContract]
@@ -510,20 +522,37 @@ namespace FlowMatters.Source.WebServer
             return (result == null) ? TimeSeriesNotFound() : new SimpleTimeSeries(result);
         }
 
-        private TimeSeries MatchTimeSeries(string runId, string networkElement, string recordingElement, string variable)
+        private Tuple<TimeSeriesLink,TimeSeries>[] MatchTimeSeries(string runId, string networkElement, string recordingElement, string variable)
         {
             Run run = RunForId(runId);
-            if (run == null) return null;
-
-            ProjectViewRow row =
-                run.RunParameters.FirstOrDefault(
+            List<Tuple<TimeSeriesLink,TimeSeries>> result = new List<Tuple<TimeSeriesLink, TimeSeries>>();
+            if (run == null) return result.ToArray();
+            IEnumerable<ProjectViewRow> rows =
+                run.RunParameters.Where(
                     r => MatchesElements(r, networkElement, recordingElement));
 
-            if (row == null) return null;
+//            if (row == null) return null;
 
-            return row.ElementRecorder.GetResultList().FirstOrDefault(er => 
-                (URLSafeString(er.Key.KeyString) == URLSafeString(variable))||
-                ((er.Key.KeyString=="")&&(row.ElementName==variable))).Value;            
+            foreach (var row in rows)
+            {
+                result.AddRange(row.ElementRecorder.GetResultList().Where(er=>MatchesVariable(row,er,variable)).Select(
+                    er =>
+                    {
+                        return new Tuple<TimeSeriesLink, TimeSeries>(RunSummary.BuildLink(er.Value,row,er.Key,run.RunNumber),er.Value);
+                    }));
+            }
+            return result.ToArray();
+            //return row.ElementRecorder.GetResultList().FirstOrDefault(er => 
+            //    (URLSafeString(er.Key.KeyString) == URLSafeString(variable))||
+            //    ((er.Key.KeyString=="")&&(row.ElementName==variable))).Value;            
+        }
+
+        private bool MatchesVariable(ProjectViewRow row, KeyValuePair<AttributeRecordingState, TimeSeries> er, string variable)
+        {
+            if(variable == UriTemplates.MatchAll) return true;
+
+            return (URLSafeString(er.Key.KeyString) == URLSafeString(variable)) ||
+                ((er.Key.KeyString == "") && (row.ElementName == variable));
         }
 
         private SimpleTimeSeries TimeSeriesNotFound()
@@ -540,8 +569,11 @@ namespace FlowMatters.Source.WebServer
 
         private static bool MatchesElements(ProjectViewRow row, string networkElement, string recordingElement)
         {
-            return (URLSafeString(row.NetworkElementName) == URLSafeString(networkElement)) && 
-                (URLSafeString(row.ElementName) == URLSafeString(recordingElement));
+            bool matchesNetworkElement = (networkElement == UriTemplates.MatchAll) ||
+                                         (URLSafeString(row.NetworkElementName) == URLSafeString(networkElement));
+            bool matchesRecordingElement = (recordingElement == UriTemplates.MatchAll) ||
+                                           (URLSafeString(row.ElementName) == URLSafeString(recordingElement));
+            return matchesNetworkElement && matchesRecordingElement;
         }
 
         public static string URLSafeString(string src)

@@ -9,28 +9,17 @@ using TIME.DataTypes;
 namespace FlowMatters.Source.WebServer.ExchangeObjects
 {
     [DataContract]
-    public class SimpleTimeSeries : VeneerResponse
+    public class SimpleTimeSeries : TimeSeriesReponseMeta
     {
-        public SimpleTimeSeries() { }
+        public SimpleTimeSeries(): base(null){ }
 
-        public SimpleTimeSeries(TimeSeries source)
+        public SimpleTimeSeries(TimeSeries source):base(source)
         {
             if (source == null)
             {
-                Name = "No Data";
                 Events = new TimeSeriesEvent[0];
                 return;
             }
-
-            Name = source.name;
-            Units = source.units.ShortName;
-            NoDataValue = source.NullValue;
-            Min = source.Min;
-            Max = source.Max;
-            Mean = source.average();
-            Sum = source.total();
-            StartDate = source.Start.ToString(CultureInfo.InvariantCulture);
-            EndDate = source.End.ToString(CultureInfo.InvariantCulture);
 
             IList<TimeSeriesEvent> eventList = new List<TimeSeriesEvent>();
             for (int i = 0; i < source.count(); i++)
@@ -42,23 +31,6 @@ namespace FlowMatters.Source.WebServer.ExchangeObjects
 
             Events = eventList.ToArray();
         }
-
-        public DateTime AsDate(string text)
-        {
-            return DateTime.Parse(text, CultureInfo.InvariantCulture.DateTimeFormat);
-        }
-
-        [DataMember]
-        public string Name;
-
-        [DataMember]
-        public string Units;
-
-        [DataMember] public string StartDate, EndDate;
-
-        [DataMember] public double NoDataValue;
-
-        [DataMember] public double Min, Max, Mean, Sum;
 
         [DataMember] public TimeSeriesEvent[] Events;
     }

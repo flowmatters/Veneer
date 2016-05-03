@@ -29,14 +29,7 @@ namespace FlowMatters.Source.WebServer.ExchangeObjects
                 {
                     TimeSeries ts = rowResults[key];
                     if(ts != null)
-                        result.Add(new TimeSeriesLink
-                            {
-                                TimeSeriesName = ts.name,
-                                TimeSeriesUrl = BuildTimeSeriesUrl(row,key),
-                                NetworkElement = row.NetworkElementName,
-                                RecordingElement = row.ElementName,
-                                RecordingVariable = SelectRecordingVariable(key, row)
-                            });
+                        result.Add(BuildLink(ts, row, key, Number));
                 }
             }
 
@@ -45,13 +38,25 @@ namespace FlowMatters.Source.WebServer.ExchangeObjects
 
         private static string SelectRecordingVariable(AttributeRecordingState key, ProjectViewRow row)
         {
-            return (key.KeyString=="")?row.ElementName:key.KeyString;
+            return (key.KeyString == "") ? row.ElementName : key.KeyString;
         }
 
-        private string BuildTimeSeriesUrl(ProjectViewRow row, AttributeRecordingState key)
+        public static TimeSeriesLink BuildLink(TimeSeries ts, ProjectViewRow row, AttributeRecordingState key, int runNumber)
+        {
+            return new TimeSeriesLink
+            {
+                TimeSeriesName = ts.name,
+                TimeSeriesUrl = BuildTimeSeriesUrl(row,key, runNumber),
+                NetworkElement = row.NetworkElementName,
+                RecordingElement = row.ElementName,
+                RecordingVariable = SelectRecordingVariable(key, row)
+            };
+        }
+
+        public static string BuildTimeSeriesUrl(ProjectViewRow row, AttributeRecordingState key, int runNumber)
         {
             return string.Format(UriTemplates.TimeSeries.Replace("{runId}", "{0}").Replace("{networkElement}", "{1}").Replace("{recordingElement}","{2}").Replace("{variable}", "{3}"), 
-                Number, SourceService.URLSafeString(row.NetworkElementName), SourceService.URLSafeString(row.ElementName), SourceService.URLSafeString(SelectRecordingVariable(key,row)));
+                runNumber, SourceService.URLSafeString(row.NetworkElementName), SourceService.URLSafeString(row.ElementName), SourceService.URLSafeString(SelectRecordingVariable(key,row)));
         }
 
         [DataMember]

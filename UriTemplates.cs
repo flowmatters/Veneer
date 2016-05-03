@@ -41,5 +41,12 @@ namespace FlowMatters.Source.WebServer
 
         public const string Catchment = "/network/catchments/{catchmentId}";
 
+        public const string InputSets = "/inputSets";
+
+        public const string InputSet = "/inputSets/{inputSetName}";
+
+        public const string RunInputSet = "/inputSets/{inputSetName}/run";
+
+        public const string MatchAll = "__all__";
     }
 }
