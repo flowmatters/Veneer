@@ -444,9 +444,14 @@ namespace FlowMatters.Source.WebServer
         }
 
         [OperationContract]
-        [WebInvoke(Method = "POST", UriTemplate = UriTemplates.RunInputSet)]
-        public void RunInputSet(string inputSetName)
+        [WebInvoke(Method = "POST", UriTemplate = UriTemplates.RunInputSet,RequestFormat = WebMessageFormat.Json)]
+        public void RunInputSet(string inputSetName,string action)
         {
+            if (action != "run")
+            {
+                throw new InvalidOperationException("Cannot perform action " + action + " on input sets");
+            }
+            Log("Applying inout set " + inputSetName);
             var sets = new InputSets(Scenario);
             sets.Run(inputSetName);
         }

@@ -45,7 +45,7 @@ namespace FlowMatters.Source.WebServer
 
         public const string InputSet = "/inputSets/{inputSetName}";
 
-        public const string RunInputSet = "/inputSets/{inputSetName}/run";
+        public const string RunInputSet = "/inputSets/{inputSetName}/{action}";
 
         public const string MatchAll = "__all__";
     }
