@@ -527,11 +527,13 @@ namespace FlowMatters.Source.WebServer
             if (result == null)
                 return null;
             aggregation = aggregation.ToLower();
+            string name = result.name;
             if (aggregation == "monthly")
-                return result.toMonthly();
+                result = result.toMonthly();
 
             if (aggregation == "annual")
-                return result.toAnnual();
+                result = result.toAnnual();
+            result.name = name;
 
             return result;
         }
