@@ -6,6 +6,10 @@ using System.Text;
 using System.Threading.Tasks;
 using IronPython.Runtime.Operations;
 using RiverSystem;
+using RiverSystem.Catchments.Models.ContaminantFilteringModels;
+using RiverSystem.Catchments;
+using RiverSystem.Catchments.Constituents;
+using RiverSystem.Catchments.Models.ContaminantGenerationModels;
 using RiverSystem.Constituents;
 using RiverSystem.DataManagement.DataManager;
 using RiverSystem.DataManagement.DataManager.DataDetails;
@@ -43,14 +47,14 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
         //    }
         //    return null;
         //}
-        
+
         public static void AssignTimeSeries(RiverSystemScenario scenario, object target, string element,
             string dataGroupName, string dataItem, int column = 0)
         {
             if (element.Contains("."))
             {
                 var bits = element.Split('.');
-                target = Deref(target,String.Join(".", bits.Take(bits.Length - 1)));
+                target = Deref(target, String.Join(".", bits.Take(bits.Length - 1)));
                 element = bits[bits.Length - 1];
             }
             Type t = target.GetType();
@@ -90,22 +94,51 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
         public static void InitialiseModelsForConstituent(RiverSystemScenario s, Constituent c)
         {
             ConstituentsManagement cm = s.Network.ConstituentsManagement;
+            
             cm.Elements.OfType<NetworkElementConstituentData>().ForEachItem(d =>
             {
+                if (d.Data == null)
+                    d.Data = new ConstituentsModel();
+
                 d.Data.GetModel(c, DefaultSourceSinkType(d));
             });
+
+            foreach (var catchment in s.Network.Catchments.OfType<Catchment>())
+            {
+                foreach (var functionalUnit in catchment.FunctionalUnits.OfType<StandardFunctionalUnit>())
+                {
+                    InitialiseConstituentSources(s,catchment, functionalUnit,c);
+                }
+            }
+        }
+
+        private static void InitialiseConstituentSources(RiverSystemScenario scenario, Catchment catchment, StandardFunctionalUnit fu, Constituent constituent)
+        {
+            ConstituentsManagement cm = scenario.Network.ConstituentsManagement;
+            FunctionalUnitConstituentData model = cm.GetConstituentData<CatchmentElementConstituentData>(catchment).GetFunctionalUnitData(fu);
+            ConstituentContainer constituentModel = model.ConstituentModels.SingleOrDefault(f => f.Constituent.Equals(constituent));
+            if (constituentModel == null)
+            {
+                constituentModel = new ConstituentContainer(constituent);
+                model.ConstituentModels.Add(constituentModel);
+            }
+
+            if (constituentModel.ConstituentSources.Count > 0) return;
+
+            var defaultConstituentSource = scenario.SystemConfiguration.ConstituentSources.First(cs => cs.IsDefault);
+            constituentModel.ConstituentSources.Add(new ConstituentSourceContainer(defaultConstituentSource, new NilConstituent(), new PassThroughFilter()));
         }
 
         private static Type DefaultSourceSinkType(NetworkElementConstituentData data)
         {
             if (data is LinkElementConstituentData)
             {
-                return typeof(NullLinkInstreamModel);
+                return typeof (NullLinkInstreamModel);
             }
 
             if (data is StorageElementConstituentData)
             {
-                return typeof (StorageSourceSinkModel);
+                return typeof (NullStorageInstreamModel);
             }
 
             return null;
