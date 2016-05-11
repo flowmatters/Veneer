@@ -17,7 +17,7 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects
 
         public MultipleTimeSeries(Tuple<TimeSeriesLink, TimeSeries>[] src)
         {
-            TimeSeries = src.Select(item => new SlimTimeSeries(item.Item1.TimeSeriesUrl,item.Item2)).ToArray();
+            TimeSeries = src.Select(item => new SlimTimeSeries(item.Item1,item.Item2)).ToArray();
         }
     }
 }

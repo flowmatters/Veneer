@@ -6,6 +6,9 @@ namespace FlowMatters.Source.WebServer.ExchangeObjects
     public class TimeSeriesLink
     {
         [DataMember]
+        public int RunNumber;
+
+        [DataMember]
         public string TimeSeriesName;
 
         [DataMember]

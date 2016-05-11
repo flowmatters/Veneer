@@ -46,6 +46,7 @@ namespace FlowMatters.Source.WebServer.ExchangeObjects
             return new TimeSeriesLink
             {
                 TimeSeriesName = ts.name,
+                RunNumber = runNumber,
                 TimeSeriesUrl = BuildTimeSeriesUrl(row,key, runNumber),
                 NetworkElement = row.NetworkElementName,
                 RecordingElement = row.ElementName,

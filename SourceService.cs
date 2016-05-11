@@ -227,7 +227,7 @@ namespace FlowMatters.Source.WebServer
                 Log(e.Message);
                 Log(e.StackTrace);
             }
-            Run r = RunForId("latest");
+            Run r = RunsForId("latest")[0];
 
             WebOperationContext.Current.OutgoingResponse.StatusCode = HttpStatusCode.Redirect;
             WebOperationContext.Current.OutgoingResponse.Headers.Add("Location",
@@ -248,7 +248,7 @@ namespace FlowMatters.Source.WebServer
             else
                 msg = string.Format("run with id={0}", runId);
 
-            Run run = RunForId(runId);
+            Run run = RunsForId(runId)[0];
 
             Log("Requested " + msg);
 
@@ -278,12 +278,17 @@ namespace FlowMatters.Source.WebServer
             Scenario.Project.ResultManager.RemoveRun(id);
         }
 
-        private Run RunForId(string id)
+        private Run[] RunsForId(string id)
         {
             if(id.ToLower() == "latest")
-                return Scenario.Project.ResultManager.AllRuns().LastOrDefault();
-            
-            return Scenario.Project.ResultManager.AllRuns().FirstOrDefault(x => x.RunNumber.ToString(CultureInfo.InvariantCulture) == id);
+                return new Run[] {Scenario.Project.ResultManager.AllRuns().LastOrDefault()};
+
+            if (id.ToLower() == UriTemplates.MatchAll.ToLower())
+            {
+                var x = Scenario.Project.ResultManager.AllRuns();
+                return x.ToArray();
+            }
+            return new Run[] { Scenario.Project.ResultManager.AllRuns().FirstOrDefault(x => x.RunNumber.ToString(CultureInfo.InvariantCulture) == id)};
         }
 
         [OperationContract]
@@ -546,21 +551,23 @@ namespace FlowMatters.Source.WebServer
         
         private Tuple<TimeSeriesLink,TimeSeries>[] MatchTimeSeries(string runId, string networkElement, string recordingElement, string variable)
         {
-            Run run = RunForId(runId);
-            List<Tuple<TimeSeriesLink,TimeSeries>> result = new List<Tuple<TimeSeriesLink, TimeSeries>>();
-            if (run == null) return result.ToArray();
-            IEnumerable<ProjectViewRow> rows =
-                run.RunParameters.Where(
-                    r => MatchesElements(r, networkElement, recordingElement));
+            List<Tuple<TimeSeriesLink, TimeSeries>> result = new List<Tuple<TimeSeriesLink, TimeSeries>>();
+            Run[] runs = RunsForId(runId);
+            if (runs[0] == null) return result.ToArray();
+            IEnumerable<Tuple<int,ProjectViewRow>> rows =
+                runs.SelectMany(run=>run.RunParameters.Where(
+                    r => MatchesElements(r, networkElement, recordingElement)).Select(row=>new Tuple<int,ProjectViewRow>(run.RunNumber,row)));
 
 //            if (row == null) return null;
 
-            foreach (var row in rows)
+            foreach (Tuple<int, ProjectViewRow> entry in rows)
             {
+                var row = entry.Item2;
+                var runNumber = entry.Item1;
                 result.AddRange(row.ElementRecorder.GetResultList().Where(er=>MatchesVariable(row,er,variable)).Select(
                     er =>
                     {
-                        return new Tuple<TimeSeriesLink, TimeSeries>(RunSummary.BuildLink(er.Value,row,er.Key,run.RunNumber),er.Value);
+                        return new Tuple<TimeSeriesLink, TimeSeries>(RunSummary.BuildLink(er.Value,row,er.Key,runNumber),er.Value);
                     }));
             }
             return result.ToArray();
