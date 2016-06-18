@@ -4,6 +4,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
+using IronPython.Modules;
 using IronPython.Runtime.Operations;
 using RiverSystem;
 using RiverSystem.Catchments.Models.ContaminantFilteringModels;
@@ -110,6 +111,25 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
                     InitialiseConstituentSources(s,catchment, functionalUnit,c);
                 }
             }
+        }
+
+        public static void EnsureElementsHaveConstituentProviders(RiverSystemScenario scenario)
+        {
+            RiverSystem.Network network = scenario.Network;
+            ConstituentsManagement cm = network.ConstituentsManagement;
+
+            Action<INetworkElement> ensure = element =>
+            {
+                cm.NetworkElementAdded(element,null);
+            };
+
+            network.Nodes.ForEachItem(ensure);
+            network.Links.ForEachItem(ensure);
+            /* 
+                            var element = sender as INetworkElement;
+            if (element != null && !_elementsDictionary.ContainsKey(element))
+                _elementsDictionary.Add(element, ElementDataFactory.GetNetworkElementConstituentData(element));
+*/
         }
 
         private static void InitialiseConstituentSources(RiverSystemScenario scenario, Catchment catchment, StandardFunctionalUnit fu, Constituent constituent)
