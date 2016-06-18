@@ -36,6 +36,11 @@ namespace FlowMatters.Source.Veneer.DomainActions
             return result.ToArray();
         }
 
+        public void UpdateInstructions(InputSet inputSet, string[] newInstructions)
+        {
+            ParameterSet(inputSet).Configuration.Instructions = String.Join("\n", newInstructions);
+        }
+
         private ParameterSet ParameterSet(InputSet inputSet)
         {
             ParameterSetManager Manager = Scenario.PluginDataModels.OfType<ParameterSetManager>().First();

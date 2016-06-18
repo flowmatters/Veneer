@@ -449,6 +449,16 @@ namespace FlowMatters.Source.WebServer
         }
 
         [OperationContract]
+        [WebInvoke(Method = "PUT", UriTemplate = UriTemplates.InputSet, RequestFormat = WebMessageFormat.Json)]
+        public void UpdateInputSet(string inputSetName, InputSetSummary summary)
+        {
+            Log("Updating Input Set Commands for " + inputSetName);
+            var sets = new InputSets(Scenario);
+            InputSet set = sets.Find(inputSetName);
+            sets.UpdateInstructions(set, summary.Configuration);
+        }
+
+        [OperationContract]
         [WebInvoke(Method = "POST", UriTemplate = UriTemplates.RunInputSet,RequestFormat = WebMessageFormat.Json)]
         public void RunInputSet(string inputSetName,string action)
         {
