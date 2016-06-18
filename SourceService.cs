@@ -542,6 +542,8 @@ namespace FlowMatters.Source.WebServer
             if (result == null)
                 return null;
             aggregation = aggregation.ToLower();
+            var origUnits = result.units;
+
             string name = result.name;
             if (aggregation == "monthly")
                 result = result.toMonthly();
@@ -549,7 +551,8 @@ namespace FlowMatters.Source.WebServer
             if (aggregation == "annual")
                 result = result.toAnnual();
             result.name = name;
-
+            if (origUnits != null)
+                result.units = origUnits;
             return result;
         }
 
