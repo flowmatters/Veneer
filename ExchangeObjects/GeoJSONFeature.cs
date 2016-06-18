@@ -51,7 +51,7 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects
             SchematicNetworkConfigurationPersistent schematic = tmp as SchematicNetworkConfigurationPersistent;
             if (schematic != null)
             {
-                PointF schematicLocation = schematic.ExistingFeatureShapeProperties.Where(shape=>shape.Feature==n).Select(shape=>shape.Location).First();
+                PointF schematicLocation = schematic.ExistingFeatureShapeProperties.Where(shape=>shape.Feature==n).Select(shape=>shape.Location).FirstOrDefault();
                 properties.Add("schematic_location",new double[] {schematicLocation.X,schematicLocation.Y});
             }
             properties.Add(ResourceProperty,
