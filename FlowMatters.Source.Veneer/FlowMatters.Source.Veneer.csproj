@@ -21,7 +21,7 @@
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
-    <OutputPath>Output\</OutputPath>
+    <OutputPath>..\Output\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -75,43 +75,43 @@
       <HintPath>packages\Newtonsoft.Json.5.0.6\lib\net40\Newtonsoft.Json.dll</HintPath>
     </Reference>
     <Reference Include="nunit.framework">
-      <HintPath>References\nunit.framework.dll</HintPath>
+      <HintPath>..\References\nunit.framework.dll</HintPath>
     </Reference>
     <Reference Include="RiverSystem">
-      <HintPath>References\RiverSystem.dll</HintPath>
+      <HintPath>..\References\RiverSystem.dll</HintPath>
     </Reference>
     <Reference Include="RiverSystem.Api">
-      <HintPath>References\RiverSystem.Api.dll</HintPath>
+      <HintPath>..\References\RiverSystem.Api.dll</HintPath>
     </Reference>
     <Reference Include="RiverSystem.ApplicationLayer.Consumer, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>References\RiverSystem.ApplicationLayer.Consumer.dll</HintPath>
+      <HintPath>..\References\RiverSystem.ApplicationLayer.Consumer.dll</HintPath>
     </Reference>
     <Reference Include="RiverSystem.ApplicationLayer.Consumer.Forms, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>References\RiverSystem.ApplicationLayer.Consumer.Forms.dll</HintPath>
+      <HintPath>..\References\RiverSystem.ApplicationLayer.Consumer.Forms.dll</HintPath>
     </Reference>
     <Reference Include="RiverSystem.ApplicationLayer.Interfaces, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>References\RiverSystem.ApplicationLayer.Interfaces.dll</HintPath>
+      <HintPath>..\References\RiverSystem.ApplicationLayer.Interfaces.dll</HintPath>
     </Reference>
     <Reference Include="RiverSystem.Controls">
-      <HintPath>References\RiverSystem.Controls.dll</HintPath>
+      <HintPath>..\References\RiverSystem.Controls.dll</HintPath>
     </Reference>
     <Reference Include="RiverSystem.Forms">
-      <HintPath>References\RiverSystem.Forms.exe</HintPath>
+      <HintPath>..\References\RiverSystem.Forms.exe</HintPath>
     </Reference>
     <Reference Include="RiverSystem.Persistence, Version=3.8.14.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>References\RiverSystem.Persistence.dll</HintPath>
+      <HintPath>..\References\RiverSystem.Persistence.dll</HintPath>
     </Reference>
     <Reference Include="RiverSystem.ScenarioExplorer, Version=3.8.14.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>References\RiverSystem.ScenarioExplorer.dll</HintPath>
+      <HintPath>..\References\RiverSystem.ScenarioExplorer.dll</HintPath>
     </Reference>
     <Reference Include="RiverSystem.Simulation, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>References\RiverSystem.Simulation.dll</HintPath>
+      <HintPath>..\References\RiverSystem.Simulation.dll</HintPath>
     </Reference>
     <!--    <Reference Include="ScenarioManagement">
-      <HintPath>References\ScenarioManagement.dll</HintPath>
+      <HintPath>..\References\ScenarioManagement.dll</HintPath>
     </Reference>
 -->
     <Reference Include="System" />
@@ -130,16 +130,16 @@
       <RequiredTargetFramework>4.0</RequiredTargetFramework>
     </Reference>
     <Reference Include="TIME">
-      <HintPath>References\TIME.dll</HintPath>
+      <HintPath>..\References\TIME.dll</HintPath>
     </Reference>
     <Reference Include="TIME.ScenarioManagement">
-      <HintPath>References\TIME.ScenarioManagement.dll</HintPath>
+      <HintPath>..\References\TIME.ScenarioManagement.dll</HintPath>
     </Reference>
     <Reference Include="TIME.Tools, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>References\TIME.Tools.dll</HintPath>
+      <HintPath>..\References\TIME.Tools.dll</HintPath>
     </Reference>
     <Reference Include="TIME.Winforms, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>References\TIME.Winforms.dll</HintPath>
+      <HintPath>..\References\TIME.Winforms.dll</HintPath>
     </Reference>
     <Reference Include="WindowsBase" />
     <Reference Include="PresentationCore" />
