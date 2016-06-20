@@ -50,6 +50,7 @@ namespace FlowMatters.Source.WebServer
         public SourceService()
         {
             AllowScript = false;
+            RunningInGUI = true;
         }
 
         [OperationContract]
@@ -219,7 +220,7 @@ namespace FlowMatters.Source.WebServer
             ScenarioInvoker si = new ScenarioInvoker { Scenario = Scenario };
             try
             {
-                si.RunScenario(parameters);
+                si.RunScenario(parameters,RunningInGUI);
             }
             catch (Exception e)
             {
@@ -235,6 +236,8 @@ namespace FlowMatters.Source.WebServer
                                                                          ["Location"] +
                                                                      String.Format("runs/{0}", r.RunNumber));
         }
+
+        public bool RunningInGUI { get; set; }
 
         [OperationContract]
         [WebInvoke(Method = "GET", ResponseFormat = WebMessageFormat.Json, UriTemplate = UriTemplates.RunResults)]

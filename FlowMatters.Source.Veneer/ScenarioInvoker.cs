@@ -31,11 +31,15 @@ namespace FlowMatters.Source.Veneer
         {
             get
             {
-                return ProjectManager.Instance.CurrentRiverSystemScenarioProxy.riverSystemScenario.RunManager;
+                if (Scenario == null)
+                {
+                    return ProjectManager.Instance.CurrentRiverSystemScenarioProxy.riverSystemScenario.RunManager;
+                }
+                return Scenario.RunManager;
             }
         }
 
-        public void RunScenario(RunParameters parameters)
+        public void RunScenario(RunParameters parameters,bool showWindow)
         {
             if (Scenario == null)
             {
@@ -53,14 +57,19 @@ namespace FlowMatters.Source.Veneer
                 //                JobRunner.BeforeRun += new BeforeTemporalRunHandler(JobRunner_BeforeRun);
                 Scenario.RunManager.UpdateEvent = new EventHandler<JobRunEventArgs>(JobRunner_Update);
 
-                var runWindow = new ScenarioRunWindow(Scenario);
-                //runWindow.SetOwner(this);
-                //runWindow.WindowStartupLocation = WindowStartupLocation.CenterOwner;
-                //Enabled = false;
-                runWindow.Show();
-
+                ScenarioRunWindow runWindow = null;
                 var startOfRun = DateTime.Now;
-                ProjectManager.Instance.SaveAuditLogMessage("Run started at " + DateTime.Now);
+
+                if (showWindow)
+                {
+                    runWindow = new ScenarioRunWindow(Scenario);
+                    //runWindow.SetOwner(this);
+                    //runWindow.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+                    //Enabled = false;
+                    runWindow.Show();
+                    ProjectManager.Instance.SaveAuditLogMessage("Run started at " + DateTime.Now);
+                }
+
 
                 Task x = Task.Factory.StartNew(() => Scenario.RunManager.Execute());
                 while (!x.IsCompleted)
@@ -70,9 +79,13 @@ namespace FlowMatters.Source.Veneer
                 }
 
                 LogRunEnd(startOfRun);
-                ProjectManager.Instance.SaveAuditLogMessage("Run finished at " + DateTime.Now + " and took " + TimeTools.TimeSpanString(DateTime.Now - startOfRun));
-                runWindow.Close();
-                runWindow.Dispose();
+
+                if (showWindow)
+                {
+                    ProjectManager.Instance.SaveAuditLogMessage("Run finished at " + DateTime.Now + " and took " + TimeTools.TimeSpanString(DateTime.Now - startOfRun));
+                    runWindow.Close();
+                    runWindow.Dispose();
+                }
                 //if so then run
                 //running = true;
 
@@ -81,15 +94,15 @@ namespace FlowMatters.Source.Veneer
                 //runControl.Show();
 
                 //Scenario.RunManager.Execute();
-//                lock (lockObj)
-//                {
+                //                lock (lockObj)
+                //                {
                 //while (running)
                 //{
                 //    Thread.Sleep(50);
                 //    Application.DoEvents();
                 //    //Monitor.Wait(lockObj);
                 //}
-//                }
+                //                }
 
                 //runControl.Close();
                 //runControl.Dispose();
