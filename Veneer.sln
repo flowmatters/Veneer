@@ -1,7 +1,11 @@
 ﻿
-Microsoft Visual Studio Solution File, Format Version 11.00
-# Visual Studio 2010
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FlowMatters.Source.Veneer", "FlowMatters.Source.Veneer.csproj", "{3BD8FE40-11EA-4F0E-AB7C-9EA6E3FD1304}"
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 14
+VisualStudioVersion = 14.0.24720.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FlowMatters.Source.Veneer", "FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj", "{3BD8FE40-11EA-4F0E-AB7C-9EA6E3FD1304}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FlowMatters.Source.VeneerCmd", "FlowMatters.Source.VeneerCmd\FlowMatters.Source.VeneerCmd.csproj", "{2D61D0F4-DCF5-4F41-9994-94F97C7AD1B9}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -23,6 +27,16 @@ Global
 		{3BD8FE40-11EA-4F0E-AB7C-9EA6E3FD1304}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
 		{3BD8FE40-11EA-4F0E-AB7C-9EA6E3FD1304}.Release|Mixed Platforms.Build.0 = Release|Any CPU
 		{3BD8FE40-11EA-4F0E-AB7C-9EA6E3FD1304}.Release|x86.ActiveCfg = Release|Any CPU
+		{2D61D0F4-DCF5-4F41-9994-94F97C7AD1B9}.Debug|Any CPU.ActiveCfg = Debug|x86
+		{2D61D0F4-DCF5-4F41-9994-94F97C7AD1B9}.Debug|Mixed Platforms.ActiveCfg = Debug|x86
+		{2D61D0F4-DCF5-4F41-9994-94F97C7AD1B9}.Debug|Mixed Platforms.Build.0 = Debug|x86
+		{2D61D0F4-DCF5-4F41-9994-94F97C7AD1B9}.Debug|x86.ActiveCfg = Debug|x86
+		{2D61D0F4-DCF5-4F41-9994-94F97C7AD1B9}.Debug|x86.Build.0 = Debug|x86
+		{2D61D0F4-DCF5-4F41-9994-94F97C7AD1B9}.Release|Any CPU.ActiveCfg = Release|x86
+		{2D61D0F4-DCF5-4F41-9994-94F97C7AD1B9}.Release|Mixed Platforms.ActiveCfg = Release|x86
+		{2D61D0F4-DCF5-4F41-9994-94F97C7AD1B9}.Release|Mixed Platforms.Build.0 = Release|x86
+		{2D61D0F4-DCF5-4F41-9994-94F97C7AD1B9}.Release|x86.ActiveCfg = Release|x86
+		{2D61D0F4-DCF5-4F41-9994-94F97C7AD1B9}.Release|x86.Build.0 = Release|x86
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
