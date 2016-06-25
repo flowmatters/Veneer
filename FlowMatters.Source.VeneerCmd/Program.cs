@@ -24,7 +24,16 @@ namespace FlowMatters.Source.VeneerCmd
             {
                 if (options.ProjectFiles.Count > 0)
                 {
-                    RunWithOptions(options);
+                    try
+                    {
+                        RunWithOptions(options);
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine(e.Message);
+                        Console.WriteLine(e.StackTrace);
+                        Console.WriteLine("Unhandled exception: {0}",e.Message);
+                    }
                     return;
                 }
             }
@@ -48,9 +57,18 @@ namespace FlowMatters.Source.VeneerCmd
             var fn = options.ProjectFiles[0];
             LoadPlugins();
 
-            Directory.SetCurrentDirectory(Path.GetDirectoryName(fn));
+            if (!File.Exists(fn))
+            {
+                Console.WriteLine("Cannot find project file: {0}",fn);
+                return;
+            }
+
+            var project_dir = Path.GetDirectoryName(fn);
+            if (project_dir == "")
+                project_dir = ".";
+            Directory.SetCurrentDirectory(project_dir);
             
-            RiverSystemProject project = LoadProject(fn);
+            RiverSystemProject project = LoadProject(fn,options);
             Show(project.Name);
             var scenario = project.GetRSScenarios()[0];
             Show(scenario.ScenarioName);
@@ -74,9 +92,9 @@ namespace FlowMatters.Source.VeneerCmd
             Show(msg);
         }
 
-        private static RiverSystemProject LoadProject(string fn)
+        private static RiverSystemProject LoadProject(string fn,Options arguments)
         {
-            var callback = new DefaultCallback();
+            var callback = new CommandLineProjectCallback(arguments);
             var loader = ProjectHandlerFactory.CreateProjectHandler<RiverSystemProject>(callback);
             callback.OutputFileName = fn;
             Show($"Opening project file: {fn}");
@@ -105,6 +123,22 @@ namespace FlowMatters.Source.VeneerCmd
         }
     }
 
+    public class CommandLineProjectCallback : DefaultCallback
+    {
+        private Options _arguments;
+
+        public CommandLineProjectCallback(Options arguments)
+        {
+            _arguments = arguments;
+        }
+
+        public override bool BackupProject(string currentFileName, out string newFileName)
+        {
+            base.BackupProject(currentFileName, out newFileName);
+            return _arguments.BackupRSPROJ;
+        }
+    }
+
     public class Options
     {
         [Option('p',"port",DefaultValue = 9876u,HelpText= "Port for Veneer server")]
@@ -115,6 +149,9 @@ namespace FlowMatters.Source.VeneerCmd
 
         [Option('s',"allow-scripts",HelpText = "Allow submission of Iron Python scripts",DefaultValue = false)]
         public bool AllowScripts { get; set; }
+
+        [Option('b', "backup-rsproj", HelpText = "Backup .rsproj file", DefaultValue = false)]
+        public bool BackupRSPROJ { get; set; }
 
         [ValueList(typeof(List<string>), MaximumElements = 1)]
         public IList<string> ProjectFiles { get; set; }
