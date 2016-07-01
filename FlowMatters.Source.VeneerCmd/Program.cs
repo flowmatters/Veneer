@@ -11,6 +11,7 @@ using RiverSystem.PluginManager;
 using CommandLine;
 using CommandLine.Text;
 using FlowMatters.Source.WebServer;
+using RiverSystem.ApplicationLayer.Persistence.ZipContainer;
 
 namespace FlowMatters.Source.VeneerCmd
 {
@@ -18,7 +19,17 @@ namespace FlowMatters.Source.VeneerCmd
     {
         static void Main(string[] args)
         {
-//            CopyDLLs();
+            Constants.SetLargeDataOptions();
+            try
+            {
+                TempDirectoryLayout.DeleteProcessIdDirectories(TempDirectoryLayout.ConstBaseTempDirectory);
+            }
+            catch
+            {
+                
+            }
+
+            //            CopyDLLs();
             var options = new Options();
             if (CommandLine.Parser.Default.ParseArguments(args, options))
             {
@@ -97,7 +108,7 @@ namespace FlowMatters.Source.VeneerCmd
             var callback = new CommandLineProjectCallback(arguments);
             var loader = ProjectHandlerFactory.CreateProjectHandler<RiverSystemProject>(callback);
             callback.OutputFileName = fn;
-            Show($"Opening project file: {fn}");
+            Show(String.Format("Opening project file: {0}", fn));
             loader.OpenProject();
             Show("Loading project");
             loader.LoadProject(false);
