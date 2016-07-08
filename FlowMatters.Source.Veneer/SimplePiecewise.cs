@@ -16,8 +16,6 @@ namespace FlowMatters.Source.Veneer
 
             XName = source.XName;
             YName = source.YName;
-            XUnits = source.XUnit.SIUnits;
-            YUnits = source.YUnit.SIUnits;
 
             Entries = new double[source.Entries.Count][];
             for (int i = 0; i < Entries.Length; i++)
@@ -35,9 +33,6 @@ namespace FlowMatters.Source.Veneer
             linV.XName = XName ?? linV.XName;
             linV.YName = YName ?? linV.YName;
 
-            linV.XUnit = Unit.parse(XUnits ?? linV.XUnit.SIUnits);
-            linV.YUnit = Unit.parse(YUnits ?? linV.YUnit.SIUnits);
-
             if (Entries != null)
             {
                 while (linV.Entries.Count > Entries.Length)
@@ -54,7 +49,7 @@ namespace FlowMatters.Source.Veneer
             }
         }
 
-        [DataMember] public string XName, YName, XUnits, YUnits;
+        [DataMember] public string XName, YName;
         [DataMember] public double[][] Entries;
     }
 }
