@@ -119,13 +119,19 @@ namespace FlowMatters.Source.VeneerCmd
             loader.LoadProject(false);
             Show("Project Loaded");
             var project = loader.ProjectMetaStructure.Project;
+            projectHandler = loader;
             return project;
         }
 
         private static void LoadPlugins()
         {
             Show("Loading plugins");
-            PluginRegisterUtility.LoadPlugins();
+            var manager = PluginRegisterUtility.LoadPlugins();
+            manager.LoadPlugins();
+            foreach (var plugin in manager.ActivePlugins)
+            {
+                Show(String.Format("Loaded {0}",plugin.Path));               
+            }
             Show("Plugins loaded");
         }
 
