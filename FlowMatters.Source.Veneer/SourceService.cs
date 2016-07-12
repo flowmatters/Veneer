@@ -20,6 +20,7 @@ using FlowMatters.Source.Veneer.ExchangeObjects;
 using FlowMatters.Source.Veneer.RemoteScripting;
 using FlowMatters.Source.WebServer.ExchangeObjects;
 using RiverSystem;
+using RiverSystem.ApplicationLayer.Interfaces;
 using RiverSystem.Controls.Icons;
 using RiverSystem.DataManagement.DataManager;
 using RiverSystem.Functions;
@@ -46,6 +47,8 @@ namespace FlowMatters.Source.WebServer
         public bool AllowScript { get; set; }
 
         public event ServerLogListener LogGenerator;
+
+        public IProjectHandler<RiverSystemProject> ProjectHandler { get; set; }
 
         public SourceService()
         {
@@ -507,6 +510,7 @@ namespace FlowMatters.Source.WebServer
             }
             Log(String.Format("Running IronyPython script:\n{0}",(script.Script.Length>80)?(script.Script.Substring(0,75)+"..."):script.Script));
             scriptRunner.Scenario = Scenario;
+            scriptRunner.ProjectHandler = ProjectHandler;
             return scriptRunner.Run(script);
         }
 

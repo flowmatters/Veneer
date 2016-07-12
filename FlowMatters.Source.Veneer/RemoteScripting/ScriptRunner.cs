@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 using FlowMatters.Source.Veneer.ExchangeObjects;
 using FlowMatters.Source.WebServer.ExchangeObjects;
 using IronPython.Hosting;
@@ -11,6 +12,8 @@ using Microsoft.Scripting.Hosting;
 using Microsoft.Scripting.Utils;
 using NUnit.Framework;
 using RiverSystem;
+using RiverSystem.ApplicationLayer.Consumer.Forms;
+using RiverSystem.ApplicationLayer.Interfaces;
 using RiverSystem.Forms;
 using RiverSystem.Functions.Variables;
 using TIME.DataTypes;
@@ -23,7 +26,8 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
     class ScriptRunner
     {
         public RiverSystemScenario Scenario { get; set; }
-    
+        public IProjectHandler<RiverSystemProject> ProjectHandler { get; set; }
+
         public IronPythonResponse Run(IronPythonScript script)
         {
             object actual = null;
@@ -38,12 +42,21 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
             {
                 var engine = Python.CreateEngine();
 
+                if(SynchronizationContext.Current==null)
+                    SynchronizationContext.SetSynchronizationContext(new SynchronizationContext());
+
                 AddAssemblyReferences(engine);
                 engine.Runtime.IO.SetOutput(outputStream, outputWriter);
                 engine.Runtime.IO.SetErrorOutput(errorStream, errorWriter);
 
                 var scope = engine.CreateScope();
                 scope.SetVariable("scenario", Scenario);
+
+                if (ProjectHandler == null)
+                {
+                    ProjectHandler = ProjectManager.Instance.ProjectHandler;
+                }
+                scope.SetVariable("project_handler", ProjectHandler);
                 var sourceCode = engine.CreateScriptSourceFromString(script.Script);
                 actual = sourceCode.Execute<object>(scope);
                 if (scope.ContainsVariable("result"))

@@ -4,6 +4,7 @@ using System.Data.Common;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using RiverSystem;
 using RiverSystem.ApplicationLayer.Consumers;
 using RiverSystem.ApplicationLayer.Creation;
@@ -11,6 +12,7 @@ using RiverSystem.PluginManager;
 using CommandLine;
 using CommandLine.Text;
 using FlowMatters.Source.WebServer;
+using RiverSystem.ApplicationLayer.Interfaces;
 using RiverSystem.ApplicationLayer.Persistence.ZipContainer;
 
 namespace FlowMatters.Source.VeneerCmd
@@ -19,6 +21,7 @@ namespace FlowMatters.Source.VeneerCmd
     {
         static void Main(string[] args)
         {
+            SynchronizationContext.SetSynchronizationContext(new SynchronizationContext());
             Constants.SetLargeDataOptions();
             try
             {
@@ -90,7 +93,7 @@ namespace FlowMatters.Source.VeneerCmd
             _server.Start();
             _server.Service.AllowScript = options.AllowScripts;
             _server.Service.RunningInGUI = false;
-
+            _server.Service.ProjectHandler = projectHandler;
             Show("Server started. Ctrl-C to exit, or POST /shutdown command");
             while (true)
             {
@@ -103,6 +106,8 @@ namespace FlowMatters.Source.VeneerCmd
             Show(msg);
         }
 
+        private static IProjectHandler<RiverSystemProject> projectHandler;
+         
         private static RiverSystemProject LoadProject(string fn,Options arguments)
         {
             var callback = new CommandLineProjectCallback(arguments);
