@@ -46,6 +46,8 @@ namespace FlowMatters.Source.WebServer
 
         public bool AllowScript { get; set; }
 
+        public bool RunningInGUI { get; set; }
+
         public event ServerLogListener LogGenerator;
 
         public IProjectHandler<RiverSystemProject> ProjectHandler { get; set; }
@@ -90,7 +92,7 @@ namespace FlowMatters.Source.WebServer
             MemoryStream ms = new MemoryStream();
             string basePath = Scenario.Project.FileDirectory;
             string filename = basePath + "\\" + fn;
-            WebOperationContext.Current.OutgoingResponse.ContentType = ContentTypeForFilename(filename);
+            WebOperationContext.Current.OutgoingResponse.ContentType = ResourceHelpers.ContentTypeForFilename(filename);
             byte[] contents = File.ReadAllBytes(filename);
             ms.Write(contents,0,contents.Length);
             ms.Position = 0;
@@ -106,37 +108,18 @@ namespace FlowMatters.Source.WebServer
 
         [OperationContract]
         [WebInvoke(Method="GET",UriTemplate = UriTemplates.Resources)]
-        public Stream GetResources(string resourceName)
+        public Stream GetResource(string resourceName)
         {
             Log(string.Format("Requested resource {0}", resourceName));
             MemoryStream ms = new MemoryStream();
             Assembly rsFormsAssembly = Assembly.GetEntryAssembly();
 
-            Bitmap resource = FindByName(resourceName);
+            Bitmap resource = ResourceHelpers.FindByName(resourceName);
 
             resource.Save(ms, ImageFormat.Png);
             ms.Position = 0;
             WebOperationContext.Current.OutgoingResponse.ContentType = "image/png";
             return ms;
-        }
-
-        private Bitmap FindByName(string s)
-        {
-            Type modelType = Finder.typesInherting(typeof(IDomainObject)).Where(t => t.Name == s).FirstOrDefault();
-
-            if (modelType == null)
-            {
-                s += "240";
-                Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
-                Assembly assembly = assemblies.First(a => a.FullName.Contains("RiverSystem.Controls"));
-                Type resourcesType = assembly.GetType("RiverSystem.Controls.Properties.Resources");
-                PropertyInfo resourceProperty = resourcesType.GetProperty(s, BindingFlags.Public | BindingFlags.Static);
-                Bitmap result = (Bitmap) resourceProperty.GetValue(null, new object[0]);
-
-                return result;
-            }
-
-            return (Bitmap) IconLookup.GetIcon(modelType);
         }
 
         [OperationContract]
@@ -162,36 +145,6 @@ namespace FlowMatters.Source.WebServer
         {
             Log(string.Format("Requested link {0} (NOT IMPLEMENTED)", linkId));
             return null;
-        }
-        private static string ContentTypeForFilename(string fn)
-        {
-            string contentType = "";
-            FileInfo fileInfo = new FileInfo(fn);
-            string extension = fileInfo.Extension;
-            switch (extension)
-            {
-                case ".html":
-                case ".htm":
-                    contentType = "text/html";
-                    break;
-                case ".jpeg":
-                case ".jpg":
-                    contentType = "image/jpeg";
-                    break;
-                case ".png":
-                    contentType = "image/png";
-                    break;
-                case ".json":
-                    contentType = "application/json";
-                    break;
-                case ".js":
-                    contentType = "application/javascript";
-                    break;
-                case ".css":
-                    contentType = "text/css";
-                    break;
-            }
-            return contentType;
         }
 
         [OperationContract]
@@ -239,8 +192,6 @@ namespace FlowMatters.Source.WebServer
                                                                          ["Location"] +
                                                                      String.Format("runs/{0}", r.RunNumber));
         }
-
-        public bool RunningInGUI { get; set; }
 
         [OperationContract]
         [WebInvoke(Method = "GET", ResponseFormat = WebMessageFormat.Json, UriTemplate = UriTemplates.RunResults)]
