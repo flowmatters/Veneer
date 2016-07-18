@@ -26,6 +26,7 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects
     }
 
     [DataContract]
+    [KnownType(typeof(TimeSeriesFullSummary))]
     [KnownType(typeof(SlimTimeSeries))]
     [KnownType(typeof(SimpleTimeSeries))]
     public class TimeSeriesReponseMeta : TimeSeriesResponse
@@ -48,6 +49,22 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects
             StartDate = source.Start.ToString(CultureInfo.InvariantCulture);
             EndDate = source.End.ToString(CultureInfo.InvariantCulture);
             TimeStep = source.timeStep.Name;
+            refTimeSeries = source;
+        }
+
+        public TimeSeriesReponseMeta(TimeSeriesReponseMeta source)
+        {
+            Name = source.Name;
+            Units = source.Units;
+            NoDataValue = source.NoDataValue;
+            Min = source.Min;
+            Max = source.Max;
+            Mean = source.Mean;
+            Sum = source.Sum;
+            StartDate = source.StartDate;
+            EndDate = source.EndDate;
+            TimeStep = source.TimeStep;
+            refTimeSeries = source.refTimeSeries;
         }
 
         [DataMember]
@@ -67,5 +84,55 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects
 
         [DataMember]
         public string TimeStep;
+
+        private TimeSeries refTimeSeries;
+
+        public string DateForTimeStep(int i)
+        {
+            return refTimeSeries.timeForItem(i).ToString(CultureInfo.InvariantCulture);
+        }
     }
+
+    [DataContract]
+    [KnownType(typeof (SlimTimeSeries))]
+    public class TimeSeriesFullSummary : TimeSeriesReponseMeta
+    {
+        [DataMember]
+        public int RunNumber;
+
+        [DataMember]
+        public string SingleURL;
+
+        [DataMember]
+        public string NetworkElement;
+
+        [DataMember]
+        public string RecordingElement;
+
+        [DataMember]
+        public string RecordingVariable;
+
+        public TimeSeriesFullSummary(TimeSeriesLink link, TimeSeries source) : base(source)
+        {
+            RunNumber = link.RunNumber;
+            SingleURL = link.TimeSeriesUrl;
+            NetworkElement = link.NetworkElement;
+            RecordingElement = link.RecordingElement;
+            RecordingVariable = link.RecordingVariable;
+        }
+
+        public TimeSeriesFullSummary(TimeSeriesReponseMeta source) : base(source)
+        {
+            if (source is TimeSeriesFullSummary)
+            {
+                var full = source as TimeSeriesFullSummary;
+                RunNumber = full.RunNumber;
+                SingleURL = full.SingleURL;
+                NetworkElement = full.NetworkElement;
+                RecordingElement = full.RecordingElement;
+                RecordingVariable = full.RecordingVariable;
+            }
+        }
+    }
+
 }

@@ -13,11 +13,19 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects
     [DataContract]
     public class MultipleTimeSeries : TimeSeriesResponse
     {
-        [DataMember] public SlimTimeSeries[] TimeSeries;
+        [DataMember] public TimeSeriesReponseMeta[] TimeSeries;
 
-        public MultipleTimeSeries(Tuple<TimeSeriesLink, TimeSeries>[] src)
+        public MultipleTimeSeries(TimeSeriesFullSummary tsMeta)
         {
-            TimeSeries = src.Select(item => new SlimTimeSeries(item.Item1,item.Item2)).ToArray();
+            TimeSeries = new[] {tsMeta};
+        }
+
+        public MultipleTimeSeries(Tuple<TimeSeriesLink, TimeSeries>[] src,bool includeValues = true)
+        {
+            if(includeValues)
+                TimeSeries = src.Select(item => new SlimTimeSeries(item.Item1,item.Item2)).ToArray();
+            else
+                TimeSeries = src.Select(item => new TimeSeriesFullSummary(item.Item1, item.Item2)).ToArray();
         }
     }
 }

@@ -11,8 +11,6 @@ namespace FlowMatters.Source.WebServer.ExchangeObjects
     [DataContract]
     public class SimpleTimeSeries : TimeSeriesReponseMeta
     {
-        public SimpleTimeSeries(): base(null){ }
-
         public SimpleTimeSeries(TimeSeries source):base(source)
         {
             if (source == null)
@@ -33,5 +31,10 @@ namespace FlowMatters.Source.WebServer.ExchangeObjects
         }
 
         [DataMember] public TimeSeriesEvent[] Events;
+
+        public SlimTimeSeries Slim()
+        {
+            return new SlimTimeSeries(this);
+        }
     }
 }

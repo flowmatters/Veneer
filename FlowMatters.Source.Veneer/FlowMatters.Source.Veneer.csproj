@@ -171,6 +171,8 @@
     <Compile Include="ExchangeObjects\VeneerResponse.cs" />
     <Compile Include="ExchangeObjects\GeoJSONGeometry.cs" />
     <Compile Include="ExchangeObjects\GeoJSONNetwork.cs" />
+    <Compile Include="Formatting\TimeSeriesResponseFormatter.cs" />
+    <Compile Include="Formatting\ReplyFormatSwitchBehaviour.cs" />
     <Compile Include="RemoteScripting\IronPythonResponse.cs" />
     <Compile Include="RemoteScripting\IronPythonScript.cs" />
     <Compile Include="ISourceService.cs" />
@@ -737,9 +739,7 @@
     </None>
     <AppDesigner Include="Properties\" />
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="SerializeData\" />
-  </ItemGroup>
+  <ItemGroup />
   <ItemGroup>
     <Resource Include="Logo_RGB.png" />
   </ItemGroup>

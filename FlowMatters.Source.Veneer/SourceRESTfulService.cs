@@ -5,6 +5,7 @@ using System.ServiceModel;
 using System.ServiceModel.Description;
 using System.ServiceModel.Web;
 using System.Text;
+using FlowMatters.Source.Veneer.Formatting;
 using RiverSystem;
 
 namespace FlowMatters.Source.WebServer
@@ -37,8 +38,8 @@ namespace FlowMatters.Source.WebServer
             binding.CrossDomainScriptAccessEnabled = true;
             
             //AppendHeader("Access-Control-Allow-Origin", "*");
-            /*ServiceEndpoint endpoint= */_host.AddServiceEndpoint(typeof(SourceService), binding, string.Format("http://localhost:{0}/", _port));
-            //            endpoint.Behaviors.Add();
+            ServiceEndpoint endpoint= _host.AddServiceEndpoint(typeof(SourceService), binding, string.Format("http://localhost:{0}/", _port));
+            endpoint.Behaviors.Add(new ReplyFormatSwitchBehaviour());
 
             try
             {

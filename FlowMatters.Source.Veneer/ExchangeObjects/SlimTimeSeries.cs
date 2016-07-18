@@ -11,28 +11,27 @@ using TIME.DataTypes;
 namespace FlowMatters.Source.Veneer.ExchangeObjects
 {
     [DataContract]
-    public class SlimTimeSeries : TimeSeriesReponseMeta
+    public class SlimTimeSeries : TimeSeriesFullSummary
     {
-        public SlimTimeSeries(TimeSeriesLink link, TimeSeries source) : base(source)
+        public SlimTimeSeries(TimeSeriesLink link, TimeSeries source) : base(link,source)
         {
-            RunNumber = link.RunNumber;
-            SingleURL = link.TimeSeriesUrl;
-            NetworkElement = link.NetworkElement;
-            RecordingElement = link.RecordingElement;
-            RecordingVariable = link.RecordingVariable;
             Values = source.ToArray();
         }
 
-        [DataMember]
-        public int RunNumber;
-
-        [DataMember]
-        public string SingleURL;
+        public SlimTimeSeries(TimeSeriesReponseMeta source) : base(source)
+        {
+            if (source is SlimTimeSeries)
+            {
+                var slim = source as SlimTimeSeries;
+                Values = (double[]) slim.Values.Clone();
+            } else if (source is SimpleTimeSeries)
+            {
+                var simple = source as SimpleTimeSeries;
+                Values = simple.Events.Select(evt => evt.Value).ToArray();
+            }
+        }
 
         [DataMember]
         public double[] Values;
-
-        [DataMember]
-        public string NetworkElement, RecordingElement, RecordingVariable;
     }
 }
