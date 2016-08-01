@@ -81,7 +81,7 @@ namespace FlowMatters.Source.Veneer.Formatting
 
                 string line = field + ",";
                 string ditto = "...";
-                if ((values.Distinct().Count() == 1)&&(values[0].Length>ditto.Length))
+                if ((values.Length>1)&&(values.Distinct().Count() == 1)&&(values[0].Length>ditto.Length))
                 {
                     line += values[0] + ',';
                     line += string.Join(",", Enumerable.Repeat(ditto, values.Length - 1));
