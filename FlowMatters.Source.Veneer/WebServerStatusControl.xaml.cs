@@ -33,7 +33,7 @@ namespace FlowMatters.Source.WebServerPanel
 
         public WebServerStatusControl()
         {
-            Port = 9876;
+            Port = SourceRESTfulService.DEFAULT_PORT;
             InitializeComponent();
             _originalContext = SynchronizationContext.Current;
             this.DataContext = this;
@@ -115,7 +115,7 @@ namespace FlowMatters.Source.WebServerPanel
 
         private void Launch(string p)
         {
-            int port = 9876;
+            int port = SourceRESTfulService.DEFAULT_PORT;
             string url = string.Format("http://localhost:{0}/doc/{1}", port, p);
             Process.Start(url);
         }
@@ -151,20 +151,36 @@ namespace FlowMatters.Source.WebServerPanel
             set
             {
                 _port = value;
-                if (_server != null)
-                {
-                    StopServer();
-                    StartServer();
-                }
+                RestartIfRunning();
+            }
+        }
+
+        private bool _allowRemoteConnections;
+
+        public bool AllowRemoteConnections
+        {
+            get { return _allowRemoteConnections; }
+            set
+            {
+                _allowRemoteConnections = value;
+                RestartIfRunning();
+            }
+        }
+        private void RestartIfRunning()
+        {
+            if (_server != null)
+            {
+                RestartServer();
             }
         }
 
         private void StartServer()
         {
-            _server = new SourceRESTfulService(Port);
+            _server = new SourceRESTfulService(Port) {AllowRemoteConnections = AllowRemoteConnections};
             _server.Scenario = Scenario;
             _server.LogGenerator += ServerLogEvent;
             _server.Start();
+            _port = _server.Port;
         }
 
         public bool NotRunning { get { return !Running; } }
@@ -207,6 +223,11 @@ namespace FlowMatters.Source.WebServerPanel
         }
 
         private void RestartBtn_OnClick(object sender, RoutedEventArgs e)
+        {
+            RestartServer();
+        }
+
+        private void RestartServer()
         {
             StopServer();
             StartServer();

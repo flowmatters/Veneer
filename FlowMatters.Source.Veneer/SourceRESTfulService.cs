@@ -12,9 +12,13 @@ namespace FlowMatters.Source.WebServer
 {
     public class SourceRESTfulService : AbstractSourceServer
     {
+        public const int DEFAULT_PORT = 9876;
         private WebServiceHost _host;
         private SourceService _singletonInstance;
         private RiverSystemScenario _scenario;
+        private List<int> _registeredOnPorts = new List<int>();
+         
+        public bool AllowRemoteConnections { get; set; }
 
         public override SourceService Service
         {
@@ -29,6 +33,7 @@ namespace FlowMatters.Source.WebServer
         public override void Start()
         {
             WebHttpBinding binding = new WebHttpBinding();
+
             binding.MaxReceivedMessageSize = 1024*1024;
             _singletonInstance = new SourceService();
             _singletonInstance.LogGenerator += _singletonInstance_LogGenerator;
@@ -36,10 +41,17 @@ namespace FlowMatters.Source.WebServer
             _host = new WebServiceHost(_singletonInstance);
             _host.UnknownMessageReceived += _host_UnknownMessageReceived;
             binding.CrossDomainScriptAccessEnabled = true;
-            
+
+            if(!AllowRemoteConnections)
+                binding.HostNameComparisonMode = HostNameComparisonMode.Exact;
+
             //AppendHeader("Access-Control-Allow-Origin", "*");
-            ServiceEndpoint endpoint= _host.AddServiceEndpoint(typeof(SourceService), binding, string.Format("http://localhost:{0}/", _port));
+            ServiceEndpoint endpoint = _host.AddServiceEndpoint(typeof(SourceService), binding, string.Format("http://localhost:{0}/", _port));
             endpoint.Behaviors.Add(new ReplyFormatSwitchBehaviour());
+
+//            int sslPort = _port + 1000;
+//            endpoint = _host.AddServiceEndpoint(typeof(SourceService), binding, string.Format("https://localhost:{0}/", sslPort));
+//            endpoint.Behaviors.Add(new ReplyFormatSwitchBehaviour());
 
             try
             {

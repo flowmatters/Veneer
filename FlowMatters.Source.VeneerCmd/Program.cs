@@ -90,6 +90,8 @@ namespace FlowMatters.Source.VeneerCmd
             var _server = new SourceRESTfulService((int)options.Port);
             _server.Scenario = scenario.riverSystemScenario;
             _server.LogGenerator += ServerLogEvent;
+            _server.AllowRemoteConnections = options.RemoteAccess;
+
             _server.Start();
             _server.Service.AllowScript = options.AllowScripts;
             _server.Service.RunningInGUI = false;
@@ -182,7 +184,7 @@ namespace FlowMatters.Source.VeneerCmd
 
     public class Options
     {
-        [Option('p',"port",DefaultValue = 9876u,HelpText= "Port for Veneer server")]
+        [Option('p',"port",DefaultValue = (uint)SourceRESTfulService.DEFAULT_PORT,HelpText= "Port for Veneer server")]
         public uint Port { get; set; }
 
         [Option('r', "remote-access",HelpText ="Allow access from other computers", DefaultValue= false)]
