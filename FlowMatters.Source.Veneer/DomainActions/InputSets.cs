@@ -8,6 +8,8 @@ using RiverSystem;
 using RiverSystem.Api;
 using RiverSystem.DataManagement.DataManager;
 using RiverSystem.ScenarioExplorer.ParameterSet;
+using TIME.Tools.Optimisation;
+using ParameterSet = RiverSystem.ScenarioExplorer.ParameterSet.ParameterSet;
 
 namespace FlowMatters.Source.Veneer.DomainActions
 {
@@ -32,24 +34,36 @@ namespace FlowMatters.Source.Veneer.DomainActions
 
         public string[] Instructions(InputSet inputSet)
         {
-            IEnumerable<string> result = ParameterSet(inputSet).Configuration.GetInstructions(null);
+            ParameterSet parameterSet = ParameterSet(inputSet);
+            if (parameterSet == null)
+                return new string[0];
+
+            IEnumerable<string> result = parameterSet.Configuration.GetInstructions(null);
             return result.ToArray();
         }
 
         public void UpdateInstructions(InputSet inputSet, string[] newInstructions)
         {
-            ParameterSet(inputSet).Configuration.Instructions = String.Join("\n", newInstructions);
+            ParameterSet parameterSet = ParameterSet(inputSet);
+            if (parameterSet == null)
+                return;
+            parameterSet.Configuration.Instructions = String.Join("\n", newInstructions);
         }
 
         private ParameterSet ParameterSet(InputSet inputSet)
         {
-            ParameterSetManager Manager = Scenario.PluginDataModels.OfType<ParameterSetManager>().First();
+            ParameterSetManager Manager = Scenario.PluginDataModels.OfType<ParameterSetManager>().FirstOrDefault();
+            if (Manager == null)
+                return null;
             return Manager.ParameterSets.First(x => x.InputSet == inputSet).Parameters;
         }
 
         public void Run(InputSet inputSet)
         {
-            ParameterSet(inputSet).Reset(new Scenario(Scenario));
+            ParameterSet parameterSet = ParameterSet(inputSet);
+            if (parameterSet == null)
+                return;
+            parameterSet.Reset(new Scenario(Scenario));
         }
 
         public void Run(string urlSafeInputSetName)
