@@ -13,12 +13,16 @@ using System.Windows.Forms;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Media.TextFormatting;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 using FlowMatters.Source.WebServer;
 using RiverSystem;
+using RiverSystem.Controls.ManagedExtensions;
 using RiverSystem.TaskDefinitions;
 using Application = System.Windows.Forms.Application;
+using Button = System.Windows.Controls.Button;
+using TextBox = System.Windows.Controls.TextBox;
 using UserControl = System.Windows.Controls.UserControl;
 
 namespace FlowMatters.Source.WebServerPanel
@@ -168,7 +172,7 @@ namespace FlowMatters.Source.WebServerPanel
         }
         private void RestartIfRunning()
         {
-            if (_server != null)
+            if (Running)
             {
                 RestartServer();
             }
@@ -181,12 +185,15 @@ namespace FlowMatters.Source.WebServerPanel
             _server.LogGenerator += ServerLogEvent;
             _server.Start();
             _port = _server.Port;
+            PortTxt.GetBindingExpression(TextBox.TextProperty).UpdateTarget();
+            _server.Service.AllowScript = AllowScripts;
+            UpdateButtons();
         }
 
         public bool NotRunning { get { return !Running; } }
         public bool Running
         {
-            get { return (_server != null); }
+            get { return (_server != null) && _server.Running; }
         }
 
         void ServerLogEvent(object sender, string msg)
@@ -200,11 +207,14 @@ namespace FlowMatters.Source.WebServerPanel
         private void StopServer()
         {
             _server.Stop();
+            _server = null;
+            UpdateButtons();
         }
 
         public void Dispose()
         {
             StopServer();
+            UpdateButtons();
         }
 
         private void ClearBtn_OnClick(object sender, RoutedEventArgs e)
@@ -231,6 +241,13 @@ namespace FlowMatters.Source.WebServerPanel
         {
             StopServer();
             StartServer();
+        }
+
+        private void UpdateButtons()
+        {
+            StartBtn.GetBindingExpression(Button.IsEnabledProperty).UpdateTarget();
+            StopBtn.GetBindingExpression(Button.IsEnabledProperty).UpdateTarget();
+            RestartBtn.GetBindingExpression(Button.IsEnabledProperty).UpdateTarget();
         }
     }
 }

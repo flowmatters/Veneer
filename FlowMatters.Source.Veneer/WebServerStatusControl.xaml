@@ -27,7 +27,7 @@
         <Button Name="ClearBtn" Grid.Row="0" Grid.Column="5" Grid.ColumnSpan="2" Content="Clear Log" Click="ClearBtn_OnClick"/>
 
         <Label Grid.Row="1" Grid.Column="0" HorizontalAlignment="Right" Content="Port:"/>
-        <TextBox Grid.Row="1" Text="{Binding Path=Port}" Grid.Column="1" Grid.ColumnSpan="2"/>
+        <TextBox Name="PortTxt" Grid.Row="1" Text="{Binding Path=Port}" Grid.Column="1" Grid.ColumnSpan="2"/>
         <Label Grid.Row="1" Grid.Column="3" HorizontalAlignment="Right" Content="Allow Remote Connections:"/>
         <CheckBox Grid.Row="1" IsChecked="{Binding Path=AllowRemoteConnections}"  Grid.Column="4" VerticalAlignment="Center"/>
         <Label Grid.Row="1" Grid.Column="5" HorizontalAlignment="Right" Content="Allow Scripts:"/>

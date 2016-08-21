@@ -18,6 +18,8 @@ namespace FlowMatters.Source.WebServer
         public abstract void Stop();
         public abstract RiverSystemScenario Scenario { get; set; }
 
+        public bool Running { get; protected set; }
+
         protected void Log(string query)
         {
             if (LogGenerator != null)

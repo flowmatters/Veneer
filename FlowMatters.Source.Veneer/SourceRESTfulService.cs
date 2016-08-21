@@ -55,14 +55,40 @@ namespace FlowMatters.Source.WebServer
 
             try
             {
+                Running = false;
                 _host.Open();
                 Log("Veneer, by Flow Matters: http://www.flowmatters.com.au");
                 Log(string.Format("Started Source RESTful Service on port:{0}", _port));
+                Running = true;
             }
             catch (AddressAlreadyInUseException)
             {
                 _port++; // Keep retrying until we run out of allocated ports
                 Start();
+            }
+            catch (AddressAccessDeniedException)
+            {
+                Log(String.Format("For details, see: https://github.com/flowmatters/veneer"));
+
+                if (AllowRemoteConnections)
+                {
+                    Log("If you require external connections, you must select a port where Veneer has permissions to accept external connections.");
+                    Log(
+                        String.Format(
+                            "Veneer does not have permission to accept external (ie non-local) connections on port {0}",
+                            _port));
+                }
+                else
+                {
+                    Log("Alternatively, enable 'Allow Remote Connections' and restart Veneer.");
+                    Log("To establish a local-only connection, select a port where Veneer is NOT registered for external connections.");
+                    Log(String.Format(
+                            "This is most likely because Veneer is registered to accept external/non-local connections on port {0}.", _port));
+                    Log(String.Format(
+                            "Veneer does not have permission to accept local-only connections on port {0}",
+                            _port));
+                }
+                Log(String.Format("COULD NOT START VENEER ON PORT {0}",_port));
             }
             catch (Exception e)
             {
@@ -98,6 +124,7 @@ namespace FlowMatters.Source.WebServer
                 _host.Close();
                 _host = null;
             }
+            Running = false;
         }
 
         public override RiverSystemScenario Scenario
