@@ -578,7 +578,7 @@ namespace FlowMatters.Source.WebServer
 
         public static string URLSafeString(string src)
         {
-            return src.Replace("#","").Replace("/","%2F");
+            return src.Replace("#","").Replace("/","%2F").Replace(":","");
         }
 
         protected void Log(string query)
