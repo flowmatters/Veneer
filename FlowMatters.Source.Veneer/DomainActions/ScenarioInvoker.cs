@@ -12,7 +12,7 @@ using RiverSystem.ApplicationLayer.Consumer.Forms;
 using RiverSystem.Controls;
 using RiverSystem.Controls.ModelRun;
 using RiverSystem.DataManagement.DataManager;
-using RiverSystem.Tracking;
+//using RiverSystem.Tracking;
 using TIME.DataTypes;
 using TIME.ScenarioManagement.Execution;
 using TIME.ScenarioManagement.RunManagement;
@@ -78,7 +78,7 @@ namespace FlowMatters.Source.Veneer
                     Application.DoEvents();
                 }
 
-                LogRunEnd(startOfRun);
+//                LogRunEnd(startOfRun);
 
                 if (showWindow)
                 {
@@ -111,20 +111,20 @@ namespace FlowMatters.Source.Veneer
 //            ProjectManager.Instance.SaveAuditLogMessage("Close run scenario window");
         }
 
-        private void LogRunEnd(DateTime startOfRun)
-        {
-            Type t = typeof (RunTracker);
-            MethodInfo method = t.GetMethod("RunCompleted", BindingFlags.Public | BindingFlags.Static);
+        //private void LogRunEnd(DateTime startOfRun)
+        //{
+        //    Type t = typeof (RunTracker);
+        //    MethodInfo method = t.GetMethod("RunCompleted", BindingFlags.Public | BindingFlags.Static);
 
-            try
-            {
-                method.Invoke(null, new object[] {Scenario.Project, Scenario, startOfRun});
-            }
-            catch(Exception)
-            {
-                method.Invoke(null, new object[] { Scenario.Project, startOfRun });
-            }
-        }
+        //    try
+        //    {
+        //        method.Invoke(null, new object[] {Scenario.Project, Scenario, startOfRun});
+        //    }
+        //    catch(Exception)
+        //    {
+        //        method.Invoke(null, new object[] { Scenario.Project, startOfRun });
+        //    }
+        //}
 
         private void ApplyRunParameters(RunParameters parameters)
         {
