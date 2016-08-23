@@ -62,7 +62,7 @@ namespace FlowMatters.Source.WebServer
         [WebGet(UriTemplate = "/", ResponseFormat = WebMessageFormat.Json)]
         public string GetRoot()
         {
-            WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Origin", "*");
+//            WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Origin", "*");
             Log("Requested /");
             return "Root node of service";
         }
@@ -127,7 +127,7 @@ namespace FlowMatters.Source.WebServer
         public GeoJSONNetwork GetNetwork()
         {
             Log("Requested network");
-            WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Origin", "*");
+//            WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Origin", "*");
             return new GeoJSONNetwork(Scenario.Network);
         }
 
@@ -152,7 +152,7 @@ namespace FlowMatters.Source.WebServer
         public RunLink[] GetRunList()
         {
             Log("Requested run list");
-            WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Origin", "*");
+//            WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Origin", "*");
             var runs = Scenario.Project.ResultManager.AllRuns().ToArray();
             RunLink[] links = new RunLink[runs.Length];
             for(int i = 0; i < runs.Length; i++)
@@ -198,7 +198,7 @@ namespace FlowMatters.Source.WebServer
         public RunSummary GetRunResults(string runId)
         {
             Log(String.Format("Requested run results ({0})",runId));
-            WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Origin", "*");
+//            WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Origin", "*");
             string msg = "";
             if (runId.ToLower() == "latest")
                 msg = "latest run";
@@ -516,7 +516,7 @@ namespace FlowMatters.Source.WebServer
 
         private SimpleTimeSeries SimpleTimeSeries(TimeSeries result)
         {
-            WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Origin", "*");
+            //WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Origin", "*");
             return (result == null) ? TimeSeriesNotFound() : new SimpleTimeSeries(result);
         }
         

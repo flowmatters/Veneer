@@ -116,6 +116,7 @@
     </Reference>
 -->
     <Reference Include="System" />
+    <Reference Include="System.configuration" />
     <Reference Include="System.Data" />
     <Reference Include="System.Drawing" />
     <Reference Include="System.Runtime.Serialization" />
@@ -149,6 +150,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AbstractSourceServer.cs" />
+    <Compile Include="CORS\EnableCrossOriginResourceSharingBehavior.cs" />
+    <Compile Include="CORS\CORSMessageInspector.cs" />
     <Compile Include="DomainActions\InputSets.cs" />
     <Compile Include="DomainActions\ScenarioInvoker.cs" />
     <Compile Include="ExchangeObjects\BooleanResponse.cs" />

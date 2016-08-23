@@ -5,6 +5,7 @@ using System.ServiceModel;
 using System.ServiceModel.Description;
 using System.ServiceModel.Web;
 using System.Text;
+using FlowMatters.Source.Veneer.CORS;
 using FlowMatters.Source.Veneer.Formatting;
 using RiverSystem;
 
@@ -48,6 +49,7 @@ namespace FlowMatters.Source.WebServer
             //AppendHeader("Access-Control-Allow-Origin", "*");
             ServiceEndpoint endpoint = _host.AddServiceEndpoint(typeof(SourceService), binding, string.Format("http://localhost:{0}/", _port));
             endpoint.Behaviors.Add(new ReplyFormatSwitchBehaviour());
+            endpoint.Behaviors.Add(new EnableCrossOriginResourceSharingBehavior());
 
 //            int sslPort = _port + 1000;
 //            endpoint = _host.AddServiceEndpoint(typeof(SourceService), binding, string.Format("https://localhost:{0}/", sslPort));
