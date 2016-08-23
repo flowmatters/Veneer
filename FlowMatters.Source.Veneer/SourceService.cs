@@ -398,7 +398,6 @@ namespace FlowMatters.Source.WebServer
                 {
                     URL = String.Format("{0}/{1}",UriTemplates.InputSets,URLSafeString(inputSet.Name)),
                     Name = inputSet.Name,
-                    Default = inputSet.IsDefault,
                     Configuration = sets.Instructions(inputSet)
                 };
             }
@@ -630,7 +629,6 @@ namespace FlowMatters.Source.WebServer
     {
         [DataMember] public string URL;
         [DataMember] public string Name;
-        [DataMember] public bool Default;
         [DataMember] public string[] Configuration;
     }
 
