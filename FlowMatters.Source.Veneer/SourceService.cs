@@ -7,7 +7,6 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Reflection;
-using System.Runtime.Serialization;
 using System.ServiceModel;
 using System.ServiceModel.Channels;
 using System.ServiceModel.Web;
@@ -585,57 +584,5 @@ namespace FlowMatters.Source.WebServer
             if (LogGenerator != null)
                 LogGenerator(this, query);
         }
-    }
-
-    [Serializable]
-    public class RunParameters : ISerializable
-    {
-        public RunParameters()
-        {
-                
-        }
-
-        public RunParameters(SerializationInfo info, StreamingContext context)
-        {
-            foreach (var entry in info)
-            {
-                properties.Add(entry.Name, entry.Value);
-            }
-        }
-
-        private Dictionary<string,object> properties = new Dictionary<string, object>();
-        public Dictionary<string, object> Params { get { return properties; } }
-        
-        public void Add(string key, object value)
-        {
-            properties[key] = value;
-        }
-
-        public void GetObjectData(SerializationInfo info, StreamingContext context)
-        {
-            foreach (KeyValuePair<string, object> kvp in properties)
-                info.AddValue(kvp.Key,kvp.Value);
-        }
-
-        //[DataMember] public string Start;
-        //[DataMember] public string End;
-        //[DataMember] public int ForecastLength;
-        //[DataMember] public string InputSet;
-
-    }
-
-    [DataContract]
-    public class InputSetSummary
-    {
-        [DataMember] public string URL;
-        [DataMember] public string Name;
-        [DataMember] public string[] Configuration;
-    }
-
-    [DataContract]
-    public class FunctionValue
-    {
-        [DataMember] public string Name;
-        [DataMember] public string Expression;
     }
 }

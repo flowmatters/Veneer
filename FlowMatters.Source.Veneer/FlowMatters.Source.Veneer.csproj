@@ -162,6 +162,7 @@
     <Compile Include="ExchangeObjects\NumericResponse.cs" />
     <Compile Include="ExchangeObjects\RecordingInstructions.cs" />
     <Compile Include="ExchangeObjects\RunLink.cs" />
+    <Compile Include="ExchangeObjects\RunParameters.cs" />
     <Compile Include="ExchangeObjects\RunSummary.cs" />
     <Compile Include="ExchangeObjects\SimpleException.cs" />
     <Compile Include="ExchangeObjects\SimplePiecewise.cs" />
@@ -176,6 +177,8 @@
     <Compile Include="ExchangeObjects\GeoJSONNetwork.cs" />
     <Compile Include="Formatting\TimeSeriesResponseFormatter.cs" />
     <Compile Include="Formatting\ReplyFormatSwitchBehaviour.cs" />
+    <Compile Include="ExchangeObjects\FunctionValue.cs" />
+    <Compile Include="ExchangeObjects\InputSetSummary.cs" />
     <Compile Include="RemoteScripting\IronPythonResponse.cs" />
     <Compile Include="RemoteScripting\IronPythonScript.cs" />
     <Compile Include="ISourceService.cs" />
