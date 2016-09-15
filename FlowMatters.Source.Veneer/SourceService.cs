@@ -16,6 +16,7 @@ using System.Xml;
 using FlowMatters.Source.Veneer;
 using FlowMatters.Source.Veneer.DomainActions;
 using FlowMatters.Source.Veneer.ExchangeObjects;
+using FlowMatters.Source.Veneer.ExchangeObjects.DataSources;
 using FlowMatters.Source.Veneer.RemoteScripting;
 using FlowMatters.Source.WebServer.ExchangeObjects;
 using RiverSystem;
@@ -444,6 +445,75 @@ namespace FlowMatters.Source.WebServer
                 Log("ON: " + s);
                 SwitchRecording(ri.Parse(s), true);
             }
+        }
+
+        [OperationContract]
+        [WebInvoke(Method = "GET", UriTemplate = UriTemplates.DataSources,ResponseFormat = WebMessageFormat.Json)]
+        public SimpleDataGroupItem[] GetDataSources()
+        {
+            var dm = Scenario.Network.DataManager;
+
+            return dm.DataGroups.Select(dg => new SimpleDataGroupItem(dg)).ToArray();
+        }
+
+        [OperationContract]
+        [WebInvoke(Method = "GET", UriTemplate = UriTemplates.DataSourceGroup, ResponseFormat = WebMessageFormat.Json)]
+        public SimpleDataGroupItem GetDataSource(string dataSourceGroup)
+        {
+            var dm = Scenario.Network.DataManager;
+
+            var res = dm.DataGroups.FirstOrDefault(ds => SimpleDataGroupItem.MakeID(ds) == (UriTemplates.DataSources + "/" + dataSourceGroup));
+            if (res == null)
+                ResourceNotFound();
+            return new SimpleDataGroupItem(res,false);
+        }
+
+        [OperationContract]
+        [WebInvoke(Method = "GET", UriTemplate = UriTemplates.DataGroupItem, ResponseFormat = WebMessageFormat.Json)]
+        public SimpleDataItem GetDataGroupItem(string dataSourceGroup,string inputSet)
+        {
+            var grp = GetDataSource(dataSourceGroup);
+            if (grp == null)
+                return null;
+
+            var result =
+                grp.Items.FirstOrDefault(item => item.MatchInputSet(inputSet));
+
+            if(result==null)
+                ResourceNotFound();
+            return result;
+        }
+
+        [OperationContract]
+        [WebInvoke(Method = "GET", UriTemplate = UriTemplates.DataGroupMultipleItemDetails, ResponseFormat = WebMessageFormat.Json)]
+        public SimpleDataDetails[] GetMultipleDataGroupItemDetails(string dataSourceGroup, string name)
+        {
+            var grp = GetDataSource(dataSourceGroup);
+            if (grp == null)
+                return null;
+
+            List<SimpleDataDetails> result = new List<SimpleDataDetails>();
+            foreach (var item in grp.Items)
+            {
+                var tmp = item.Details.FirstOrDefault(d => URLSafeString(d.Name) == name);
+                tmp.Name = item.Name + "/" + tmp.Name;
+                if(tmp!=null)
+                    result.Add(tmp);
+            }
+            return result.ToArray();
+            // Should it 404 on empty list?
+        }
+
+        [OperationContract]
+        [WebInvoke(Method = "GET", UriTemplate = UriTemplates.DataGroupItemDetails, ResponseFormat = WebMessageFormat.Json)]
+        public SimpleDataDetails GetDataGroupItemDetails(string dataSourceGroup, string inputSet,string item)
+        {
+            var retrieved = GetDataGroupItem(dataSourceGroup, inputSet);
+            var result = retrieved.Details.FirstOrDefault(d => URLSafeString(d.Name) == item);
+
+            if(result==null)
+                ResourceNotFound();
+            return result;
         }
 
         [OperationContract]

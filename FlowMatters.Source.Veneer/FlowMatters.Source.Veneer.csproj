@@ -155,6 +155,9 @@
     <Compile Include="DomainActions\InputSets.cs" />
     <Compile Include="DomainActions\ScenarioInvoker.cs" />
     <Compile Include="ExchangeObjects\BooleanResponse.cs" />
+    <Compile Include="ExchangeObjects\DataSources\SimpleDataDetails.cs" />
+    <Compile Include="ExchangeObjects\DataSources\SimpleDataGroupItem.cs" />
+    <Compile Include="ExchangeObjects\DataSources\SimpleDataItem.cs" />
     <Compile Include="ExchangeObjects\GeoJSONCoverage.cs" />
     <Compile Include="ExchangeObjects\GeoJSONFeature.cs" />
     <Compile Include="ExchangeObjects\ListResponse.cs" />

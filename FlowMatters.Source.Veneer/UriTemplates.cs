@@ -47,6 +47,16 @@ namespace FlowMatters.Source.WebServer
 
         public const string RunInputSet = "/inputSets/{inputSetName}/{action}";
 
+        public const string DataSources = "/dataSources";
+
+        public const string DataSourceGroup = DataSources+"/{dataSourceGroup}";
+
+        public const string DataGroupItem = DataSourceGroup + "/{inputSet}";
+
+        public const string DataGroupItemDetails = DataGroupItem + "/{item}";
+
+        public const string DataGroupMultipleItemDetails = DataSourceGroup + "/" + MatchAll + "/{name}";
+
         public const string MatchAll = "__all__";
     }
 }
