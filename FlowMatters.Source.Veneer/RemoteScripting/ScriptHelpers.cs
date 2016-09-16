@@ -1,9 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
+using FlowMatters.Source.Veneer.ExchangeObjects.DataSources;
+using FlowMatters.Source.WebServer;
 using IronPython.Modules;
 using IronPython.Runtime.Operations;
 using RiverSystem;
@@ -18,7 +21,7 @@ using RiverSystem.DataManagement.DataManager.DataSources;
 using RiverSystem.ManagedExtensions;
 using RiverSystem.Quality.SourceSinkModels;
 using TIME.Core;
-using TIME.DataTypes;
+using TimeSeries = TIME.DataTypes.TimeSeries;
 using TIME.Management;
 using TIME.Tools.Reflection;
 using TIME.Core.Metadata;
@@ -52,15 +55,7 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
         public static void AssignTimeSeries(RiverSystemScenario scenario, object target, string element,
             string dataGroupName, string dataItem, int column = 0)
         {
-            if (element.Contains("."))
-            {
-                var bits = element.Split('.');
-                target = Deref(target, String.Join(".", bits.Take(bits.Length - 1)));
-                element = bits[bits.Length - 1];
-            }
-            Type t = target.GetType();
-            var member = t.GetMember(element, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)[0];
-            var ri = ReflectedItem.NewItem(member, target);
+            var ri = GetReflectedItem(target, element);
 
             var dm = scenario.Network.DataManager;
             dm.RemoveUsage(ri);
@@ -85,6 +80,73 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
             {
                 dataGroupItem.Usages.Add(new DataUsage {ReflectedItem = ri});
             }
+        }
+
+        private static ReflectedItem GetReflectedItem(object target, string element)
+        {
+            if (element.Contains("."))
+            {
+                var bits = element.Split('.');
+                target = Deref(target, String.Join(".", bits.Take(bits.Length - 1)));
+                element = bits[bits.Length - 1];
+            }
+
+            Type t = target.GetType();
+            var member = t.GetMember(element, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)[0];
+            return ReflectedItem.NewItem(member, target);
+        }
+
+        public static TimeSeries FindInputTimeSeries(RiverSystemScenario scenario, object target, string element, string inputSet=null)
+        {
+            var ri = GetReflectedItem(target, element);
+
+            Network theNetwork = scenario.Network;
+            InputSet theInputSet = null;
+
+            if (inputSet != null)
+            {
+                IList<InputSet> inputSets = theNetwork.InputSets;
+                theInputSet = inputSets.FirstOrDefault(i => i.Name == inputSet);
+            }
+
+            if(theInputSet==null)
+                theInputSet= theNetwork.DefaultInputSet;
+            
+            DataManager dm = theNetwork.DataManager;
+            return dm.GetUsedTimeSeries(theInputSet,ri);
+        }
+
+        public static string GetFullPath(this DataGroupItem dgi, ReflectedItem ri,InputSet inputSet)
+        {
+            var gdd = dgi.DataDetails.FirstOrDefault(dd => dd.Usages.Any(u => u.ReflectedItem.Equals(ri)));
+            return gdd == null ? "" : SimpleDataGroupItem.MakeID(dgi) + "/" + inputSet.Name + "/" + SourceService.URLSafeString(gdd.Name);
+        }
+
+        public static string FindDataSource(RiverSystemScenario scenario, object target, string element,
+            string inputSet = null)
+        {
+            var ri = GetReflectedItem(target, element);
+
+            Network theNetwork = scenario.Network;
+            InputSet theInputSet = null;
+
+            if (inputSet != null)
+            {
+                IList<InputSet> inputSets = theNetwork.InputSets;
+                theInputSet = inputSets.FirstOrDefault(i => i.Name == inputSet);
+            }
+
+            if (theInputSet == null)
+                theInputSet = theNetwork.DefaultInputSet;
+
+
+            DataManager dm = theNetwork.DataManager;
+
+            foreach (var name in dm.DataGroups.Select(g => g.GetFullPath(ri,theInputSet)).Where(name => !string.IsNullOrEmpty(name)))
+            {
+                return name;
+            }
+            return "";
         }
 
         public static bool ListContainsInstance(IEnumerable<object> theList, object example)
