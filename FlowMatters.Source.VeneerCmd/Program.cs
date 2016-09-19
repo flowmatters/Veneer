@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data.Common;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading;
 using RiverSystem;
@@ -12,13 +13,17 @@ using RiverSystem.PluginManager;
 using CommandLine;
 using CommandLine.Text;
 using FlowMatters.Source.WebServer;
+using RiverSystem.ApplicationLayer;
 using RiverSystem.ApplicationLayer.Interfaces;
 using RiverSystem.ApplicationLayer.Persistence.ZipContainer;
+using TIME.DataTypes;
 
 namespace FlowMatters.Source.VeneerCmd
 {
     class Program
     {
+        private static PluginManager _pluginManager;
+
         static void Main(string[] args)
         {
             SynchronizationContext.SetSynchronizationContext(new SynchronizationContext());
@@ -112,7 +117,7 @@ namespace FlowMatters.Source.VeneerCmd
          
         private static RiverSystemProject LoadProject(string fn,Options arguments)
         {
-            var callback = new CommandLineProjectCallback(arguments);
+            var callback = new CommandLineProjectCallback(arguments,_pluginManager);
             var loader = ProjectHandlerFactory.CreateProjectHandler<RiverSystemProject>(callback);
             callback.OutputFileName = fn;
             Show(String.Format("Opening project file: {0}", fn));
@@ -154,6 +159,7 @@ namespace FlowMatters.Source.VeneerCmd
                 Show(String.Format("Loaded {0}",plugin.Path));               
             }
             Show(String.Format("Plugins loaded ({0}/{1})",manager.ActivePlugins.Count(),manager.Plugins.Count));
+            _pluginManager = manager;
         }
 
         static void Show(string msg, bool flush = true)
@@ -169,16 +175,25 @@ namespace FlowMatters.Source.VeneerCmd
     public class CommandLineProjectCallback : DefaultCallback
     {
         private Options _arguments;
+        private PluginManager _plugins;
 
-        public CommandLineProjectCallback(Options arguments)
+        public CommandLineProjectCallback(Options arguments,PluginManager plugins)
         {
             _arguments = arguments;
+            _plugins = plugins;
         }
 
         public override bool BackupProject(string currentFileName, out string newFileName)
         {
             base.BackupProject(currentFileName, out newFileName);
             return _arguments.BackupRSPROJ;
+        }
+
+        public override void PreUpgradeProject<TProjectType>(ProjectMetaStructure<TProjectType> projectMetaStructure)
+        {
+            projectMetaStructure.PluginsDictionary = new MultiMap<string, Assembly>();
+            foreach (var plugin in _plugins.ActivePlugins)
+                projectMetaStructure.PluginsDictionary.Add(plugin.Name, plugin.Assemblies);
         }
     }
 
