@@ -51,7 +51,9 @@ namespace FlowMatters.Source.Veneer
 //            ProjectManager.Instance.SaveAuditLogMessage("Open run scenario window");
 //            Scenario.outputManager = new Obsolete.Recording.OutputManager();
 
-            ApplyRunParameters(parameters);
+            if(parameters!=null)
+                ApplyRunParameters(parameters);
+
             if (IsRunnable())
             {
                
