@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 using System.Runtime.Serialization;
 using RiverSystem;
@@ -34,13 +35,22 @@ namespace FlowMatters.Source.WebServer
             coordinates = arc.items.Select(GeoJSONLineString).ToArray();
         }
 
-        public GeoJSONGeometry(Link link)
+        public GeoJSONGeometry(Link link,bool useSchematicLocation)
         {
             type = GeoJSONGeometryType.LineString;
             var cTemp = new double[2][];
             cTemp[0] = GeoJSONPoint(link.from.location);
             cTemp[1] = GeoJSONPoint(link.to.location);
             coordinates = new[] {cTemp[0], cTemp[1]};
+        }
+
+        public GeoJSONGeometry(PointF from, PointF to)
+        {
+            type = GeoJSONGeometryType.LineString;
+            var cTemp = new double[2][];
+            cTemp[0] = GeoJSONPoint(new Coordinate(from));
+            cTemp[1] = GeoJSONPoint(new Coordinate(to));
+            coordinates = new[] { cTemp[0], cTemp[1] };
         }
 
         public GeoJSONGeometry(Polygon polygon)

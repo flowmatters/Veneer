@@ -7,6 +7,7 @@ using FlowMatters.Source.Veneer.ExchangeObjects;
 using RiverSystem;
 using RiverSystem.Catchments;
 using RiverSystem.Controls.Icons;
+using TIME.ManagedExtensions;
 using Network = RiverSystem.Network;
 
 namespace FlowMatters.Source.WebServer
@@ -17,16 +18,19 @@ namespace FlowMatters.Source.WebServer
         public GeoJSONNetwork(Network source)
         {
             IList<ICatchment> catchments = new List<ICatchment>(source.Catchments);
+            bool schematicAsCoordinates =
+                source.Nodes.OfType<Node>()
+                    .All(n => n.location.E.EqualWithTolerance(0.0) && n.location.N.EqualWithTolerance(0.0));
 
             List<GeoJSONFeature> featureList = new List<GeoJSONFeature>();
-            featureList.AddRange(from Node n in source.nodes select new GeoJSONFeature(n,source.Scenario));
+            featureList.AddRange(from Node n in source.nodes select new GeoJSONFeature(n,source.Scenario,schematicAsCoordinates));
             foreach (Link link in source.links)
             {
                 if (link.Network == null)
                     link.Network = source;
             }
 
-            featureList.AddRange(from Link l in source.links select new GeoJSONFeature(l));
+            featureList.AddRange(from Link l in source.links select new GeoJSONFeature(l,source.Scenario,schematicAsCoordinates));
             featureList.AddRange(catchments.Select(c => new GeoJSONFeature((Catchment)c,source.Scenario.BoundaryForCatchment(c))));
             features = featureList.ToArray();
         }

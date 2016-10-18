@@ -7,6 +7,7 @@ using Microsoft.CSharp.RuntimeBinder;
 using RiverSystem;
 using RiverSystem.Catchments;
 using RiverSystemGUI_II.SchematicBuilder;
+using TIME.DataTypes;
 using TIME.DataTypes.Polygons;
 
 namespace FlowMatters.Source.Veneer.ExchangeObjects
@@ -40,24 +41,38 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects
             private set { _properties = value; }
         }
 
-        public GeoJSONFeature(Node n,RiverSystemScenario scenario)
+        public GeoJSONFeature(Node n,RiverSystemScenario scenario,bool useSchematicLocation)
         {           
             id = NodeURL(n);
 
             properties.Add("name",n.Name);
             properties.Add(FeatureTypeProperty, "node");
-            object tmp = null;
-            scenario.AuxiliaryInformation.TryGetValue(SchematicNetworkControl.AUX_CONFIG, out tmp);
-            SchematicNetworkConfigurationPersistent schematic = tmp as SchematicNetworkConfigurationPersistent;
+            Coordinate loc = n.location;
+            var schematic = GetSchematic(scenario);
             if (schematic != null)
             {
-                PointF schematicLocation = schematic.ExistingFeatureShapeProperties.Where(shape=>shape.Feature==n).Select(shape=>shape.Location).FirstOrDefault();
+                PointF schematicLocation = SchematicLocationForNode(n, schematic);
                 properties.Add("schematic_location",new double[] {schematicLocation.X,schematicLocation.Y});
+                if (useSchematicLocation)
+                    loc = new Coordinate(schematicLocation);
             }
             properties.Add(ResourceProperty,
                 UriTemplates.Resources.Replace("{resourceName}", ResourceName(n)));
 
-            geometry = new GeoJSONGeometry(n.location);
+            geometry = new GeoJSONGeometry(loc);
+        }
+
+        private static PointF SchematicLocationForNode(TIME.DataTypes.NodeLinkNetwork.Node n, SchematicNetworkConfigurationPersistent schematic)
+        {
+            return schematic.ExistingFeatureShapeProperties.Where(shape=>shape.Feature==n).Select(shape=>shape.Location).FirstOrDefault();
+        }
+
+        private static SchematicNetworkConfigurationPersistent GetSchematic(RiverSystemScenario scenario)
+        {
+            object tmp;
+            scenario.AuxiliaryInformation.TryGetValue(SchematicNetworkControl.AUX_CONFIG, out tmp);
+            SchematicNetworkConfigurationPersistent schematic = tmp as SchematicNetworkConfigurationPersistent;
+            return schematic;
         }
 
         private static string ResourceName(Node n)
@@ -89,15 +104,25 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects
             return UriTemplates.Link.Replace("{linkId}", link.Network.links.indexOf(link).ToString());
         }
 
-        public GeoJSONFeature(Link l)
+        public GeoJSONFeature(Link l, RiverSystemScenario scenario, bool useSchematicLocation)
         {
             id = LinkURL(l);
-            properties.Add("name",l.Name);
-            properties.Add(FeatureTypeProperty,"link");
+            properties.Add("name", l.Name);
+            properties.Add(FeatureTypeProperty, "link");
             properties.Add("from_node", NodeURL(l.UpstreamNode));
             properties.Add("to_node", NodeURL(l.DownstreamNode));
-            
-            geometry = new GeoJSONGeometry(l);
+
+            if (useSchematicLocation)
+            {
+                var schematic = GetSchematic(scenario);
+                if (scenario != null)
+                {
+
+                    geometry = new GeoJSONGeometry(SchematicLocationForNode(l.from,schematic),SchematicLocationForNode(l.to,schematic));
+                    return;
+                }
+            }
+            geometry = new GeoJSONGeometry(l, useSchematicLocation);
         }
 
         public GeoJSONFeature(Catchment c,GEORegion region)
