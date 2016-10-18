@@ -47,7 +47,7 @@ namespace FlowMatters.Source.Veneer.DomainActions
             ParameterSet parameterSet = ParameterSet(inputSet);
             if (parameterSet == null)
                 return;
-            parameterSet.Configuration.Instructions = String.Join("\n", newInstructions);
+            parameterSet.Configuration.Instructions = String.Join(Environment.NewLine, newInstructions);
         }
 
         private ParameterSet ParameterSet(InputSet inputSet)
