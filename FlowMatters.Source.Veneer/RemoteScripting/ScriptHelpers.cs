@@ -20,6 +20,7 @@ using RiverSystem.DataManagement.DataManager.DataDetails;
 using RiverSystem.DataManagement.DataManager.DataSources;
 using RiverSystem.ManagedExtensions;
 using RiverSystem.Quality.SourceSinkModels;
+using RiverSystemGUI_II.SchematicBuilder;
 using TIME.Core;
 using TimeSeries = TIME.DataTypes.TimeSeries;
 using TIME.Management;
@@ -142,7 +143,7 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
 
             DataManager dm = theNetwork.DataManager;
 
-            foreach (var name in dm.DataGroups.Select(g => g.GetFullPath(ri,theInputSet)).Where(name => !string.IsNullOrEmpty(name)))
+            foreach (var name in dm.DataGroups.Select(g => g.GetFullPath(ri,theInputSet)).Where(name => !String.IsNullOrEmpty(name)))
             {
                 return name;
             }
@@ -177,7 +178,7 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
 
         public static void EnsureElementsHaveConstituentProviders(RiverSystemScenario scenario)
         {
-            RiverSystem.Network network = scenario.Network;
+            Network network = scenario.Network;
             ConstituentsManagement cm = network.ConstituentsManagement;
 
             Action<INetworkElement> ensure = element =>
@@ -224,6 +225,14 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
             }
 
             return null;
+        }
+
+        public static SchematicNetworkConfigurationPersistent GetSchematic(RiverSystemScenario scenario)
+        {
+            object tmp;
+            scenario.AuxiliaryInformation.TryGetValue(SchematicNetworkControl.AUX_CONFIG, out tmp);
+            SchematicNetworkConfigurationPersistent schematic = tmp as SchematicNetworkConfigurationPersistent;
+            return schematic;
         }
     }
 }

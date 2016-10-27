@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Runtime.Serialization;
+using FlowMatters.Source.Veneer.RemoteScripting;
 using FlowMatters.Source.WebServer;
 using Microsoft.CSharp.RuntimeBinder;
 using RiverSystem;
@@ -48,7 +49,7 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects
             properties.Add("name",n.Name);
             properties.Add(FeatureTypeProperty, "node");
             Coordinate loc = n.location;
-            var schematic = GetSchematic(scenario);
+            var schematic = ScriptHelpers.GetSchematic(scenario);
             if (schematic != null)
             {
                 PointF schematicLocation = SchematicLocationForNode(n, schematic);
@@ -65,14 +66,6 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects
         private static PointF SchematicLocationForNode(TIME.DataTypes.NodeLinkNetwork.Node n, SchematicNetworkConfigurationPersistent schematic)
         {
             return schematic.ExistingFeatureShapeProperties.Where(shape=>shape.Feature==n).Select(shape=>shape.Location).FirstOrDefault();
-        }
-
-        private static SchematicNetworkConfigurationPersistent GetSchematic(RiverSystemScenario scenario)
-        {
-            object tmp;
-            scenario.AuxiliaryInformation.TryGetValue(SchematicNetworkControl.AUX_CONFIG, out tmp);
-            SchematicNetworkConfigurationPersistent schematic = tmp as SchematicNetworkConfigurationPersistent;
-            return schematic;
         }
 
         private static string ResourceName(Node n)
@@ -114,7 +107,7 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects
 
             if (useSchematicLocation)
             {
-                var schematic = GetSchematic(scenario);
+                var schematic = ScriptHelpers.GetSchematic(scenario);
                 if (scenario != null)
                 {
 
