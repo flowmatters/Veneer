@@ -23,6 +23,7 @@ using RiverSystem.TaskDefinitions;
 using Application = System.Windows.Forms.Application;
 using Button = System.Windows.Controls.Button;
 using TextBox = System.Windows.Controls.TextBox;
+using Timer = System.Timers.Timer;
 using UserControl = System.Windows.Controls.UserControl;
 
 namespace FlowMatters.Source.WebServerPanel
@@ -34,6 +35,7 @@ namespace FlowMatters.Source.WebServerPanel
     {
         private RiverSystemScenario _scenario;
         private SynchronizationContext _originalContext;
+        private Timer _timer;
 
         public WebServerStatusControl()
         {
@@ -41,6 +43,17 @@ namespace FlowMatters.Source.WebServerPanel
             InitializeComponent();
             _originalContext = SynchronizationContext.Current;
             this.DataContext = this;
+
+            _timer = new Timer(1000.0);
+            _timer.AutoReset = false;
+            _timer.Elapsed += _timer_Elapsed;
+            _timer.Start();
+        }
+
+        private void _timer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
+        {
+            if (Scenario == null)
+                ServerLogEvent(this, "No active scenario. Load a project file before opening Web Server Monitoring");
         }
 
         public RiverSystemScenario Scenario
@@ -206,7 +219,8 @@ namespace FlowMatters.Source.WebServerPanel
 
         private void StopServer()
         {
-            _server.Stop();
+            if(Running)
+                _server.Stop();
             _server = null;
             UpdateButtons();
         }
