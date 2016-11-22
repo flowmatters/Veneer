@@ -16,12 +16,13 @@
     <FileAlignment>512</FileAlignment>
     <ProjectTypeGuids>{60dc8134-eba5-43b8-bcc9-bb4bc16c2548};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
     <WarningLevel>4</WarningLevel>
+    <OutputPath>..\..\Output\Plugins</OutputPath>
+    <ReferencePath>..\..\Output;..\..\Output\Plugins;..\..\3rdParty;</ReferencePath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
-    <OutputPath>..\Output\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -33,7 +34,6 @@
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
-    <OutputPath>bin\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -41,80 +41,65 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="IronPython, Version=2.7.5.0, Culture=neutral, PublicKeyToken=7f709c5b713576e1, processorArchitecture=MSIL">
-      <HintPath>packages\IronPython.2.7.5\lib\Net45\IronPython.dll</HintPath>
+      <HintPath>..\..\RiverSystem\Solutions\packages\IronPython.2.7.5\lib\Net45\IronPython.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="IronPython.Modules, Version=2.7.5.0, Culture=neutral, PublicKeyToken=7f709c5b713576e1, processorArchitecture=MSIL">
-      <HintPath>packages\IronPython.2.7.5\lib\Net45\IronPython.Modules.dll</HintPath>
+      <HintPath>..\..\RiverSystem\Solutions\packages\IronPython.2.7.5\lib\Net45\IronPython.Modules.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="IronPython.SQLite, Version=2.7.5.0, Culture=neutral, PublicKeyToken=7f709c5b713576e1, processorArchitecture=MSIL">
-      <HintPath>packages\IronPython.2.7.5\lib\Net45\IronPython.SQLite.dll</HintPath>
+      <HintPath>..\..\RiverSystem\Solutions\packages\IronPython.2.7.5\lib\Net45\IronPython.SQLite.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="IronPython.Wpf, Version=2.7.5.0, Culture=neutral, PublicKeyToken=7f709c5b713576e1, processorArchitecture=MSIL">
-      <HintPath>packages\IronPython.2.7.5\lib\Net45\IronPython.Wpf.dll</HintPath>
+      <HintPath>..\..\RiverSystem\Solutions\packages\IronPython.2.7.5\lib\Net45\IronPython.Wpf.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="Microsoft.Dynamic, Version=1.1.0.20, Culture=neutral, PublicKeyToken=7f709c5b713576e1, processorArchitecture=MSIL">
-      <HintPath>packages\IronPython.2.7.5\lib\Net45\Microsoft.Dynamic.dll</HintPath>
+      <HintPath>..\..\RiverSystem\Solutions\packages\IronPython.2.7.5\lib\Net45\Microsoft.Dynamic.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="Microsoft.Scripting, Version=1.1.0.20, Culture=neutral, PublicKeyToken=7f709c5b713576e1, processorArchitecture=MSIL">
-      <HintPath>packages\IronPython.2.7.5\lib\Net45\Microsoft.Scripting.dll</HintPath>
+      <HintPath>..\..\RiverSystem\Solutions\packages\IronPython.2.7.5\lib\Net45\Microsoft.Scripting.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="Microsoft.Scripting.AspNet, Version=1.0.0.0, Culture=neutral, PublicKeyToken=7f709c5b713576e1, processorArchitecture=MSIL">
-      <HintPath>packages\IronPython.2.7.5\lib\Net45\Microsoft.Scripting.AspNet.dll</HintPath>
+      <HintPath>..\..\RiverSystem\Solutions\packages\IronPython.2.7.5\lib\Net45\Microsoft.Scripting.AspNet.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="Microsoft.Scripting.Metadata, Version=1.1.0.20, Culture=neutral, PublicKeyToken=7f709c5b713576e1, processorArchitecture=MSIL">
-      <HintPath>packages\IronPython.2.7.5\lib\Net45\Microsoft.Scripting.Metadata.dll</HintPath>
+      <HintPath>..\..\RiverSystem\Solutions\packages\IronPython.2.7.5\lib\Net45\Microsoft.Scripting.Metadata.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="Newtonsoft.Json, Version=4.5.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
-      <HintPath>packages\Newtonsoft.Json.5.0.6\lib\net40\Newtonsoft.Json.dll</HintPath>
+      <HintPath>..\..\RiverSystem\Solutions\packages\Newtonsoft.Json.5.0.6\lib\net40\Newtonsoft.Json.dll</HintPath>
     </Reference>
     <Reference Include="nunit.framework">
-      <HintPath>..\References\nunit.framework.dll</HintPath>
     </Reference>
     <Reference Include="RiverSystem">
-      <HintPath>..\References\RiverSystem.dll</HintPath>
     </Reference>
     <Reference Include="RiverSystem.Api">
-      <HintPath>..\References\RiverSystem.Api.dll</HintPath>
     </Reference>
-    <Reference Include="RiverSystem.ApplicationLayer.Consumer, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\References\RiverSystem.ApplicationLayer.Consumer.dll</HintPath>
+    <Reference Include="RiverSystem.ApplicationLayer.Consumer">
     </Reference>
-    <Reference Include="RiverSystem.ApplicationLayer.Consumer.Forms, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\References\RiverSystem.ApplicationLayer.Consumer.Forms.dll</HintPath>
+    <Reference Include="RiverSystem.ApplicationLayer.Consumer.Forms">
     </Reference>
-    <Reference Include="RiverSystem.ApplicationLayer.Interfaces, Culture=neutral, processorArchitecture=MSIL">
+    <Reference Include="RiverSystem.ApplicationLayer.Interfaces">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\References\RiverSystem.ApplicationLayer.Interfaces.dll</HintPath>
     </Reference>
     <Reference Include="RiverSystem.Controls">
-      <HintPath>..\References\RiverSystem.Controls.dll</HintPath>
     </Reference>
     <Reference Include="RiverSystem.Forms">
-      <HintPath>..\References\RiverSystem.Forms.exe</HintPath>
     </Reference>
-    <Reference Include="RiverSystem.Persistence, Version=3.8.14.0, Culture=neutral, processorArchitecture=MSIL">
+    <Reference Include="RiverSystem.Persistence">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\References\RiverSystem.Persistence.dll</HintPath>
     </Reference>
-    <Reference Include="RiverSystem.ScenarioExplorer, Version=3.8.14.0, Culture=neutral, processorArchitecture=MSIL">
+    <Reference Include="RiverSystem.ScenarioExplorer">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\References\RiverSystem.ScenarioExplorer.dll</HintPath>
     </Reference>
-    <Reference Include="RiverSystem.Simulation, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\References\RiverSystem.Simulation.dll</HintPath>
+    <Reference Include="RiverSystem.Simulation">
     </Reference>
-    <!--    <Reference Include="ScenarioManagement">
-      <HintPath>..\References\ScenarioManagement.dll</HintPath>
-    </Reference>
--->
     <Reference Include="System" />
     <Reference Include="System.configuration" />
     <Reference Include="System.Data" />
@@ -132,16 +117,12 @@
       <RequiredTargetFramework>4.0</RequiredTargetFramework>
     </Reference>
     <Reference Include="TIME">
-      <HintPath>..\References\TIME.dll</HintPath>
     </Reference>
     <Reference Include="TIME.ScenarioManagement">
-      <HintPath>..\References\TIME.ScenarioManagement.dll</HintPath>
     </Reference>
-    <Reference Include="TIME.Tools, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\References\TIME.Tools.dll</HintPath>
+    <Reference Include="TIME.Tools">
     </Reference>
-    <Reference Include="TIME.Winforms, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\References\TIME.Winforms.dll</HintPath>
+    <Reference Include="TIME.Winforms">
     </Reference>
     <Reference Include="WindowsBase" />
     <Reference Include="PresentationCore" />
@@ -747,7 +728,9 @@
     </None>
     <AppDesigner Include="Properties\" />
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <Folder Include="Lib\site-packages\" />
+  </ItemGroup>
   <ItemGroup>
     <Resource Include="Logo_RGB.png" />
   </ItemGroup>
@@ -756,9 +739,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\FM.ico" />
-  </ItemGroup>
-  <ItemGroup>
-    <Resource Include="Lib\site-packages\README.txt" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
