@@ -15,7 +15,7 @@
     </TargetFrameworkProfile>
     <FileAlignment>512</FileAlignment>
     <OutputPath>..\..\Output\Plugins</OutputPath>
-    <ReferencePath>..\..\Output;..\..\Output\Plugins;..\..\3rdParty</ReferencePath>
+    <ReferencePath>..\..\Output;..\..\Output\Plugins;..\..\3rdParty;..\References</ReferencePath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x86' ">
     <PlatformTarget>x64</PlatformTarget>
