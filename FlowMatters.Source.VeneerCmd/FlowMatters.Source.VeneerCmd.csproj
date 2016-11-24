@@ -15,7 +15,7 @@
     </TargetFrameworkProfile>
     <FileAlignment>512</FileAlignment>
     <OutputPath>..\..\Output\Plugins\CommunityPlugins</OutputPath>
-    <ReferencePath>..\..\Output;..\..\Output\Plugins;..\..\3rdParty</ReferencePath>
+    <ReferencePath>..\..\Output;..\..\Output\Plugins;..\..\3rdParty;..\References</ReferencePath>
     <NoWarn>1591,1587</NoWarn>
     <WarningLevel>4</WarningLevel>
     <Prefer32Bit>false</Prefer32Bit>
