@@ -24,7 +24,7 @@
 	<file src="..\Output\Plugins\Microsoft.Scripting.Metadata.dll" target="lib\Microsoft.Scripting.Metadata.dll" />
 	<file src="..\Output\Plugins\Microsoft.Scripting.AspNet.dll" target="lib\Microsoft.Scripting.AspNet.dll" />
 	
-	<file src="..\Output\Plugins\FlowMatters.Source.VeneerCmd.dll" target="lib\FlowMatters.Source.VeneerCmd.dll" />
+	<file src="..\Output\Plugins\FlowMatters.Source.VeneerCmd.exe" target="lib\FlowMatters.Source.VeneerCmd.exe" />
 	<file src="..\Output\Plugins\CommandLine.dll" target="lib\CommandLine.dll" />
   </files>
 </package>
