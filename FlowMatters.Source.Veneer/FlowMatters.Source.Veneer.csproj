@@ -62,7 +62,7 @@
     </Reference>
     <Reference Include="Microsoft.Dynamic">
       <SpecificVersion>False</SpecificVersion>
-      <Private>True</Private>
+      <Private>False</Private>
     </Reference>
     <Reference Include="Microsoft.Scripting">
       <SpecificVersion>False</SpecificVersion>
@@ -78,6 +78,7 @@
     </Reference>
     <Reference Include="Newtonsoft.Json">
       <SpecificVersion>False</SpecificVersion>
+      <Private>True</Private>
     </Reference>
     <Reference Include="nunit.framework">
       <Private>False</Private>
