@@ -20,16 +20,23 @@ namespace FlowMatters.Source.Veneer.CORS
         {
             List<String> knownOrigins = new List<string>
             {
-                "http://www.flowmatters.com.au",
-                "http://flowmatters.com.au",
-                "http://hydrograph.io",
-                "http://www.hydrograph.io",
-                "http://staging.hydrograph.io"
+                "www.flowmatters.com.au",
+                "flowmatters.com.au",
+                "hydrograph.io",
+                "www.hydrograph.io",
+                "staging.hydrograph.io",
+                "0.0.0.0"
             };
 
             HttpRequestMessageProperty httpProp = (HttpRequestMessageProperty)request.Properties[HttpRequestMessageProperty.Name];
 
-            if (knownOrigins.Contains(httpProp.Headers[Origin]))
+            var origin = httpProp.Headers[Origin];
+            if (String.IsNullOrEmpty(origin))
+                return null;
+            origin = origin.Split(':')[1];
+            origin = origin.TrimStart('/');
+
+            if (knownOrigins.Contains(origin))
                 return httpProp.Headers[Origin];
             return null;
         }
