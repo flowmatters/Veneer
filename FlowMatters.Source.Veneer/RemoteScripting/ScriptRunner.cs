@@ -78,22 +78,10 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
 
         private static void AddAssemblyReferences(ScriptEngine engine)
         {
-            List<string> ignoreList = new List<string>(Finder.DllsThatAreIrrelevantToFinder);
-            List<string> myList = new List<string>
-            {
-                "system.core.dll"
-            };
-            foreach (Assembly a in  AppDomain.CurrentDomain.GetAssemblies())
-            {
-                var dllName = a.ManifestModule.Name.ToLower();
-
-                // skip looking for user options if we are a system/3rd party
-                // assembly
-                if (ignoreList.Contains(dllName) && !myList.Contains(dllName))
-                    continue;
-
+            var myList = new HashSet<string>{ "system.core.dll" };
+            var includeList = AssemblyManager.Assemblies();
+            foreach(var a in includeList.Where(a=> !myList.Contains(a.ManifestModule.Name.ToLower())))
                 engine.Runtime.LoadAssembly(a);
-            }
         }
 
         private VeneerResponse AsKnownDataContract(object actual)

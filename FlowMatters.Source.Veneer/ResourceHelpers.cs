@@ -16,7 +16,7 @@ namespace FlowMatters.Source.Veneer
     {
         public static Bitmap FindByName(string s)
         {
-            Type modelType = Finder.typesInherting(typeof(IDomainObject)).Where(t => t.Name == s).FirstOrDefault();
+            var modelType = AssemblyManager.FindTypes(typeof(IDomainObject),allowAbstract:false,allowIgnore:true).FirstOrDefault(t => t.Name == s);
 
             if (modelType == null)
             {
