@@ -54,62 +54,60 @@ namespace FlowMatters.Source.Veneer
             if(parameters!=null)
                 ApplyRunParameters(parameters);
 
-            if (IsRunnable())
+            if (!IsRunnable()) throw new Exception("Scenario not runnable");
+
+            //                JobRunner.BeforeRun += new BeforeTemporalRunHandler(JobRunner_BeforeRun);
+            Scenario.RunManager.UpdateEvent = new EventHandler<JobRunEventArgs>(JobRunner_Update);
+
+            ScenarioRunWindow runWindow = null;
+            var startOfRun = DateTime.Now;
+
+            if (showWindow)
             {
-               
-                //                JobRunner.BeforeRun += new BeforeTemporalRunHandler(JobRunner_BeforeRun);
-                Scenario.RunManager.UpdateEvent = new EventHandler<JobRunEventArgs>(JobRunner_Update);
-
-                ScenarioRunWindow runWindow = null;
-                var startOfRun = DateTime.Now;
-
-                if (showWindow)
-                {
-                    runWindow = new ScenarioRunWindow(Scenario);
-                    //runWindow.SetOwner(this);
-                    //runWindow.WindowStartupLocation = WindowStartupLocation.CenterOwner;
-                    //Enabled = false;
-                    runWindow.Show();
-                    ProjectManager.Instance.SaveAuditLogMessage("Run started at " + DateTime.Now);
-                }
+                runWindow = new ScenarioRunWindow(Scenario);
+                //runWindow.SetOwner(this);
+                //runWindow.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+                //Enabled = false;
+                runWindow.Show();
+                ProjectManager.Instance.SaveAuditLogMessage("Run started at " + DateTime.Now);
+            }
 
 
-                Task x = Task.Factory.StartNew(() => Scenario.RunManager.Execute());
-                while (!x.IsCompleted)
-                {
-                    Thread.Sleep(50);
-                    Application.DoEvents();
-                }
+            Task x = Task.Factory.StartNew(() => Scenario.RunManager.Execute());
+            while (!x.IsCompleted)
+            {
+                Thread.Sleep(50);
+                Application.DoEvents();
+            }
 
 //                LogRunEnd(startOfRun);
 
-                if (showWindow)
-                {
-                    ProjectManager.Instance.SaveAuditLogMessage("Run finished at " + DateTime.Now + " and took " + TimeTools.TimeSpanString(DateTime.Now - startOfRun));
-                    runWindow.Close();
-                    runWindow.Dispose();
-                }
-                //if so then run
-                //running = true;
-
-                //runControl = new ScenarioRunWindow(Scenario);
-                //runControl.SetOwner(MainForm.Instance);
-                //runControl.Show();
-
-                //Scenario.RunManager.Execute();
-                //                lock (lockObj)
-                //                {
-                //while (running)
-                //{
-                //    Thread.Sleep(50);
-                //    Application.DoEvents();
-                //    //Monitor.Wait(lockObj);
-                //}
-                //                }
-
-                //runControl.Close();
-                //runControl.Dispose();
+            if (showWindow)
+            {
+                ProjectManager.Instance.SaveAuditLogMessage("Run finished at " + DateTime.Now + " and took " + TimeTools.TimeSpanString(DateTime.Now - startOfRun));
+                runWindow.Close();
+                runWindow.Dispose();
             }
+            //if so then run
+            //running = true;
+
+            //runControl = new ScenarioRunWindow(Scenario);
+            //runControl.SetOwner(MainForm.Instance);
+            //runControl.Show();
+
+            //Scenario.RunManager.Execute();
+            //                lock (lockObj)
+            //                {
+            //while (running)
+            //{
+            //    Thread.Sleep(50);
+            //    Application.DoEvents();
+            //    //Monitor.Wait(lockObj);
+            //}
+            //                }
+
+            //runControl.Close();
+            //runControl.Dispose();
 
 //            ProjectManager.Instance.SaveAuditLogMessage("Close run scenario window");
         }
