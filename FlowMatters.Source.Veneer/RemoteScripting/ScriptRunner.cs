@@ -92,6 +92,7 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
                 // assembly
                 if (ignoreList.Contains(dllName) && !myList.Contains(dllName))
                     continue;
+                engine.Runtime.LoadAssembly(a);
             }
 #else
             var myList = new HashSet<string>{ "system.core.dll" };
