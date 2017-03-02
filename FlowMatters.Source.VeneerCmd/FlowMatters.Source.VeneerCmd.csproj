@@ -132,6 +132,7 @@
     <ProjectReference Include="..\FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj">
       <Project>{3bd8fe40-11ea-4f0e-ab7c-9ea6e3fd1304}</Project>
       <Name>FlowMatters.Source.Veneer</Name>
+      <Private>False</Private>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>

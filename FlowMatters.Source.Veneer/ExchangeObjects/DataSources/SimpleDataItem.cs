@@ -16,7 +16,7 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects.DataSources
         {
             Name = isi.Name;
             InputSets = isi.InputSets.Select(iset => iset.Name).ToArray();
-            Details = isi.DataSource.PersistedData.Select(ddi => new SimpleDataDetails(ddi,summary)).ToArray();
+            Details = isi.DataSource.Data.Select(ddi => new SimpleDataDetails(ddi,summary)).ToArray();
         }
 
         public SimpleDataItem(GenericDataDetails gdd)

@@ -19,7 +19,6 @@
     <file src="..\Output\Plugins\CommunityPlugins\IronPython.Modules.dll" target="lib\IronPython.Modules.dll" />
 	<file src="..\Output\Plugins\CommunityPlugins\IronPython.SQLite.dll" target="lib\IronPython.SQLite.dll" />
 	<file src="..\Output\Plugins\CommunityPlugins\IronPython.Wpf.dll" target="lib\IronPython.Wpf.dll" />
-	<file src="..\Output\Plugins\CommunityPlugins\Microsoft.Dynamic.dll" target="lib\Microsoft.Dynamic.dll" />
 	<file src="..\Output\Plugins\CommunityPlugins\Microsoft.Scripting.dll" target="lib\Microsoft.Scripting.dll" />
 	<file src="..\Output\Plugins\CommunityPlugins\Microsoft.Scripting.Metadata.dll" target="lib\Microsoft.Scripting.Metadata.dll" />
 	<file src="..\Output\Plugins\CommunityPlugins\Microsoft.Scripting.AspNet.dll" target="lib\Microsoft.Scripting.AspNet.dll" />
