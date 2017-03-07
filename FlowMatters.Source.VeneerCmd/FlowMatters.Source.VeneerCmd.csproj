@@ -10,15 +10,15 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>FlowMatters.Source.VeneerCmd</RootNamespace>
     <AssemblyName>FlowMatters.Source.VeneerCmd</AssemblyName>
-    <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
-    <TargetFrameworkProfile>
-    </TargetFrameworkProfile>
+    <TargetFrameworkVersion>v4.6.2</TargetFrameworkVersion>
+    <TargetFrameworkProfile></TargetFrameworkProfile>
     <FileAlignment>512</FileAlignment>
     <OutputPath>..\..\Output\Plugins\CommunityPlugins</OutputPath>
     <ReferencePath>..\..\Output;..\..\Output\Plugins;..\..\3rdParty;..\References;..\References\Plugins</ReferencePath>
     <NoWarn>1591,1587</NoWarn>
     <WarningLevel>4</WarningLevel>
     <Prefer32Bit>false</Prefer32Bit>
+    <LangVersion>6</LangVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x86' ">
     <PlatformTarget>x64</PlatformTarget>
