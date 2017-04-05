@@ -134,25 +134,20 @@ namespace FlowMatters.Source.Veneer
             foreach (var entry in parameters.Params)
             {
                 var prop = configType.GetProperty(entry.Key, BindingFlags.Instance | BindingFlags.Public);
+                var val = entry.Value;
                 if (prop == null)
                 {
                     throw new NotImplementedException(String.Format(
                         "Running configuration doesn't have a property: {0}", entry.Key));
                 }
                 if (prop.PropertyType == typeof (DateTime))
-                {
-                    DateTime dt = DateTime.ParseExact(entry.Value.ToString(), "dd/MM/yyyy", CultureInfo.InvariantCulture);
-                    prop.SetValue(configuration,dt);
-                }
+                    val = DateTime.ParseExact(entry.Value.ToString(), "dd/MM/yyyy", CultureInfo.InvariantCulture);
                 else if (prop.PropertyType == typeof (InputSet))
-                {
-                    InputSet set = Scenario.Network.InputSets.FirstOrDefault(ipSet => ipSet.Name == (string)entry.Value);
-                    prop.SetValue(configuration,set);
-                }
-                else
-                {
-                    prop.SetValue(configuration, entry.Value);
-                }
+                    val = Scenario.Network.InputSets.FirstOrDefault(ipSet => ipSet.Name == (string)entry.Value);
+                else if (prop.PropertyType == typeof(TimeStep))
+                    val = TimeStep.FromName((string) entry.Value);
+
+                prop.SetValue(configuration,val);
             }
         }
 
