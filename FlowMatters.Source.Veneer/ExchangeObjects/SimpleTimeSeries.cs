@@ -20,7 +20,7 @@ namespace FlowMatters.Source.WebServer.ExchangeObjects
             }
 
             IList<TimeSeriesEvent> eventList = new List<TimeSeriesEvent>();
-            for (int i = 0; i < source.count(); i++)
+            for (int i = 0; i < source.Count; i++)
                 eventList.Add(new TimeSeriesEvent
                     {
                         Date = source.timeForItem(i).ToString(CultureInfo.InvariantCulture),

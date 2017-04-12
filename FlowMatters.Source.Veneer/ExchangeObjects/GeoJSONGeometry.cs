@@ -80,7 +80,7 @@ namespace FlowMatters.Source.WebServer
             type = GeoJSONGeometryType.MultiPolygon;
             
             List<double[][][]> coordTemp = new List<double[][][]>();
-            for(int i = 0; i < region.count(); i++)
+            for(int i = 0; i < region.Count; i++)
                 coordTemp.Add(GeoJSONPolygon(region.item(i)));
             coordinates = coordTemp.ToArray();
         }
@@ -93,7 +93,7 @@ namespace FlowMatters.Source.WebServer
         private static double[][] GeoJSONLineString(PolyLine line)
         {
             var coords = new List<double[]>();
-            for (int i = 0; i < line.count(); i++)
+            for (int i = 0; i < line.Count; i++)
                 coords.Add(GeoJSONPoint(line.item(i)));
             return coords.ToArray();
         }
@@ -104,7 +104,7 @@ namespace FlowMatters.Source.WebServer
         public static PolyLine Reverse(this PolyLine original)
         {
             List<Coordinate> points = new List<Coordinate>();
-            for(int i = 0; i < original.count(); i++)
+            for(int i = 0; i < original.Count; i++)
                 points.Add(original.item(i));
             points.Reverse();
             PolyLine result = new PolyLine();
