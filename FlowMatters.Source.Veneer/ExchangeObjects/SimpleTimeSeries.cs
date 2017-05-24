@@ -1,4 +1,8 @@
-﻿using System;
+﻿#if V3 || V4_0 || V4_1 || V4_2_0 || V4_2_1 || V4_2_2 || V4_2_3
+#define BeforeCaseRefactor
+#endif
+
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -20,9 +24,13 @@ namespace FlowMatters.Source.WebServer.ExchangeObjects
             }
 
             IList<TimeSeriesEvent> eventList = new List<TimeSeriesEvent>();
+#if BeforeCaseRefactor
+            for (int i = 0; i < source.count(); i++)
+#else
             for (int i = 0; i < source.Count; i++)
+#endif
                 eventList.Add(new TimeSeriesEvent
-                    {
+            {
                         Date = source.timeForItem(i).ToString(CultureInfo.InvariantCulture),
                         Value = source[i]
                     });
