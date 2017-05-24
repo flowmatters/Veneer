@@ -81,6 +81,9 @@ namespace FlowMatters.Source.Veneer.DomainActions
         public string Filename(InputSet inputSet)
         {
             var p = ParameterSet(inputSet);
+            if (p == null)
+                return null;
+
             if (p.Configuration is FileParameterSetConfiguration)
             {
                 return ((FileParameterSetConfiguration)p.Configuration).Filename;
@@ -91,6 +94,9 @@ namespace FlowMatters.Source.Veneer.DomainActions
         public bool ReloadOnRun(InputSet inputSet)
         {
             var p = ParameterSet(inputSet);
+            if (p == null)
+                return false;
+
             if (p.Configuration is FileParameterSetConfiguration)
             {
                 return ((FileParameterSetConfiguration) p.Configuration).ReloadOnRun;
