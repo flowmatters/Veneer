@@ -38,7 +38,7 @@ namespace FlowMatters.Source.Veneer.DomainActions
             if (parameterSet == null)
                 return new string[0];
 
-            IEnumerable<string> result = parameterSet.Configuration.GetInstructions(null);
+            IEnumerable<string> result = parameterSet.Configuration.GetInstructions(new Scenario(Scenario));
             return result.ToArray();
         }
 
