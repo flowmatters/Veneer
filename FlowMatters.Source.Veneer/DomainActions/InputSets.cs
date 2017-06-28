@@ -38,8 +38,15 @@ namespace FlowMatters.Source.Veneer.DomainActions
             if (parameterSet == null)
                 return new string[0];
 
-            IEnumerable<string> result = parameterSet.Configuration.GetInstructions(null);
-            return result.ToArray();
+            try
+            {
+                IEnumerable<string> result = parameterSet.Configuration.GetInstructions(new Scenario(Scenario));
+                return result.ToArray();
+            }
+            catch
+            {
+                return new string[] { "// Couldn't read instructions." };
+            }
         }
 
         public void UpdateInstructions(InputSet inputSet, string[] newInstructions)
@@ -69,6 +76,32 @@ namespace FlowMatters.Source.Veneer.DomainActions
         public void Run(string urlSafeInputSetName)
         {
             Run(Find(urlSafeInputSetName));
+        }
+
+        public string Filename(InputSet inputSet)
+        {
+            var p = ParameterSet(inputSet);
+            if (p == null)
+                return null;
+
+            if (p.Configuration is FileParameterSetConfiguration)
+            {
+                return ((FileParameterSetConfiguration)p.Configuration).Filename;
+            }
+            return null;
+        }
+
+        public bool ReloadOnRun(InputSet inputSet)
+        {
+            var p = ParameterSet(inputSet);
+            if (p == null)
+                return false;
+
+            if (p.Configuration is FileParameterSetConfiguration)
+            {
+                return ((FileParameterSetConfiguration) p.Configuration).ReloadOnRun;
+            }
+            return false;
         }
     }
 }

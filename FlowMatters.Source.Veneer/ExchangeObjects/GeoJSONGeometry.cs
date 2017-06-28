@@ -1,4 +1,8 @@
-﻿using System.Collections.Generic;
+﻿#if V3 || V4_0 || V4_1 || V4_2_0 || V4_2_1 || V4_2_2 || V4_2_3
+#define BeforeCaseRefactor
+#endif
+
+using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Runtime.Serialization;
@@ -80,7 +84,11 @@ namespace FlowMatters.Source.WebServer
             type = GeoJSONGeometryType.MultiPolygon;
             
             List<double[][][]> coordTemp = new List<double[][][]>();
-            for(int i = 0; i < region.Count; i++)
+#if BeforeCaseRefactor
+            for(int i = 0; i < region.count(); i++)
+#else
+            for (int i = 0; i < region.Count; i++)
+#endif
                 coordTemp.Add(GeoJSONPolygon(region.item(i)));
             coordinates = coordTemp.ToArray();
         }
@@ -93,7 +101,11 @@ namespace FlowMatters.Source.WebServer
         private static double[][] GeoJSONLineString(PolyLine line)
         {
             var coords = new List<double[]>();
+#if BeforeCaseRefactor
+            for (int i = 0; i < line.count(); i++)
+#else
             for (int i = 0; i < line.Count; i++)
+#endif
                 coords.Add(GeoJSONPoint(line.item(i)));
             return coords.ToArray();
         }
@@ -104,7 +116,11 @@ namespace FlowMatters.Source.WebServer
         public static PolyLine Reverse(this PolyLine original)
         {
             List<Coordinate> points = new List<Coordinate>();
-            for(int i = 0; i < original.Count; i++)
+#if BeforeCaseRefactor
+            for(int i = 0; i < original.count(); i++)
+#else
+            for (int i = 0; i < original.Count; i++)
+#endif
                 points.Add(original.item(i));
             points.Reverse();
             PolyLine result = new PolyLine();

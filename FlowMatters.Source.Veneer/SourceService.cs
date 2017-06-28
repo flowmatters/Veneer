@@ -401,6 +401,14 @@ namespace FlowMatters.Source.WebServer
                     Name = inputSet.Name,
                     Configuration = sets.Instructions(inputSet)
                 };
+
+                string fn = sets.Filename(inputSet);
+
+                if (!String.IsNullOrEmpty(fn))
+                {
+                    result[i].Filename = fn;
+                    result[i].ReloadOnRun = sets.ReloadOnRun(inputSet);
+                }
             }
             return result;
         }
