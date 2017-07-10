@@ -40,7 +40,7 @@ namespace FlowMatters.Source.Veneer.DomainActions
 
             try
             {
-                IEnumerable<string> result = parameterSet.Configuration.GetInstructions(new Scenario(Scenario));
+                IEnumerable<string> result = parameterSet.Configuration.GetInstructions(Scenario);
                 return result.ToArray();
             }
             catch
@@ -70,7 +70,7 @@ namespace FlowMatters.Source.Veneer.DomainActions
             ParameterSet parameterSet = ParameterSet(inputSet);
             if (parameterSet == null)
                 return;
-            parameterSet.Reset(new Scenario(Scenario));
+            parameterSet.Apply(Scenario);
         }
 
         public void Run(string urlSafeInputSetName)
