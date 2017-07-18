@@ -18,6 +18,7 @@ using TIME.ScenarioManagement.Execution;
 using TIME.ScenarioManagement.RunManagement;
 using TIME.Winforms.Utils;
 using FlowMatters.Source.Veneer.ExchangeObjects;
+using RiverSystem.Options;
 
 namespace FlowMatters.Source.Veneer
 {
