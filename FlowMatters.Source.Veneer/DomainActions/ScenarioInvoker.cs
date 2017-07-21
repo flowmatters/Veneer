@@ -18,7 +18,11 @@ using TIME.ScenarioManagement.Execution;
 using TIME.ScenarioManagement.RunManagement;
 using TIME.Winforms.Utils;
 using FlowMatters.Source.Veneer.ExchangeObjects;
+#if V3 || V4_0 || V4_1 || V4_2 || V4_3 || V4_4 || V4_5 || GBRSource
+
+#else
 using RiverSystem.Options;
+#endif
 
 namespace FlowMatters.Source.Veneer
 {
