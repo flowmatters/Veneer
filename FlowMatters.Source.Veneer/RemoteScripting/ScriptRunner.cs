@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Data;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -116,6 +117,37 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
                 return new StringResponse {Value=(string)actual};
             if(actual is GEORegionData[])
                 return new GeoJSONCoverage((GEORegionData[])actual);
+            if (actual is IronPython.Runtime.PythonDictionary)
+            {
+                var dict = (IronPython.Runtime.PythonDictionary) actual;
+                var keys = dict.keys();
+                return new DictResponse
+                {
+                    Entries = keys.Select(k => new KeyValueResponse
+                    {
+                        Key = AsKnownDataContract(k),
+                        Value = AsKnownDataContract(dict.get(k))
+                    })
+                };
+            }
+            if (actual is DataTable)
+            {
+                var table = (DataTable) actual;
+                return new ListResponse
+                {
+                    Value = table.Rows.OfType<DataRow>().Select(row =>
+                    {
+                        return new DictResponse
+                        {
+                            Entries = table.Columns.OfType<DataColumn>().Select(col => new KeyValueResponse
+                            {
+                                Key = AsKnownDataContract(col.ColumnName),
+                                Value = AsKnownDataContract(row[col])
+                            })
+                        };
+                    })
+                };
+            }
             if (actual is IEnumerable)
             {
                 IEnumerable enumerable = (IEnumerable) actual;

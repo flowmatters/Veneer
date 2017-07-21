@@ -194,6 +194,7 @@
     <Compile Include="ExchangeObjects\DataSources\SimpleDataDetails.cs" />
     <Compile Include="ExchangeObjects\DataSources\SimpleDataGroupItem.cs" />
     <Compile Include="ExchangeObjects\DataSources\SimpleDataItem.cs" />
+    <Compile Include="ExchangeObjects\DictResponse.cs" />
     <Compile Include="ExchangeObjects\GeoJSONCoverage.cs" />
     <Compile Include="ExchangeObjects\GeoJSONFeature.cs" />
     <Compile Include="ExchangeObjects\ListResponse.cs" />
