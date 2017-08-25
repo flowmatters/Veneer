@@ -14,6 +14,8 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects
     [KnownType(typeof(BooleanResponse))]
     [KnownType(typeof(ListResponse))]
     [KnownType(typeof(GeoJSONCoverage))]
+    [KnownType(typeof(DictResponse))]
+    [KnownType(typeof(KeyValueResponse))]
     public class VeneerResponse
     {
     }
