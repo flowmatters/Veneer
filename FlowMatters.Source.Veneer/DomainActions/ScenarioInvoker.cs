@@ -18,7 +18,12 @@ using TIME.ScenarioManagement.Execution;
 using TIME.ScenarioManagement.RunManagement;
 using TIME.Winforms.Utils;
 using FlowMatters.Source.Veneer.ExchangeObjects;
+using TIME.Tools.Reflection;
+#if V3 || V4_0 || V4_1 || V4_2 || V4_3 || V4_4 || V4_5 || GBRSource
+
+#else
 using RiverSystem.Options;
+#endif
 
 namespace FlowMatters.Source.Veneer
 {
@@ -134,21 +139,17 @@ namespace FlowMatters.Source.Veneer
             Type configType = configuration.GetType();
             foreach (var entry in parameters.Params)
             {
-                var prop = configType.GetProperty(entry.Key, BindingFlags.Instance | BindingFlags.Public);
+                var ri = ReflectedItem.NewItem(entry.Key, configuration);
                 var val = entry.Value;
-                if (prop == null)
-                {
-                    throw new NotImplementedException(String.Format(
-                        "Running configuration doesn't have a property: {0}", entry.Key));
-                }
-                if (prop.PropertyType == typeof (DateTime))
+
+                if (ri.itemType == typeof (DateTime))
                     val = DateTime.ParseExact(entry.Value.ToString(), "dd/MM/yyyy", CultureInfo.InvariantCulture);
-                else if (prop.PropertyType == typeof (InputSet))
+                else if (ri.itemType == typeof (InputSet))
                     val = Scenario.Network.InputSets.FirstOrDefault(ipSet => ipSet.Name == (string)entry.Value);
-                else if (prop.PropertyType == typeof(TimeStep))
+                else if (ri.itemType == typeof(TimeStep))
                     val = TimeStep.FromName((string) entry.Value);
 
-                prop.SetValue(configuration,val);
+                ri.itemValue = val;
             }
         }
 

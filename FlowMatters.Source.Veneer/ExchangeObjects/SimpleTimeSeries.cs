@@ -1,4 +1,4 @@
-﻿#if V3 || V4_0 || V4_1 || V4_2_0 || V4_2_1 || V4_2_2 || V4_2_3
+﻿#if V3 || V4_0 || V4_1 || V4_2_0 || V4_2_1 || V4_2_2 || V4_2_3 || GBRSource
 #define BeforeCaseRefactor
 #endif
 
