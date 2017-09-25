@@ -40,7 +40,7 @@ namespace FlowMatters.Source.Veneer.DomainActions
 
             try
             {
-#if V3 || V4_0 || V4_1 || V4_2 || V4_3 || V4_4 || V4_5 || GBRSource
+#if V3 || V4_0 || V4_1 || V4_2_0 || V4_2_1 || V4_2_2 || V4_2_3 || V4_2_4 || V4_2_5 || V4_2_6 || GBRSource
                 IEnumerable<string> result = parameterSet.Configuration.GetInstructions(new Scenario(Scenario));
 #else
                 IEnumerable<string> result = parameterSet.Configuration.GetInstructions(Scenario);
@@ -74,7 +74,7 @@ namespace FlowMatters.Source.Veneer.DomainActions
             ParameterSet parameterSet = ParameterSet(inputSet);
             if (parameterSet == null)
                 return;
-#if V3 || V4_0 || V4_1 || V4_2 || V4_3 || V4_4 || V4_5 || GBRSource
+#if V3 || V4_0 || V4_1 || V4_2_0 || V4_2_1 || V4_2_2 || V4_2_3 || V4_2_4 || V4_2_5 || V4_2_6 || GBRSource
             parameterSet.Reset(new Scenario(Scenario));
 #else
             parameterSet.Apply(Scenario);
