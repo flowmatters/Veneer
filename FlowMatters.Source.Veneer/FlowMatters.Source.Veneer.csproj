@@ -208,6 +208,7 @@
     <Compile Include="ExchangeObjects\SimpleException.cs" />
     <Compile Include="ExchangeObjects\SimplePiecewise.cs" />
     <Compile Include="ExchangeObjects\SimpleTimeSeries.cs" />
+    <Compile Include="ExchangeObjects\SimulationFault.cs" />
     <Compile Include="ExchangeObjects\SlimTimeSeries.cs" />
     <Compile Include="ExchangeObjects\StringResponse.cs" />
     <Compile Include="ExchangeObjects\TimeSeriesEvent.cs" />

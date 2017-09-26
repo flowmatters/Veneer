@@ -170,7 +170,9 @@ namespace FlowMatters.Source.WebServer
         }
 
         [OperationContract]
-        [WebInvoke(Method = "POST", UriTemplate = UriTemplates.Runs, RequestFormat = WebMessageFormat.Json)]
+        [WebInvoke(Method = "POST", UriTemplate = UriTemplates.Runs,
+         RequestFormat = WebMessageFormat.Json,ResponseFormat = WebMessageFormat.Json)]
+        [FaultContract(typeof(SimulationFault))]
         public void TriggerRun(RunParameters parameters)
         {
             Log("Triggering a run.");
@@ -184,6 +186,7 @@ namespace FlowMatters.Source.WebServer
                 Log("Run Failed");
                 Log(e.Message);
                 Log(e.StackTrace);
+                throw new WebFaultException<SimulationFault>(new SimulationFault(e),HttpStatusCode.InternalServerError);
             }
             Run r = RunsForId("latest")[0];
 
