@@ -83,7 +83,7 @@
       <Private>False</Private>
     </Reference>
     <Reference Include="nunit.framework">
-      <Private>False</Private>
+      <Private>True</Private>
     </Reference>
     <Reference Include="RiverSystem">
       <Private>False</Private>
