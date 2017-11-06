@@ -18,6 +18,7 @@ namespace FlowMatters.Source.WebServer.ExchangeObjects
             Number = r.RunNumber;
             Results = BuildResultsArray(r.RunParameters.GetRowsForScenario(r.Scenario.id).ToArray());
             Status = r.RunResultIndicator.ToString();
+            RunLog = new string[0];
         }
 
         private TimeSeriesLink[] BuildResultsArray(ProjectViewRow[] rows)
@@ -78,5 +79,7 @@ namespace FlowMatters.Source.WebServer.ExchangeObjects
 
         [DataMember]
         public string Status;
+
+        [DataMember] public string[] RunLog;
     }
 }
