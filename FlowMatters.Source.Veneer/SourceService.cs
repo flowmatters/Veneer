@@ -70,6 +70,23 @@ namespace FlowMatters.Source.WebServer
             return "Root node of service";
         }
 
+        [OperationContract]
+        [WebInvoke(Method = "POST", UriTemplate = "/shutdown")]
+        public void ShutdownServer()
+        {
+            Log("Shutdown Requested");
+            if (!RunningInGUI)
+            {
+                Environment.Exit(0);
+            }
+            else
+            {
+                Log("Shutdown not supported");
+            }
+
+            throw new Exception("Shutdown not supported");
+        }
+
         //[OperationContract]
         //[WebInvoke(Method = "GET", UriTemplate = UriTemplates.FilesD)]
         //public Stream GetFileD(string dir, string fn)
