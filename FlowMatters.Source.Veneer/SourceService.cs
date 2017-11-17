@@ -42,6 +42,8 @@ namespace FlowMatters.Source.WebServer
     [ServiceKnownType(typeof(double[][][][]))]
     public class SourceService //: ISourceService
     {
+        public List<string[]> RunLogs = new List<string[]>();
+
         public RiverSystemScenario Scenario { get; set; }
         private ScriptRunner scriptRunner = new ScriptRunner();
 
@@ -66,6 +68,23 @@ namespace FlowMatters.Source.WebServer
 //            WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Origin", "*");
             Log("Requested /");
             return "Root node of service";
+        }
+
+        [OperationContract]
+        [WebInvoke(Method = "POST", UriTemplate = "/shutdown")]
+        public void ShutdownServer()
+        {
+            Log("Shutdown Requested");
+            if (!RunningInGUI)
+            {
+                Environment.Exit(0);
+            }
+            else
+            {
+                Log("Shutdown not supported");
+            }
+
+            throw new Exception("Shutdown not supported");
         }
 
         //[OperationContract]
@@ -177,17 +196,31 @@ namespace FlowMatters.Source.WebServer
         {
             Log("Triggering a run.");
             ScenarioInvoker si = new ScenarioInvoker { Scenario = Scenario };
+
+            List<string> messages = new List<string>();
+            LogAction runLogger = (sender, args) =>
+            {
+                messages.Add(args.Entry.Message);
+            };
+            TIME.Management.Log.MessageRecieved += runLogger;
+
             try
             {
-                si.RunScenario(parameters,RunningInGUI);
+                si.RunScenario(parameters, RunningInGUI);
             }
             catch (Exception e)
             {
                 Log("Run Failed");
                 Log(e.Message);
                 Log(e.StackTrace);
-                throw new WebFaultException<SimulationFault>(new SimulationFault(e),HttpStatusCode.InternalServerError);
+                throw new WebFaultException<SimulationFault>(new SimulationFault(e), HttpStatusCode.InternalServerError);
             }
+            finally
+            {
+                TIME.Management.Log.MessageRecieved -= runLogger;
+            }
+
+            RunLogs.Add(messages.ToArray());
             Run r = RunsForId("latest")[0];
 
             WebOperationContext.Current.OutgoingResponse.StatusCode = HttpStatusCode.Redirect;
@@ -204,10 +237,18 @@ namespace FlowMatters.Source.WebServer
             Log(String.Format("Requested run results ({0})",runId));
 //            WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Origin", "*");
             string msg = "";
+            string[] log;
             if (runId.ToLower() == "latest")
+            {
                 msg = "latest run";
+                log = RunLogs.LastOrDefault();
+            }
             else
+            {
                 msg = string.Format("run with id={0}", runId);
+                var idx = int.Parse(runId) - 1;
+                log = RunLogs[idx];
+            }
 
             Run run = RunsForId(runId)[0];
 
@@ -218,8 +259,9 @@ namespace FlowMatters.Source.WebServer
                 Log(string.Format("Run {0} not found", runId));
                 return null;
             }
-
-            return new RunSummary(run);
+            var result = new RunSummary(run);
+            result.RunLog = log;
+            return result;
         }
 
         [OperationContract]
@@ -231,10 +273,12 @@ namespace FlowMatters.Source.WebServer
             if (runId == "latest")
             {
                 id = Scenario.Project.ResultManager.AllRuns().Count();
+                RunLogs.RemoveAt(RunLogs.Count-1);
             }
             else
             {
                 id = int.Parse(runId);
+                RunLogs.RemoveAt(id - 1);
             }
             Scenario.Project.ResultManager.RemoveRun(id);
         }
