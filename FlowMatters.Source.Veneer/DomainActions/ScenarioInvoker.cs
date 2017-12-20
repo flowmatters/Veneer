@@ -18,6 +18,13 @@ using TIME.ScenarioManagement.Execution;
 using TIME.ScenarioManagement.RunManagement;
 using TIME.Winforms.Utils;
 using FlowMatters.Source.Veneer.ExchangeObjects;
+using TIME.Management;
+using TIME.Tools.Reflection;
+#if V3 || V4_0 || V4_1 || V4_2_0 || V4_2_1 || V4_2_2 || V4_2_3 || V4_2_4 || V4_2_5 || GBRSource
+
+#else
+using RiverSystem.Options;
+#endif
 
 namespace FlowMatters.Source.Veneer
 {
@@ -54,62 +61,60 @@ namespace FlowMatters.Source.Veneer
             if(parameters!=null)
                 ApplyRunParameters(parameters);
 
-            if (IsRunnable())
+            if (!IsRunnable()) throw new Exception("Scenario not runnable");
+
+            //                JobRunner.BeforeRun += new BeforeTemporalRunHandler(JobRunner_BeforeRun);
+            Scenario.RunManager.UpdateEvent = new EventHandler<JobRunEventArgs>(JobRunner_Update);
+
+            ScenarioRunWindow runWindow = null;
+            var startOfRun = DateTime.Now;
+
+            if (showWindow)
             {
-               
-                //                JobRunner.BeforeRun += new BeforeTemporalRunHandler(JobRunner_BeforeRun);
-                Scenario.RunManager.UpdateEvent = new EventHandler<JobRunEventArgs>(JobRunner_Update);
-
-                ScenarioRunWindow runWindow = null;
-                var startOfRun = DateTime.Now;
-
-                if (showWindow)
-                {
-                    runWindow = new ScenarioRunWindow(Scenario);
-                    //runWindow.SetOwner(this);
-                    //runWindow.WindowStartupLocation = WindowStartupLocation.CenterOwner;
-                    //Enabled = false;
-                    runWindow.Show();
-                    ProjectManager.Instance.SaveAuditLogMessage("Run started at " + DateTime.Now);
-                }
+                runWindow = new ScenarioRunWindow(Scenario);
+                //runWindow.SetOwner(this);
+                //runWindow.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+                //Enabled = false;
+                runWindow.Show();
+                ProjectManager.Instance.SaveAuditLogMessage("Run started at " + DateTime.Now);
+            }
 
 
-                Task x = Task.Factory.StartNew(() => Scenario.RunManager.Execute());
-                while (!x.IsCompleted)
-                {
-                    Thread.Sleep(50);
-                    Application.DoEvents();
-                }
+            Task x = Task.Factory.StartNew(() => Scenario.RunManager.Execute());
+            while (!x.IsCompleted)
+            {
+                Thread.Sleep(50);
+                Application.DoEvents();
+            }
 
 //                LogRunEnd(startOfRun);
 
-                if (showWindow)
-                {
-                    ProjectManager.Instance.SaveAuditLogMessage("Run finished at " + DateTime.Now + " and took " + TimeTools.TimeSpanString(DateTime.Now - startOfRun));
-                    runWindow.Close();
-                    runWindow.Dispose();
-                }
-                //if so then run
-                //running = true;
-
-                //runControl = new ScenarioRunWindow(Scenario);
-                //runControl.SetOwner(MainForm.Instance);
-                //runControl.Show();
-
-                //Scenario.RunManager.Execute();
-                //                lock (lockObj)
-                //                {
-                //while (running)
-                //{
-                //    Thread.Sleep(50);
-                //    Application.DoEvents();
-                //    //Monitor.Wait(lockObj);
-                //}
-                //                }
-
-                //runControl.Close();
-                //runControl.Dispose();
+            if (showWindow)
+            {
+                ProjectManager.Instance.SaveAuditLogMessage("Run finished at " + DateTime.Now + " and took " + TimeTools.TimeSpanString(DateTime.Now - startOfRun));
+                runWindow.Close();
+                runWindow.Dispose();
             }
+            //if so then run
+            //running = true;
+
+            //runControl = new ScenarioRunWindow(Scenario);
+            //runControl.SetOwner(MainForm.Instance);
+            //runControl.Show();
+
+            //Scenario.RunManager.Execute();
+            //                lock (lockObj)
+            //                {
+            //while (running)
+            //{
+            //    Thread.Sleep(50);
+            //    Application.DoEvents();
+            //    //Monitor.Wait(lockObj);
+            //}
+            //                }
+
+            //runControl.Close();
+            //runControl.Dispose();
 
 //            ProjectManager.Instance.SaveAuditLogMessage("Close run scenario window");
         }
@@ -135,26 +140,17 @@ namespace FlowMatters.Source.Veneer
             Type configType = configuration.GetType();
             foreach (var entry in parameters.Params)
             {
-                var prop = configType.GetProperty(entry.Key, BindingFlags.Instance | BindingFlags.Public);
-                if (prop == null)
-                {
-                    throw new NotImplementedException(String.Format(
-                        "Running configuration doesn't have a property: {0}", entry.Key));
-                }
-                if (prop.PropertyType == typeof (DateTime))
-                {
-                    DateTime dt = DateTime.ParseExact(entry.Value.ToString(), "dd/MM/yyyy", CultureInfo.InvariantCulture);
-                    prop.SetValue(configuration,dt);
-                }
-                else if (prop.PropertyType == typeof (InputSet))
-                {
-                    InputSet set = Scenario.Network.InputSets.FirstOrDefault(ipSet => ipSet.Name == (string)entry.Value);
-                    prop.SetValue(configuration,set);
-                }
-                else
-                {
-                    prop.SetValue(configuration, entry.Value);
-                }
+                var ri = ReflectedItem.NewItem(entry.Key, configuration);
+                var val = entry.Value;
+
+                if (ri.itemType == typeof (DateTime))
+                    val = DateTime.ParseExact(entry.Value.ToString(), "dd/MM/yyyy", CultureInfo.InvariantCulture);
+                else if (ri.itemType == typeof (InputSet))
+                    val = Scenario.Network.InputSets.FirstOrDefault(ipSet => ipSet.Name == (string)entry.Value);
+                else if (ri.itemType == typeof(TimeStep))
+                    val = TimeStep.FromName((string) entry.Value);
+
+                ri.itemValue = val;
             }
         }
 

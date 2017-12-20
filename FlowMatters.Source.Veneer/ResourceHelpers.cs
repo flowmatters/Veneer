@@ -16,8 +16,11 @@ namespace FlowMatters.Source.Veneer
     {
         public static Bitmap FindByName(string s)
         {
+#if V3 || V4_0 || V4_1 || V4_2_0 || GBRSource
             Type modelType = Finder.typesInherting(typeof(IDomainObject)).Where(t => t.Name == s).FirstOrDefault();
-
+#else
+            var modelType = AssemblyManager.FindTypes(typeof(IDomainObject),allowAbstract:false,allowIgnore:true).FirstOrDefault(t => t.Name == s);
+#endif
             if (modelType == null)
             {
                 s += "240";

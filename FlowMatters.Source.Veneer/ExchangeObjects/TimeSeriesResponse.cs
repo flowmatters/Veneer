@@ -31,6 +31,11 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects
     [KnownType(typeof(SimpleTimeSeries))]
     public class TimeSeriesReponseMeta : TimeSeriesResponse
     {
+        public TimeSeriesReponseMeta()
+        {
+            
+        }
+
         public TimeSeriesReponseMeta(TimeSeries source)
         {
             if (source == null)

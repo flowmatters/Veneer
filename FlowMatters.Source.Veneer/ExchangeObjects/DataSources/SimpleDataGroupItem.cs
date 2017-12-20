@@ -5,13 +5,19 @@ using System.Runtime.Serialization;
 using System.Text;
 using System.Threading.Tasks;
 using FlowMatters.Source.WebServer;
+using RiverSystem;
 using RiverSystem.DataManagement.DataManager;
+using RiverSystem.DataManagement.DataManager.DataSources;
 
 namespace FlowMatters.Source.Veneer.ExchangeObjects.DataSources
 {
     [DataContract]
     public class SimpleDataGroupItem
     {
+        public SimpleDataGroupItem()
+        {
+            
+        }
         public SimpleDataGroupItem(DataGroupItem dgi,bool summary=true)
         {
             Name = dgi.Name;
@@ -19,6 +25,23 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects.DataSources
             FullName = MakeFullName(dgi);
             id = MakeID(dgi);
             Items = dgi.InputSetItems.Select(isi => new SimpleDataItem(isi,summary)).ToArray();
+        }
+
+        public void AddToScenario(RiverSystemScenario scenario)
+        {
+            var dm = scenario.Network.DataManager;
+            var dataGroup = DataGroupItem.CreateGroup<GeneratedCentralDataSource>(scenario.Network.DefaultInputSet);
+            dataGroup.Name = Name;
+            dm.DataGroups.Add(dataGroup);
+
+            if(Items==null)
+                return;
+
+            for (int i = 0; i < Items.Length; i++)
+            {
+                var item = Items[i];
+                item.AddToGroup(scenario, dataGroup,i);
+            }
         }
 
         [DataMember]

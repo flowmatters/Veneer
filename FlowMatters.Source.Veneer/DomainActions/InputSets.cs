@@ -38,8 +38,19 @@ namespace FlowMatters.Source.Veneer.DomainActions
             if (parameterSet == null)
                 return new string[0];
 
-            IEnumerable<string> result = parameterSet.Configuration.GetInstructions(null);
-            return result.ToArray();
+            try
+            {
+#if V3 || V4_0 || V4_1 || V4_2_0 || V4_2_1 || V4_2_2 || V4_2_3 || V4_2_4 || V4_2_5 || V4_2_6 || GBRSource
+                IEnumerable<string> result = parameterSet.Configuration.GetInstructions(new Scenario(Scenario));
+#else
+                IEnumerable<string> result = parameterSet.Configuration.GetInstructions(Scenario);
+#endif
+                return result.ToArray();
+            }
+            catch
+            {
+                return new string[] { "// Couldn't read instructions." };
+            }
         }
 
         public void UpdateInstructions(InputSet inputSet, string[] newInstructions)
@@ -63,12 +74,42 @@ namespace FlowMatters.Source.Veneer.DomainActions
             ParameterSet parameterSet = ParameterSet(inputSet);
             if (parameterSet == null)
                 return;
+#if V3 || V4_0 || V4_1 || V4_2_0 || V4_2_1 || V4_2_2 || V4_2_3 || V4_2_4 || V4_2_5 || V4_2_6 || GBRSource
             parameterSet.Reset(new Scenario(Scenario));
+#else
+            parameterSet.Apply(Scenario);
+#endif
         }
 
         public void Run(string urlSafeInputSetName)
         {
             Run(Find(urlSafeInputSetName));
+        }
+
+        public string Filename(InputSet inputSet)
+        {
+            var p = ParameterSet(inputSet);
+            if (p == null)
+                return null;
+
+            if (p.Configuration is FileParameterSetConfiguration)
+            {
+                return ((FileParameterSetConfiguration)p.Configuration).Filename;
+            }
+            return null;
+        }
+
+        public bool ReloadOnRun(InputSet inputSet)
+        {
+            var p = ParameterSet(inputSet);
+            if (p == null)
+                return false;
+
+            if (p.Configuration is FileParameterSetConfiguration)
+            {
+                return ((FileParameterSetConfiguration) p.Configuration).ReloadOnRun;
+            }
+            return false;
         }
     }
 }

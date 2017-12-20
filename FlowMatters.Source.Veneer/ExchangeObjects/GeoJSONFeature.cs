@@ -123,7 +123,8 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects
             id = UriTemplates.Catchment.Replace("{catchmentId}", c.id.ToString());
             properties.Add("name", c.Name);
             properties.Add(FeatureTypeProperty,"catchment");
-            properties.Add("link",LinkURL(c.DownstreamLink));
+            properties.Add("link", c.DownstreamLink != null ? LinkURL(c.DownstreamLink) : null);
+            properties.Add("areaInSquareMeters", c.characteristics.areaInSquareMeters);
             geometry = new GeoJSONGeometry(region);
         }
 

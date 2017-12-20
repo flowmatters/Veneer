@@ -165,6 +165,11 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
                     d.Data = new ConstituentsModel();
 
                 d.Data.GetModel(c, DefaultSourceSinkType(d));
+                if (!d.Data.ConstituentPlayedValues.Any(cpv => cpv.Constituent == c))
+                {
+                    d.Data.ConstituentPlayedValues.Add(new ConstituentPlayedValue(c) { PlayedType = ConstituentPlayedValue.ConstituentPlayedType.varConcentration });
+                }
+                d.Reset(cm,false,null,ScenarioType.RiverManager);
             });
 
             foreach (var catchment in s.Network.Catchments.OfType<Catchment>())

@@ -35,7 +35,7 @@ namespace FlowMatters.Source.WebServer
         {
             WebHttpBinding binding = new WebHttpBinding();
 
-            binding.MaxReceivedMessageSize = 1024*1024;
+            binding.MaxReceivedMessageSize = 1024*1024*1024; // 1 gigabyte
             _singletonInstance = new SourceService();
             _singletonInstance.LogGenerator += _singletonInstance_LogGenerator;
             _singletonInstance.Scenario = Scenario;
@@ -140,4 +140,5 @@ namespace FlowMatters.Source.WebServer
             }
         }
     }
+
 }

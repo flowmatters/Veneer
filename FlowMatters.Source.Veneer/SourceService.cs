@@ -11,6 +11,7 @@ using System.ServiceModel;
 using System.ServiceModel.Channels;
 using System.ServiceModel.Web;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using System.Xml;
 using FlowMatters.Source.Veneer;
@@ -41,6 +42,8 @@ namespace FlowMatters.Source.WebServer
     [ServiceKnownType(typeof(double[][][][]))]
     public class SourceService //: ISourceService
     {
+        public List<string[]> RunLogs = new List<string[]>();
+
         public RiverSystemScenario Scenario { get; set; }
         private ScriptRunner scriptRunner = new ScriptRunner();
 
@@ -65,6 +68,23 @@ namespace FlowMatters.Source.WebServer
 //            WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Origin", "*");
             Log("Requested /");
             return "Root node of service";
+        }
+
+        [OperationContract]
+        [WebInvoke(Method = "POST", UriTemplate = "/shutdown")]
+        public void ShutdownServer()
+        {
+            Log("Shutdown Requested");
+            if (!RunningInGUI)
+            {
+                Environment.Exit(0);
+            }
+            else
+            {
+                Log("Shutdown not supported");
+            }
+
+            throw new Exception("Shutdown not supported");
         }
 
         //[OperationContract]
@@ -169,21 +189,38 @@ namespace FlowMatters.Source.WebServer
         }
 
         [OperationContract]
-        [WebInvoke(Method = "POST", UriTemplate = UriTemplates.Runs, RequestFormat = WebMessageFormat.Json)]
+        [WebInvoke(Method = "POST", UriTemplate = UriTemplates.Runs,
+         RequestFormat = WebMessageFormat.Json,ResponseFormat = WebMessageFormat.Json)]
+        [FaultContract(typeof(SimulationFault))]
         public void TriggerRun(RunParameters parameters)
         {
             Log("Triggering a run.");
             ScenarioInvoker si = new ScenarioInvoker { Scenario = Scenario };
+
+            List<string> messages = new List<string>();
+            LogAction runLogger = (sender, args) =>
+            {
+                messages.Add(args.Entry.Message);
+            };
+            TIME.Management.Log.MessageRecieved += runLogger;
+
             try
             {
-                si.RunScenario(parameters,RunningInGUI);
+                si.RunScenario(parameters, RunningInGUI);
             }
             catch (Exception e)
             {
                 Log("Run Failed");
                 Log(e.Message);
                 Log(e.StackTrace);
+                throw new WebFaultException<SimulationFault>(new SimulationFault(e), HttpStatusCode.InternalServerError);
             }
+            finally
+            {
+                TIME.Management.Log.MessageRecieved -= runLogger;
+            }
+
+            RunLogs.Add(messages.ToArray());
             Run r = RunsForId("latest")[0];
 
             WebOperationContext.Current.OutgoingResponse.StatusCode = HttpStatusCode.Redirect;
@@ -200,10 +237,18 @@ namespace FlowMatters.Source.WebServer
             Log(String.Format("Requested run results ({0})",runId));
 //            WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Origin", "*");
             string msg = "";
+            string[] log;
             if (runId.ToLower() == "latest")
+            {
                 msg = "latest run";
+                log = RunLogs.LastOrDefault();
+            }
             else
+            {
                 msg = string.Format("run with id={0}", runId);
+                var idx = int.Parse(runId) - 1;
+                log = RunLogs[idx];
+            }
 
             Run run = RunsForId(runId)[0];
 
@@ -214,8 +259,9 @@ namespace FlowMatters.Source.WebServer
                 Log(string.Format("Run {0} not found", runId));
                 return null;
             }
-
-            return new RunSummary(run);
+            var result = new RunSummary(run);
+            result.RunLog = log;
+            return result;
         }
 
         [OperationContract]
@@ -227,10 +273,12 @@ namespace FlowMatters.Source.WebServer
             if (runId == "latest")
             {
                 id = Scenario.Project.ResultManager.AllRuns().Count();
+                RunLogs.RemoveAt(RunLogs.Count-1);
             }
             else
             {
                 id = int.Parse(runId);
+                RunLogs.RemoveAt(id - 1);
             }
             Scenario.Project.ResultManager.RemoveRun(id);
         }
@@ -400,6 +448,14 @@ namespace FlowMatters.Source.WebServer
                     Name = inputSet.Name,
                     Configuration = sets.Instructions(inputSet)
                 };
+
+                string fn = sets.Filename(inputSet);
+
+                if (!String.IsNullOrEmpty(fn))
+                {
+                    result[i].Filename = fn;
+                    result[i].ReloadOnRun = sets.ReloadOnRun(inputSet);
+                }
             }
             return result;
         }
@@ -460,19 +516,42 @@ namespace FlowMatters.Source.WebServer
         [WebInvoke(Method = "GET", UriTemplate = UriTemplates.DataSourceGroup, ResponseFormat = WebMessageFormat.Json)]
         public SimpleDataGroupItem GetDataSource(string dataSourceGroup)
         {
+            return GetSimpleDataSourceInternal(dataSourceGroup, false);
+        }
+
+        [OperationContract]
+        [WebInvoke(Method = "POST", UriTemplate = UriTemplates.DataSources, RequestFormat = WebMessageFormat.Json)]
+        public void CreateDataSource(SimpleDataGroupItem newItem)
+        {
             var dm = Scenario.Network.DataManager;
 
-            var res = dm.DataGroups.FirstOrDefault(ds => SimpleDataGroupItem.MakeID(ds) == (UriTemplates.DataSources + "/" + dataSourceGroup));
+            var existing = dm.DataGroups.FirstOrDefault(ds => ds.Name == newItem.Name);
+
+            if(existing!=null)
+            {
+                dm.RemoveGroup(existing);
+            }
+
+            newItem.AddToScenario(Scenario);
+        }
+
+        private SimpleDataGroupItem GetSimpleDataSourceInternal(string dataSourceGroup, bool summary)
+        {
+            var dm = Scenario.Network.DataManager;
+
+            var res =
+                dm.DataGroups.FirstOrDefault(
+                    ds => SimpleDataGroupItem.MakeID(ds) == (UriTemplates.DataSources + "/" + dataSourceGroup));
             if (res == null)
                 ResourceNotFound();
-            return new SimpleDataGroupItem(res,false);
+            return new SimpleDataGroupItem(res, summary);
         }
 
         [OperationContract]
         [WebInvoke(Method = "GET", UriTemplate = UriTemplates.DataGroupItem, ResponseFormat = WebMessageFormat.Json)]
         public SimpleDataItem GetDataGroupItem(string dataSourceGroup,string inputSet)
         {
-            var grp = GetDataSource(dataSourceGroup);
+            var grp = GetSimpleDataSourceInternal(dataSourceGroup,false);
             if (grp == null)
                 return null;
 
@@ -488,20 +567,29 @@ namespace FlowMatters.Source.WebServer
         [WebInvoke(Method = "GET", UriTemplate = UriTemplates.DataGroupMultipleItemDetails, ResponseFormat = WebMessageFormat.Json)]
         public SimpleDataDetails[] GetMultipleDataGroupItemDetails(string dataSourceGroup, string name)
         {
-            var grp = GetDataSource(dataSourceGroup);
+            var grp = GetSimpleDataSourceInternal(dataSourceGroup,true);
             if (grp == null)
                 return null;
 
             List<SimpleDataDetails> result = new List<SimpleDataDetails>();
             foreach (var item in grp.Items)
             {
-                var tmp = item.Details.FirstOrDefault(d => URLSafeString(d.Name) == name);
-                tmp.Name = item.Name + "/" + tmp.Name;
-                if(tmp!=null)
+                var tmp = item.Details.FirstOrDefault(d =>
+                {
+                    var safeName = URLSafeString(d.Name);
+                    return safeName == name || Regex.IsMatch(safeName, name);
+                });
+                if (tmp != null)
+                {
+                    tmp.Name = item.Name + "/" + tmp.Name;
+                    tmp.Expand();
                     result.Add(tmp);
+                }
             }
+
+            if(result.Count==0)
+                ResourceNotFound();
             return result.ToArray();
-            // Should it 404 on empty list?
         }
 
         [OperationContract]
