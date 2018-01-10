@@ -30,6 +30,8 @@ namespace FlowMatters.Source.Veneer
 {
     class ScenarioInvoker
     {
+        const string RUN_NAME_KEY = "_RunName";
+
         //private ScenarioRunWindow runControl;
         private object lockObj = new object();
         //private bool running;
@@ -47,7 +49,7 @@ namespace FlowMatters.Source.Veneer
             }
         }
 
-        public void RunScenario(RunParameters parameters,bool showWindow)
+        public void RunScenario(RunParameters parameters, bool showWindow, ServerLogListener logger)
         {
             if (Scenario == null)
             {
@@ -95,6 +97,24 @@ namespace FlowMatters.Source.Veneer
                 runWindow.Close();
                 runWindow.Dispose();
             }
+
+            if(parameters.Params.ContainsKey(RUN_NAME_KEY))
+            {
+                try
+                {
+                    var latestRun = Scenario.Project.ResultManager.AllRuns().Last();
+                    var runName = parameters.Params[RUN_NAME_KEY];
+                    SetPrivateRunProperty(latestRun, "_runName", runName);
+                    SetPrivateRunProperty(latestRun, "_runFullName", runName);
+                }
+                catch
+                {
+                    // Ignore. Not supported in all versions of Source
+                    if (logger != null)
+                        logger(this, "Cannot set custom run name. Not supported by this version of Source");
+                }
+            }
+
             //if so then run
             //running = true;
 
@@ -116,7 +136,14 @@ namespace FlowMatters.Source.Veneer
             //runControl.Close();
             //runControl.Dispose();
 
-//            ProjectManager.Instance.SaveAuditLogMessage("Close run scenario window");
+            //            ProjectManager.Instance.SaveAuditLogMessage("Close run scenario window");
+        }
+
+        private static void SetPrivateRunProperty(object run, string field, object value)
+        {
+            var mi = run.GetType().GetMember(field, BindingFlags.NonPublic | BindingFlags.Instance)[0];
+            var ri = ReflectedItem.NewItem(mi, run);
+            ri.itemValue = value;
         }
 
         //private void LogRunEnd(DateTime startOfRun)
@@ -136,9 +163,11 @@ namespace FlowMatters.Source.Veneer
 
         private void ApplyRunParameters(RunParameters parameters)
         {
+            HashSet<string> skipKeys = new HashSet<string>(new [] { RUN_NAME_KEY});
+
             RunningConfiguration configuration = Scenario.CurrentConfiguration;
             Type configType = configuration.GetType();
-            foreach (var entry in parameters.Params)
+            foreach (var entry in parameters.Params.Where(kvp=>!skipKeys.Contains(kvp.Key)))
             {
                 var ri = ReflectedItem.NewItem(entry.Key, configuration);
                 var val = entry.Value;
