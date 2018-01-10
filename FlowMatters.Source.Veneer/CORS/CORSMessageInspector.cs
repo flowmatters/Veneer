@@ -25,7 +25,8 @@ namespace FlowMatters.Source.Veneer.CORS
                 "hydrograph.io",
                 "www.hydrograph.io",
                 "staging.hydrograph.io",
-                "0.0.0.0"
+                "0.0.0.0",
+                "localhost"
             };
 
             HttpRequestMessageProperty httpProp = (HttpRequestMessageProperty)request.Properties[HttpRequestMessageProperty.Name];
