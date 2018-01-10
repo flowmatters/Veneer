@@ -57,15 +57,11 @@ namespace FlowMatters.Source.Veneer
                 return;
             }
 
-//            ProjectManager.Instance.SaveAuditLogMessage("Open run scenario window");
-//            Scenario.outputManager = new Obsolete.Recording.OutputManager();
-
             if(parameters!=null)
                 ApplyRunParameters(parameters);
 
             if (!IsRunnable()) throw new Exception("Scenario not runnable");
 
-            //                JobRunner.BeforeRun += new BeforeTemporalRunHandler(JobRunner_BeforeRun);
             Scenario.RunManager.UpdateEvent = new EventHandler<JobRunEventArgs>(JobRunner_Update);
 
             ScenarioRunWindow runWindow = null;
@@ -74,9 +70,6 @@ namespace FlowMatters.Source.Veneer
             if (showWindow)
             {
                 runWindow = new ScenarioRunWindow(Scenario);
-                //runWindow.SetOwner(this);
-                //runWindow.WindowStartupLocation = WindowStartupLocation.CenterOwner;
-                //Enabled = false;
                 runWindow.Show();
                 ProjectManager.Instance.SaveAuditLogMessage("Run started at " + DateTime.Now);
             }
@@ -88,8 +81,6 @@ namespace FlowMatters.Source.Veneer
                 Thread.Sleep(50);
                 Application.DoEvents();
             }
-
-//                LogRunEnd(startOfRun);
 
             if (showWindow)
             {
@@ -114,29 +105,6 @@ namespace FlowMatters.Source.Veneer
                         logger(this, "Cannot set custom run name. Not supported by this version of Source");
                 }
             }
-
-            //if so then run
-            //running = true;
-
-            //runControl = new ScenarioRunWindow(Scenario);
-            //runControl.SetOwner(MainForm.Instance);
-            //runControl.Show();
-
-            //Scenario.RunManager.Execute();
-            //                lock (lockObj)
-            //                {
-            //while (running)
-            //{
-            //    Thread.Sleep(50);
-            //    Application.DoEvents();
-            //    //Monitor.Wait(lockObj);
-            //}
-            //                }
-
-            //runControl.Close();
-            //runControl.Dispose();
-
-            //            ProjectManager.Instance.SaveAuditLogMessage("Close run scenario window");
         }
 
         private static void SetPrivateRunProperty(object run, string field, object value)
