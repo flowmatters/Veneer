@@ -139,16 +139,12 @@ namespace FlowMatters.Source.VeneerCmd
 
 #if V3 || V4_0 || V4_1 || V4_2 || V4_3_0
             var manager = PluginRegisterUtility.LoadPlugins();
-#else
-            var manager = PluginManager.Instance;
-#endif
             // NASTY HACK to counter the fact that other Source servers may be trying to rewrite the plugin file at the same time...
             int delay = 1; // 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048
             for (int attempt = 0; attempt < MAX_PLUGIN_LOAD_ATTEMPTS; attempt++)
             {
                 if (attempt > 0)
                 {
-//                    Show("No plugins loaded. Trying again to make sure its not a concurrency issue with other servers rewriting PLugins.xml");
                     Thread.Sleep(delay);
                     if (attempt % INCREMENT_PLUGIN_LOADING_DELAY == 0)
                         delay *= 2;
@@ -158,6 +154,9 @@ namespace FlowMatters.Source.VeneerCmd
                 if (manager.ActivePlugins.Count() > 0)
                     break;
             }
+#else
+            var manager = PluginManager.Instance;
+#endif
             foreach (var plugin in manager.ActivePlugins)
             {
                 Show(String.Format("Loaded {0}",plugin.Path));               
