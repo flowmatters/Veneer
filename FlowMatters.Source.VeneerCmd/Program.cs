@@ -136,8 +136,12 @@ namespace FlowMatters.Source.VeneerCmd
         private static void LoadPlugins()
         {
             Show("Loading plugins");
-            var manager = PluginRegisterUtility.LoadPlugins();
 
+#if V3 || V4_0 || V4_1 || V4_2 || V4_3_0
+            var manager = PluginRegisterUtility.LoadPlugins();
+#else
+            var manager = PluginManager.Instance;
+#endif
             // NASTY HACK to counter the fact that other Source servers may be trying to rewrite the plugin file at the same time...
             int delay = 1; // 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048
             for (int attempt = 0; attempt < MAX_PLUGIN_LOAD_ATTEMPTS; attempt++)
