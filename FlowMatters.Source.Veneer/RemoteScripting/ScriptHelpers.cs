@@ -211,7 +211,7 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
                 model.ConstituentModels.Add(constituentModel);
             }
 
-            if (constituentModel.ConstituentSources.Count > 0) return;
+            if (constituentModel.ConstituentSources.Length > 0) return;
 
             var defaultConstituentSource = scenario.SystemConfiguration.ConstituentSources.First(cs => cs.IsDefault);
             constituentModel.ConstituentSources.Add(new ConstituentSourceContainer(defaultConstituentSource, new NilConstituent(), new PassThroughFilter()));
