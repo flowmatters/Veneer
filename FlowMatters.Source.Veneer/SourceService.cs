@@ -88,22 +88,6 @@ namespace FlowMatters.Source.WebServer
             throw new Exception("Shutdown not supported");
         }
 
-        //[OperationContract]
-        //[WebInvoke(Method = "GET", UriTemplate = UriTemplates.FilesD)]
-        //public Stream GetFileD(string dir, string fn)
-        //{
-        //    Log("Requested File: " + dir + "/" + fn);
-        //    return GetFile(dir + "/" + fn);
-        //}
-
-        //[OperationContract]
-        //[WebInvoke(Method = "GET", UriTemplate = UriTemplates.FilesDD)]
-        //public Stream GetFileDD(string dir1, string dir2, string fn)
-        //{
-        //    Log(string.Format("Requested File: {0}/{1}/{2}",dir1,dir2,fn));
-        //    return GetFile(dir1 + "/" + dir2 + "/" + fn);
-        //}
-
         [OperationContract]
         [WebInvoke(Method = "GET", UriTemplate = UriTemplates.Files)]
         public Stream GetFile(string fn)
@@ -436,7 +420,7 @@ namespace FlowMatters.Source.WebServer
 
         [OperationContract]
         [WebInvoke(Method="GET",UriTemplate=UriTemplates.InputSets,ResponseFormat = WebMessageFormat.Json)]
-        public InputSetSummary[] InputSetShenanigans()
+        public InputSetSummary[] GetInputSets()
         {
             Log("Requested input sets");
             var sets = new InputSets(Scenario);
