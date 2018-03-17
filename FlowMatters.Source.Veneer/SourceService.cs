@@ -43,7 +43,7 @@ namespace FlowMatters.Source.WebServer
     [ServiceKnownType(typeof(double[][][][]))]
     public class SourceService //: ISourceService
     {
-        public List<string[]> RunLogs = new List<string[]>();
+        public Dictionary<int,string[]> RunLogs = new Dictionary<int,string[]>();
 
         public RiverSystemScenario Scenario { get; set; }
         private ScriptRunner scriptRunner = new ScriptRunner();
@@ -221,7 +221,7 @@ namespace FlowMatters.Source.WebServer
                 TIME.Management.Log.MessageRecieved -= runLogger;
             }
 
-            RunLogs.Add(messages.ToArray());
+            RunLogs[Scenario.Project.ResultManager.AllRuns().Last().RunNumber] = messages.ToArray();
             Run r = RunsForId("latest")[0];
 
             WebOperationContext.Current.OutgoingResponse.StatusCode = HttpStatusCode.Redirect;
@@ -239,19 +239,20 @@ namespace FlowMatters.Source.WebServer
 //            WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Origin", "*");
             string msg = "";
             string[] log;
+            Run run = RunsForId(runId)[0];
+
             if (runId.ToLower() == "latest")
             {
                 msg = "latest run";
-                log = RunLogs.LastOrDefault();
             }
             else
             {
                 msg = string.Format("run with id={0}", runId);
-                var idx = int.Parse(runId) - 1;
-                log = RunLogs[idx];
+//                var idx = int.Parse(runId) - 1;
+//                log = RunLogs[idx];
             }
+            log = RunLogs[run.RunNumber];
 
-            Run run = RunsForId(runId)[0];
 
             Log("Requested " + msg);
 
@@ -273,14 +274,14 @@ namespace FlowMatters.Source.WebServer
             int id = -1;
             if (runId == "latest")
             {
-                id = Scenario.Project.ResultManager.AllRuns().Count();
-                RunLogs.RemoveAt(RunLogs.Count-1);
+                id = Scenario.Project.ResultManager.AllRuns().Last().RunNumber;
             }
             else
             {
                 id = int.Parse(runId);
-                RunLogs.RemoveAt(id - 1);
+                //RunLogs.Remove(id);
             }
+            RunLogs.Remove(id);
             Scenario.Project.ResultManager.RemoveRun(id);
         }
 
