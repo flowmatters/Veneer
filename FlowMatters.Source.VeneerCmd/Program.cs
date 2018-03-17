@@ -89,7 +89,33 @@ namespace FlowMatters.Source.VeneerCmd
             
             RiverSystemProject project = LoadProject(fn,options);
             Show(project.Name);
-            var scenario = project.GetRSScenarios()[0];
+
+            RiverSystemScenarioContainer scenario;
+            var allScenarios = project.GetRSScenarios();
+
+            if (options.AvailableScenarios)
+            {
+                Show(String.Join(Environment.NewLine,allScenarios.Select(s => s.ScenarioName)));
+                Environment.Exit(0);
+            }
+
+            if (options.ScenarioToLoad == null)
+            {
+                scenario = allScenarios[0];
+            }
+            else
+            {
+                int scenarioNumber = -1;
+                if (int.TryParse(options.ScenarioToLoad, out scenarioNumber))
+                {
+                    scenario = allScenarios[scenarioNumber-1];
+                }
+                else
+                {
+                    scenario = allScenarios.FirstOrDefault(s => s.ScenarioName == options.ScenarioToLoad);
+                }
+            }
+            
             Show(scenario.ScenarioName);
 
             var _server = new SourceRESTfulService((int)options.Port);
@@ -213,6 +239,21 @@ namespace FlowMatters.Source.VeneerCmd
 
         [Option('b', "backup-rsproj", HelpText = "Backup .rsproj file", DefaultValue = false)]
         public bool BackupRSPROJ { get; set; }
+
+        //#if GBRSource
+        //        [Option('a', "available-scenarios", HelpText = "List available scenarios then exit", DefaultValue = false)]
+        //#else
+        [Option("a", "available-models", HelpText = "List available models (scenarios) then exit", DefaultValue = false)]
+        //#endif
+        public bool AvailableScenarios { get; set; }
+
+
+        //#if GBRSource
+        //        [Option('s', "scenario", HelpText = "Scenario to use", DefaultValue = null)]
+        //#else
+        [Option("m", "model", HelpText = "Model (scenario) to use", DefaultValue = null)]
+        //#endif
+        public string ScenarioToLoad { get; set; }
 
         [ValueList(typeof(List<string>), MaximumElements = 1)]
         public IList<string> ProjectFiles { get; set; }
