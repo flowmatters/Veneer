@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
@@ -197,10 +198,10 @@ namespace FlowMatters.Source.WebServer
             Log("Triggering a run.");
             ScenarioInvoker si = new ScenarioInvoker { Scenario = Scenario };
 
-            List<string> messages = new List<string>();
+            ConcurrentQueue<string> messages = new ConcurrentQueue<string>();
             LogAction runLogger = (sender, args) =>
             {
-                messages.Add(args.Entry.Message);
+                messages.Enqueue(args.Entry.Message);
             };
             TIME.Management.Log.MessageRecieved += runLogger;
 
