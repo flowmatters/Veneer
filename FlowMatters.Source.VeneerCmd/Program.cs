@@ -243,7 +243,7 @@ namespace FlowMatters.Source.VeneerCmd
         //#if GBRSource
         //        [Option('a', "available-scenarios", HelpText = "List available scenarios then exit", DefaultValue = false)]
         //#else
-        [Option("a", "available-models", HelpText = "List available models (scenarios) then exit", DefaultValue = false)]
+        [Option('a', "available-models", HelpText = "List available models (scenarios) then exit", DefaultValue = false)]
         //#endif
         public bool AvailableScenarios { get; set; }
 
@@ -251,7 +251,7 @@ namespace FlowMatters.Source.VeneerCmd
         //#if GBRSource
         //        [Option('s', "scenario", HelpText = "Scenario to use", DefaultValue = null)]
         //#else
-        [Option("m", "model", HelpText = "Model (scenario) to use", DefaultValue = null)]
+        [Option('m', "model", HelpText = "Model (scenario) to use", DefaultValue = null)]
         //#endif
         public string ScenarioToLoad { get; set; }
 
