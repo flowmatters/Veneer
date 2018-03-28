@@ -211,10 +211,17 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
                 model.ConstituentModels.Add(constituentModel);
             }
 
+#if V3 || V4_0 || V4_1 || V4_2 || V4_3_0
+            if (constituentModel.ConstituentSources.Count > 0) return;
+#else
             if (constituentModel.ConstituentSources.Length > 0) return;
-
+#endif
             var defaultConstituentSource = scenario.SystemConfiguration.ConstituentSources.First(cs => cs.IsDefault);
+#if V3 || V4_0 || V4_1 || V4_2 || V4_3_0
+            constituentModel.ConstituentSources.Add(new ConstituentSourceContainer(defaultConstituentSource, new NilConstituent(), new PassThroughFilter()));
+#else
             constituentModel.AddConstituentSources(new ConstituentSourceContainer(defaultConstituentSource, new NilConstituent(), new PassThroughFilter()));
+#endif
         }
 
         private static Type DefaultSourceSinkType(NetworkElementConstituentData data)
