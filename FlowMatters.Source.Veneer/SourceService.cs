@@ -447,6 +447,16 @@ namespace FlowMatters.Source.WebServer
         }
 
         [OperationContract]
+        [WebInvoke(Method = "POST", UriTemplate = UriTemplates.InputSets, RequestFormat = WebMessageFormat.Json)]
+        public void CreateInputSet(InputSetSummary newInputSet)
+        {
+            Log("Creating new Input Set: " + newInputSet.Name);
+
+            var sets = new InputSets(Scenario);
+            sets.Create(newInputSet);
+        }
+
+        [OperationContract]
         [WebInvoke(Method = "PUT", UriTemplate = UriTemplates.InputSet, RequestFormat = WebMessageFormat.Json)]
         public void UpdateInputSet(string inputSetName, InputSetSummary summary)
         {

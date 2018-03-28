@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using FlowMatters.Source.Veneer.ExchangeObjects;
 using FlowMatters.Source.WebServer;
 using RiverSystem;
 using RiverSystem.Api;
@@ -27,6 +28,13 @@ namespace FlowMatters.Source.Veneer.DomainActions
             get { return Scenario.Network.InputSets; }
         }
 
+        public void Create(InputSetSummary summary)
+        {
+            var set = new InputSet(summary.Name);
+            Scenario.Network.InputSets.Add(set);
+            UpdateInstructions(set, summary.Configuration);
+        }
+
         public InputSet Find(string urlSafeInputSetName)
         {
             return All.FirstOrDefault(inputSet => SourceService.URLSafeString(inputSet.Name) == urlSafeInputSetName);
@@ -34,7 +42,8 @@ namespace FlowMatters.Source.Veneer.DomainActions
 
         public string[] Instructions(InputSet inputSet)
         {
-            ParameterSet parameterSet = ParameterSet(inputSet);
+            ParameterSet parameterSet =
+                ParameterSetManager().ParameterSets.FirstOrDefault(x => x.InputSet == inputSet)?.Parameters;
             if (parameterSet == null)
                 return new string[0];
 
@@ -57,16 +66,27 @@ namespace FlowMatters.Source.Veneer.DomainActions
         {
             ParameterSet parameterSet = ParameterSet(inputSet);
             if (parameterSet == null)
-                return;
+            {
+                parameterSet = new ParameterSet();
+                var inputSetParameterSet = new InputSetParameterSet
+                {
+                    InputSet = inputSet,
+                    Parent = null,
+                    Parameters = parameterSet
+                };
+                ParameterSetManager().ParameterSets.Add(inputSetParameterSet);
+            }
             parameterSet.Configuration.Instructions = String.Join(Environment.NewLine, newInstructions);
         }
 
         private ParameterSet ParameterSet(InputSet inputSet)
         {
-            ParameterSetManager Manager = Scenario.PluginDataModels.OfType<ParameterSetManager>().FirstOrDefault();
-            if (Manager == null)
-                return null;
-            return Manager.ParameterSets.First(x => x.InputSet == inputSet).Parameters;
+            return ParameterSetManager().ParameterSets.FirstOrDefault(x => x.InputSet == inputSet)?.Parameters;
+        }
+
+        private ParameterSetManager ParameterSetManager()
+        {
+            return Scenario.GetOrCreatePluginModel<ParameterSetManager>();
         }
 
         public void Run(InputSet inputSet)
