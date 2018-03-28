@@ -504,7 +504,6 @@ namespace FlowMatters.Source.WebServer
         public SimpleDataGroupItem[] GetDataSources()
         {
             var dm = Scenario.Network.DataManager;
-
             return dm.DataGroups.Select(dg => new SimpleDataGroupItem(dg)).ToArray();
         }
 
@@ -520,15 +519,24 @@ namespace FlowMatters.Source.WebServer
         public void CreateDataSource(SimpleDataGroupItem newItem)
         {
             var dm = Scenario.Network.DataManager;
-
             var existing = dm.DataGroups.FirstOrDefault(ds => ds.Name == newItem.Name);
 
-            if(existing!=null)
+            if (existing != null)
             {
-                dm.RemoveGroup(existing);
+                newItem.ReplaceInScenario(Scenario, existing);
             }
+            else
+            {
+                newItem.AddToScenario(Scenario);
+            }
+        }
 
-            newItem.AddToScenario(Scenario);
+        [OperationContract]
+        [WebInvoke(Method = "PUT", UriTemplate = UriTemplates.DataSourceGroup, ResponseFormat = WebMessageFormat.Json)]
+        public void UpdateDataSource(string dataSourceGroup, SimpleDataGroupItem newItem)
+        {
+            newItem.Name = dataSourceGroup;
+            this.CreateDataSource(newItem);
         }
 
         private SimpleDataGroupItem GetSimpleDataSourceInternal(string dataSourceGroup, bool summary)

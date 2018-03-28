@@ -53,7 +53,6 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects.DataSources
         public bool MatchInputSet(string inputSet)
         {
             return InputSets.Any(iSet => SourceService.URLSafeString(iSet) == inputSet);
-
         }
 
         internal void AddToGroup(RiverSystemScenario scenario, DataGroupItem dataGroup,int index)
