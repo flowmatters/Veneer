@@ -30,7 +30,7 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects.DataSources
         public void AddToScenario(RiverSystemScenario scenario)
         {
             var dm = scenario.Network.DataManager;
-            var dataGroup = DataGroupItem.CreateGroup<GeneratedCentralDataSource>(scenario.Network.DefaultInputSet);
+            var dataGroup = DataGroupItem.CreateGroup(typeof(GeneratedCentralDataSource),scenario.Network.InputSets);
             dataGroup.Name = Name;
             dm.DataGroups.Add(dataGroup);
 
