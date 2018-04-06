@@ -11,12 +11,14 @@ using IronPython.Modules;
 using RiverSystem;
 using RiverSystem.DataManagement.DataManager;
 using RiverSystem.DataManagement.DataManager.DataDetails;
+using RiverSystem.DataManagement.DataManager.DataSources;
 using RiverSystem.ManagedExtensions;
 using TIME.Core;
 using TIME.Core.Units.Defaults;
 using TIME.DataTypes;
 using TIME.DataTypes.IO.CsvFileIo;
 using TIME.DataTypes.TimeSeriesImplementation;
+using TIME.Management;
 
 namespace FlowMatters.Source.Veneer.ExchangeObjects.DataSources
 {
@@ -41,6 +43,7 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects.DataSources
             bool slim = isi.DataSource.Data.Count >= SLIM_TS_THRESHOLD;
             Details = isi.DataSource.Data.Select(ddi => new SimpleDataDetails(ddi, summary)).ToArray();
 #endif
+            ReloadOnRun = isi.DataSource.Data.Any(ddi => ddi.DataInformation.ReloadOnRun);
         }
 
         public SimpleDataItem(GenericDataDetails gdd)
@@ -60,17 +63,51 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects.DataSources
             DataSourceItem sourceItem = dataGroup.InputSetItems[index].DataSource;
             sourceItem.Name = Name;
 
+            if (DetailsAsCSV == null)
+            {
+                LoadFromFile(dataGroup, sourceItem);
+            }
+            else
+            {
+                LoadFromDetails(dataGroup, sourceItem);
+            }
+        }
+
+        private void LoadFromFile(DataGroupItem dataGroup, DataSourceItem sourceItem)
+        {
+            FileCentralDataSource ds = sourceItem.SourceInformation as FileCentralDataSource;
+            TimeSeries[] allTS = (TimeSeries[]) NonInteractiveIO.Load(ds.Filename);
+            if (allTS == null)
+                return;
+            for(var i=0;i<allTS.Length;i++)
+            {
+                var ts = allTS[i];
+                DataDetailsItem dataItem = new DataDetailsItem
+                {
+                    Data = new TimeSeriesPersistent { TimeSeries = ts },
+                    DataInformation = new FileDataDetails{ Name = ts.name, ReloadOnRun = ReloadOnRun, Column = i, StartDate = ts.Start }
+                };
+                sourceItem.Data.Add(dataItem);
+
+                var gdd = new GenericDataDetails { Name = ts.name };
+                gdd.AssociatedData.Add(dataItem);
+                dataGroup.DataDetails.Add(gdd);
+            }
+        }
+
+        private void LoadFromDetails(DataGroupItem dataGroup, DataSourceItem sourceItem)
+        {
             TimeSeries[] allTS = ParseCSV();
             foreach (var ts in allTS)
             {
                 DataDetailsItem dataItem = new DataDetailsItem
                 {
-                    Data = new TimeSeriesPersistent { TimeSeries = ts },
-                    DataInformation = new GeneratedDataDetails { Name = ts.name }
+                    Data = new TimeSeriesPersistent {TimeSeries = ts},
+                    DataInformation = new GeneratedDataDetails {Name = ts.name, ReloadOnRun = ReloadOnRun}
                 };
                 sourceItem.Data.Add(dataItem);
 
-                var gdd = new GenericDataDetails { Name = ts.name };
+                var gdd = new GenericDataDetails {Name = ts.name};
                 gdd.AssociatedData.Add(dataItem);
                 dataGroup.DataDetails.Add(gdd);
             }
@@ -152,5 +189,7 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects.DataSources
 
         [DataMember] public string DetailsAsCSV;
         [DataMember] public string UnitsForNewTS;
+
+        [DataMember] public bool ReloadOnRun;
     }
 }

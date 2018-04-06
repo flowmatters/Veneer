@@ -8,6 +8,7 @@ using FlowMatters.Source.WebServer;
 using RiverSystem;
 using RiverSystem.DataManagement.DataManager;
 using RiverSystem.DataManagement.DataManager.DataSources;
+using RiverSystem.ManagedExtensions;
 
 namespace FlowMatters.Source.Veneer.ExchangeObjects.DataSources
 {
@@ -30,8 +31,22 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects.DataSources
         public DataGroupItem AddToScenario(RiverSystemScenario scenario)
         {
             var dm = scenario.Network.DataManager;
-            var dataGroup = DataGroupItem.CreateGroup(typeof(GeneratedCentralDataSource),scenario.Network.InputSets);
+            var asFile = Items.All(i => i.DetailsAsCSV == null);
+            var dataGroupType = asFile
+                ? typeof(FileCentralDataSource)
+                : typeof(GeneratedCentralDataSource);
+
+            var dataGroup = DataGroupItem.CreateGroup(dataGroupType,scenario.Network.InputSets);
             dataGroup.Name = Name;
+            if (asFile)
+            {
+                dataGroup.InputSetItems.ForEachItem(i =>
+                {
+                    FileCentralDataSource ds = i.DataSource.SourceInformation as FileCentralDataSource;
+                    ds.Filename = Name;
+                });
+            }
+
             dm.DataGroups.Add(dataGroup);
 
             if (Items == null)
