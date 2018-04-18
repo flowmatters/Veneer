@@ -126,24 +126,24 @@ namespace FlowMatters.Source.Veneer.Formatting
 
             return result.ToString();
         }
+    }
 
-        class RawBodyWriter : BodyWriter
+    class RawBodyWriter : BodyWriter
+    {
+        string contents;
+
+        public RawBodyWriter(string contents)
+            : base(true)
         {
-            string contents;
+            this.contents = contents;
+        }
 
-            public RawBodyWriter(string contents)
-                : base(true)
-            {
-                this.contents = contents;
-            }
-
-            protected override void OnWriteBodyContents(XmlDictionaryWriter writer)
-            {
-                writer.WriteStartElement("Binary");
-                byte[] bytes = Encoding.UTF8.GetBytes(this.contents);
-                writer.WriteBase64(bytes, 0, bytes.Length);
-                writer.WriteEndElement();
-            }
+        protected override void OnWriteBodyContents(XmlDictionaryWriter writer)
+        {
+            writer.WriteStartElement("Binary");
+            byte[] bytes = Encoding.UTF8.GetBytes(this.contents);
+            writer.WriteBase64(bytes, 0, bytes.Length);
+            writer.WriteEndElement();
         }
     }
 }

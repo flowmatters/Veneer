@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Data;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Globalization;
@@ -308,6 +309,28 @@ namespace FlowMatters.Source.WebServer
             if(result.Length==1)
                 return SimpleTimeSeries(result[0].Item2);
             return CreateMultipleTimeSeries(result);
+        }
+
+        [OperationContract]
+        [WebInvoke(Method = "GET", ResponseFormat = WebMessageFormat.Json,
+            UriTemplate = UriTemplates.TabulatedResults)]
+        public DataTable GetTabulatedResults(string runId, string networkElement, string recordingElement,
+                                              string variable, string functions)
+        {
+            Log(String.Format("Requested tabulated results {0}/{1}/{2}/{3} with functions={4}", runId, networkElement, recordingElement, variable, functions));
+            Tuple<TimeSeriesLink, TimeSeries>[] results = MatchTimeSeries(runId, WebUtility.HtmlDecode(networkElement), WebUtility.HtmlDecode(recordingElement), WebUtility.HtmlDecode(variable));
+
+            var theFunctions = functions.Split(',');
+            if (functions == UriTemplates.MatchAll)
+            {
+                theFunctions = TimeSeriesFunctions.Functions.Keys.ToArray();
+            }
+
+            return TimeSeriesFunctions.TabulateResults(theFunctions, results, 
+                runId == UriTemplates.MatchAll, 
+                networkElement == UriTemplates.MatchAll, 
+                recordingElement == UriTemplates.MatchAll,
+                variable == UriTemplates.MatchAll);
         }
 
         private TimeSeriesResponse CreateMultipleTimeSeries(Tuple<TimeSeriesLink, TimeSeries>[] result)
@@ -623,6 +646,21 @@ namespace FlowMatters.Source.WebServer
             scriptRunner.Scenario = Scenario;
             scriptRunner.ProjectHandler = ProjectHandler;
             return scriptRunner.Run(script);
+        }
+
+        [OperationContract]
+        [WebInvoke(Method = "GET", UriTemplate = UriTemplates.ScenarioTables,
+             ResponseFormat = WebMessageFormat.Json)]
+        public DataTable ModelTable(string table)
+        {
+            Log(String.Format("Requested {0} table", table));
+            if (!ModelTabulator.Functions.ContainsKey(table))
+            {
+                Log(String.Format("Unknown table: {0}", table));
+                WebOperationContext.Current.OutgoingResponse.StatusCode = HttpStatusCode.NotFound;
+                return null;
+            }
+            return ModelTabulator.Functions[table](Scenario);
         }
 
         private void SwitchRecording(TimeSeriesLink query, bool record)
