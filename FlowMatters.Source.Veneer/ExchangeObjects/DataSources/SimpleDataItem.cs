@@ -85,7 +85,12 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects.DataSources
                 DataDetailsItem dataItem = new DataDetailsItem
                 {
                     Data = new TimeSeriesPersistent { TimeSeries = ts },
-                    DataInformation = new FileDataDetails{ Name = ts.name, ReloadOnRun = ReloadOnRun, Column = i, StartDate = ts.Start }
+                    DataInformation = new FileDataDetails{ Name = ts.name, ReloadOnRun = ReloadOnRun, Column = i
+#if V3 || V4_0 || V4_1 || V4_2
+#else
+                    , StartDate = ts.Start
+#endif
+                    }
                 };
                 sourceItem.Data.Add(dataItem);
 
