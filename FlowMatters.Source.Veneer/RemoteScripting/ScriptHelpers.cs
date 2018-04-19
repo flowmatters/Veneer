@@ -181,6 +181,18 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
             }
         }
 
+        public static void InitialiseModelsForConstituentSource(RiverSystemScenario s)
+        {
+            foreach (var catchment in s.Network.Catchments.OfType<Catchment>())
+            {
+                foreach (var functionalUnit in catchment.FunctionalUnits.OfType<StandardFunctionalUnit>())
+                {
+                    foreach (var constituent in s.SystemConfiguration.Constituents)
+                        InitialiseConstituentSources(s, catchment, functionalUnit, constituent);
+                }
+            }
+        }
+
         public static void EnsureElementsHaveConstituentProviders(RiverSystemScenario scenario)
         {
             Network network = scenario.Network;
@@ -212,16 +224,32 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
             }
 
 #if V3 || V4_0 || V4_1 || V4_2 || V4_3_0
-            if (constituentModel.ConstituentSources.Count > 0) return;
+            if (constituentModel.ConstituentSources.Count == scenario.SystemConfiguration.ConstituentSources.Count) return;
 #else
-            if (constituentModel.ConstituentSources.Length > 0) return;
+            if (constituentModel.ConstituentSources.Length == scenario.SystemConfiguration.ConstituentSources.Count) return;
 #endif
-            var defaultConstituentSource = scenario.SystemConfiguration.ConstituentSources.First(cs => cs.IsDefault);
+
+            scenario.SystemConfiguration.ConstituentSources.ForEachItem(cs =>
+            {
+                if (constituentModel.ConstituentSources.Any(csc => csc.ConstituentSource == cs))
+                {
+                    return;
+                }
 #if V3 || V4_0 || V4_1 || V4_2 || V4_3_0
-            constituentModel.ConstituentSources.Add(new ConstituentSourceContainer(defaultConstituentSource, new NilConstituent(), new PassThroughFilter()));
+                constituentModel.ConstituentSources.Add(new ConstituentSourceContainer(cs, new NilConstituent(), new PassThroughFilter()));
 #else
-            constituentModel.AddConstituentSources(new ConstituentSourceContainer(defaultConstituentSource, new NilConstituent(), new PassThroughFilter()));
+                constituentModel.AddConstituentSources(new ConstituentSourceContainer(defaultConstituentSource, new NilConstituent(), new PassThroughFilter()));
 #endif
+
+            });
+            /*
+            var defaultConstituentSource = scenario.SystemConfiguration.ConstituentSources.First(cs => cs.IsDefault);
+            #if V3 || V4_0 || V4_1 || V4_2 || V4_3_0
+                        constituentModel.ConstituentSources.Add(new ConstituentSourceContainer(defaultConstituentSource, new NilConstituent(), new PassThroughFilter()));
+            #else
+                        constituentModel.AddConstituentSources(new ConstituentSourceContainer(defaultConstituentSource, new NilConstituent(), new PassThroughFilter()));
+            #endif
+            */
         }
 
         private static Type DefaultSourceSinkType(NetworkElementConstituentData data)
