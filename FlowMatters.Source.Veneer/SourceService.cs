@@ -206,7 +206,7 @@ namespace FlowMatters.Source.WebServer
 
             try
             {
-                si.RunScenario(parameters, RunningInGUI);
+                si.RunScenario(parameters, RunningInGUI, LogGenerator);
             }
             catch (Exception e)
             {

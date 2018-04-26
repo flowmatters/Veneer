@@ -64,7 +64,7 @@
     </Reference>
     <Reference Include="Microsoft.Dynamic">
       <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
+      <Private>True</Private>
     </Reference>
     <Reference Include="Microsoft.Scripting">
       <SpecificVersion>False</SpecificVersion>
