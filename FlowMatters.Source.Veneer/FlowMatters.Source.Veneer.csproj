@@ -191,7 +191,9 @@
     <Compile Include="CORS\EnableCrossOriginResourceSharingBehavior.cs" />
     <Compile Include="CORS\CORSMessageInspector.cs" />
     <Compile Include="DomainActions\InputSets.cs" />
+    <Compile Include="DomainActions\ModelTabulator.cs" />
     <Compile Include="DomainActions\ScenarioInvoker.cs" />
+    <Compile Include="DomainActions\TimeSeriesFunctions.cs" />
     <Compile Include="ExchangeObjects\BooleanResponse.cs" />
     <Compile Include="ExchangeObjects\DataSources\SimpleDataDetails.cs" />
     <Compile Include="ExchangeObjects\DataSources\SimpleDataGroupItem.cs" />
@@ -218,6 +220,7 @@
     <Compile Include="ExchangeObjects\VeneerResponse.cs" />
     <Compile Include="ExchangeObjects\GeoJSONGeometry.cs" />
     <Compile Include="ExchangeObjects\GeoJSONNetwork.cs" />
+    <Compile Include="Formatting\TableResponseFormatter.cs" />
     <Compile Include="Formatting\TimeSeriesResponseFormatter.cs" />
     <Compile Include="Formatting\ReplyFormatSwitchBehaviour.cs" />
     <Compile Include="ExchangeObjects\FunctionValue.cs" />

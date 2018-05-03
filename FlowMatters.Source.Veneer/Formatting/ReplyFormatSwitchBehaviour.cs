@@ -16,6 +16,9 @@ namespace FlowMatters.Source.Veneer.Formatting
                     {
                         DefaultDispatchMessageFormatter = base.GetReplyDispatchFormatter(operationDescription, endpoint)
                     };
+                case "GetTabulatedResults":
+                case "ModelTable":
+                    return new TableResponseFormatter();
                 default:
                     return base.GetReplyDispatchFormatter(operationDescription, endpoint);
             }

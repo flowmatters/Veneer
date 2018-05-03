@@ -41,20 +41,17 @@ namespace FlowMatters.Source.VeneerCmd
             var options = new Options();
             if (CommandLine.Parser.Default.ParseArguments(args, options))
             {
-                if (options.ProjectFiles.Count > 0)
+                try
                 {
-                    try
-                    {
-                        RunWithOptions(options);
-                    }
-                    catch (Exception e)
-                    {
-                        Console.WriteLine(e.Message);
-                        Console.WriteLine(e.StackTrace);
-                        Console.WriteLine("Unhandled exception: {0}",e.Message);
-                    }
-                    return;
+                    RunWithOptions(options);
                 }
+                catch (Exception e)
+                {
+                    Console.WriteLine(e.Message);
+                    Console.WriteLine(e.StackTrace);
+                    Console.WriteLine("Unhandled exception: {0}", e.Message);
+                }
+                return;
             }
             // Display the default usage information
             Console.WriteLine(options.GetUsage());
@@ -73,27 +70,28 @@ namespace FlowMatters.Source.VeneerCmd
         private static void RunWithOptions(Options options)
         {
 // consume Options instance properties
-            var fn = options.ProjectFiles[0];
+            var fn = (options.ProjectFiles.Count>0)?options.ProjectFiles[0]:null;
             LoadPlugins();
 
-            if (!File.Exists(fn))
+            RiverSystemScenario scenario;
+            if (fn == null)
             {
-                Console.WriteLine("Cannot find project file: {0}",fn);
+                scenario = CreateEmptyScenario(options);
+            } else if (!File.Exists(fn))
+            {
+                Console.WriteLine("Cannot find project file: {0}", fn);
                 return;
             }
+            else
+            {
+                scenario = LoadScenario(options, fn);
+            }
 
-            var project_dir = Path.GetDirectoryName(fn);
-            if (project_dir == "")
-                project_dir = ".";
-            Directory.SetCurrentDirectory(project_dir);
-            
-            RiverSystemProject project = LoadProject(fn,options);
-            Show(project.Name);
-            var scenario = project.GetRSScenarios()[0];
-            Show(scenario.ScenarioName);
+
+            Show(scenario.Name);
 
             var _server = new SourceRESTfulService((int)options.Port);
-            _server.Scenario = scenario.riverSystemScenario;
+            _server.Scenario = scenario;
             _server.LogGenerator += ServerLogEvent;
             _server.AllowRemoteConnections = options.RemoteAccess;
 
@@ -106,6 +104,54 @@ namespace FlowMatters.Source.VeneerCmd
             {
                 Console.ReadLine();
             }
+        }
+
+        private static RiverSystemScenario CreateEmptyScenario(Options options)
+        {
+            var project = RiverSystemProject.CreateProject("Created Project");
+            var scenario = new RiverSystemScenario(project);
+            var scenarioContainer = new RiverSystemScenarioContainer(scenario);
+            project.AddScenario(scenarioContainer);
+
+            return scenario;
+        }
+
+        private static RiverSystemScenario LoadScenario(Options options, string fn)
+        {
+            var project_dir = Path.GetDirectoryName(fn);
+            if (project_dir == "")
+                project_dir = ".";
+            Directory.SetCurrentDirectory(project_dir);
+
+            RiverSystemProject project = LoadProject(fn, options);
+            Show(project.Name);
+
+            RiverSystemScenarioContainer scenario;
+            var allScenarios = project.GetRSScenarios();
+
+            if (options.AvailableScenarios)
+            {
+                Show(String.Join(Environment.NewLine, allScenarios.Select(s => s.ScenarioName)));
+                Environment.Exit(0);
+            }
+
+            if (options.ScenarioToLoad == null)
+            {
+                scenario = allScenarios[0];
+            }
+            else
+            {
+                int scenarioNumber = -1;
+                if (int.TryParse(options.ScenarioToLoad, out scenarioNumber))
+                {
+                    scenario = allScenarios[scenarioNumber - 1];
+                }
+                else
+                {
+                    scenario = allScenarios.FirstOrDefault(s => s.ScenarioName == options.ScenarioToLoad);
+                }
+            }
+            return scenario.riverSystemScenario;
         }
 
         private static void ServerLogEvent(object sender, string msg)
@@ -213,6 +259,21 @@ namespace FlowMatters.Source.VeneerCmd
 
         [Option('b', "backup-rsproj", HelpText = "Backup .rsproj file", DefaultValue = false)]
         public bool BackupRSPROJ { get; set; }
+
+        //#if GBRSource
+        //        [Option('a', "available-scenarios", HelpText = "List available scenarios then exit", DefaultValue = false)]
+        //#else
+        [Option('a', "available-models", HelpText = "List available models (scenarios) then exit", DefaultValue = false)]
+        //#endif
+        public bool AvailableScenarios { get; set; }
+
+
+        //#if GBRSource
+        //        [Option('s', "scenario", HelpText = "Scenario to use", DefaultValue = null)]
+        //#else
+        [Option('m', "model", HelpText = "Model (scenario) to use", DefaultValue = null)]
+        //#endif
+        public string ScenarioToLoad { get; set; }
 
         [ValueList(typeof(List<string>), MaximumElements = 1)]
         public IList<string> ProjectFiles { get; set; }

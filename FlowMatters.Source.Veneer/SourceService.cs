@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Data;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Globalization;
@@ -42,7 +44,7 @@ namespace FlowMatters.Source.WebServer
     [ServiceKnownType(typeof(double[][][][]))]
     public class SourceService //: ISourceService
     {
-        public List<string[]> RunLogs = new List<string[]>();
+        public Dictionary<int,string[]> RunLogs = new Dictionary<int,string[]>();
 
         public RiverSystemScenario Scenario { get; set; }
         private ScriptRunner scriptRunner = new ScriptRunner();
@@ -86,22 +88,6 @@ namespace FlowMatters.Source.WebServer
 
             throw new Exception("Shutdown not supported");
         }
-
-        //[OperationContract]
-        //[WebInvoke(Method = "GET", UriTemplate = UriTemplates.FilesD)]
-        //public Stream GetFileD(string dir, string fn)
-        //{
-        //    Log("Requested File: " + dir + "/" + fn);
-        //    return GetFile(dir + "/" + fn);
-        //}
-
-        //[OperationContract]
-        //[WebInvoke(Method = "GET", UriTemplate = UriTemplates.FilesDD)]
-        //public Stream GetFileDD(string dir1, string dir2, string fn)
-        //{
-        //    Log(string.Format("Requested File: {0}/{1}/{2}",dir1,dir2,fn));
-        //    return GetFile(dir1 + "/" + dir2 + "/" + fn);
-        //}
 
         [OperationContract]
         [WebInvoke(Method = "GET", UriTemplate = UriTemplates.Files)]
@@ -197,10 +183,10 @@ namespace FlowMatters.Source.WebServer
             Log("Triggering a run.");
             ScenarioInvoker si = new ScenarioInvoker { Scenario = Scenario };
 
-            List<string> messages = new List<string>();
+            ConcurrentQueue<string> messages = new ConcurrentQueue<string>();
             LogAction runLogger = (sender, args) =>
             {
-                messages.Add(args.Entry.Message);
+                messages.Enqueue(args.Entry.Message);
             };
             TIME.Management.Log.MessageRecieved += runLogger;
 
@@ -220,7 +206,7 @@ namespace FlowMatters.Source.WebServer
                 TIME.Management.Log.MessageRecieved -= runLogger;
             }
 
-            RunLogs.Add(messages.ToArray());
+            RunLogs[Scenario.Project.ResultManager.AllRuns().Last().RunNumber] = messages.ToArray();
             Run r = RunsForId("latest")[0];
 
             WebOperationContext.Current.OutgoingResponse.StatusCode = HttpStatusCode.Redirect;
@@ -238,19 +224,20 @@ namespace FlowMatters.Source.WebServer
 //            WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Origin", "*");
             string msg = "";
             string[] log;
+            Run run = RunsForId(runId)[0];
+
             if (runId.ToLower() == "latest")
             {
                 msg = "latest run";
-                log = RunLogs.LastOrDefault();
             }
             else
             {
                 msg = string.Format("run with id={0}", runId);
-                var idx = int.Parse(runId) - 1;
-                log = RunLogs[idx];
+//                var idx = int.Parse(runId) - 1;
+//                log = RunLogs[idx];
             }
+            log = RunLogs[run.RunNumber];
 
-            Run run = RunsForId(runId)[0];
 
             Log("Requested " + msg);
 
@@ -272,14 +259,14 @@ namespace FlowMatters.Source.WebServer
             int id = -1;
             if (runId == "latest")
             {
-                id = Scenario.Project.ResultManager.AllRuns().Count();
-                RunLogs.RemoveAt(RunLogs.Count-1);
+                id = Scenario.Project.ResultManager.AllRuns().Last().RunNumber;
             }
             else
             {
                 id = int.Parse(runId);
-                RunLogs.RemoveAt(id - 1);
+                //RunLogs.Remove(id);
             }
+            RunLogs.Remove(id);
             Scenario.Project.ResultManager.RemoveRun(id);
         }
 
@@ -322,6 +309,28 @@ namespace FlowMatters.Source.WebServer
             if(result.Length==1)
                 return SimpleTimeSeries(result[0].Item2);
             return CreateMultipleTimeSeries(result);
+        }
+
+        [OperationContract]
+        [WebInvoke(Method = "GET", ResponseFormat = WebMessageFormat.Json,
+            UriTemplate = UriTemplates.TabulatedResults)]
+        public DataTable GetTabulatedResults(string runId, string networkElement, string recordingElement,
+                                              string variable, string functions)
+        {
+            Log(String.Format("Requested tabulated results {0}/{1}/{2}/{3} with functions={4}", runId, networkElement, recordingElement, variable, functions));
+            Tuple<TimeSeriesLink, TimeSeries>[] results = MatchTimeSeries(runId, WebUtility.HtmlDecode(networkElement), WebUtility.HtmlDecode(recordingElement), WebUtility.HtmlDecode(variable));
+
+            var theFunctions = functions.Split(',');
+            if (functions == UriTemplates.MatchAll)
+            {
+                theFunctions = TimeSeriesFunctions.Functions.Keys.ToArray();
+            }
+
+            return TimeSeriesFunctions.TabulateResults(theFunctions, results, 
+                runId == UriTemplates.MatchAll, 
+                networkElement == UriTemplates.MatchAll, 
+                recordingElement == UriTemplates.MatchAll,
+                variable == UriTemplates.MatchAll);
         }
 
         private TimeSeriesResponse CreateMultipleTimeSeries(Tuple<TimeSeriesLink, TimeSeries>[] result)
@@ -434,7 +443,7 @@ namespace FlowMatters.Source.WebServer
 
         [OperationContract]
         [WebInvoke(Method="GET",UriTemplate=UriTemplates.InputSets,ResponseFormat = WebMessageFormat.Json)]
-        public InputSetSummary[] InputSetShenanigans()
+        public InputSetSummary[] GetInputSets()
         {
             Log("Requested input sets");
             var sets = new InputSets(Scenario);
@@ -458,6 +467,16 @@ namespace FlowMatters.Source.WebServer
                 }
             }
             return result;
+        }
+
+        [OperationContract]
+        [WebInvoke(Method = "POST", UriTemplate = UriTemplates.InputSets, RequestFormat = WebMessageFormat.Json)]
+        public void CreateInputSet(InputSetSummary newInputSet)
+        {
+            Log("Creating new Input Set: " + newInputSet.Name);
+
+            var sets = new InputSets(Scenario);
+            sets.Create(newInputSet);
         }
 
         [OperationContract]
@@ -508,7 +527,6 @@ namespace FlowMatters.Source.WebServer
         public SimpleDataGroupItem[] GetDataSources()
         {
             var dm = Scenario.Network.DataManager;
-
             return dm.DataGroups.Select(dg => new SimpleDataGroupItem(dg)).ToArray();
         }
 
@@ -524,15 +542,24 @@ namespace FlowMatters.Source.WebServer
         public void CreateDataSource(SimpleDataGroupItem newItem)
         {
             var dm = Scenario.Network.DataManager;
-
             var existing = dm.DataGroups.FirstOrDefault(ds => ds.Name == newItem.Name);
 
-            if(existing!=null)
+            if (existing != null)
             {
-                dm.RemoveGroup(existing);
+                newItem.ReplaceInScenario(Scenario, existing);
             }
+            else
+            {
+                newItem.AddToScenario(Scenario);
+            }
+        }
 
-            newItem.AddToScenario(Scenario);
+        [OperationContract]
+        [WebInvoke(Method = "PUT", UriTemplate = UriTemplates.DataSourceGroup, ResponseFormat = WebMessageFormat.Json)]
+        public void UpdateDataSource(string dataSourceGroup, SimpleDataGroupItem newItem)
+        {
+            newItem.Name = dataSourceGroup;
+            this.CreateDataSource(newItem);
         }
 
         private SimpleDataGroupItem GetSimpleDataSourceInternal(string dataSourceGroup, bool summary)
@@ -619,6 +646,21 @@ namespace FlowMatters.Source.WebServer
             scriptRunner.Scenario = Scenario;
             scriptRunner.ProjectHandler = ProjectHandler;
             return scriptRunner.Run(script);
+        }
+
+        [OperationContract]
+        [WebInvoke(Method = "GET", UriTemplate = UriTemplates.ScenarioTables,
+             ResponseFormat = WebMessageFormat.Json)]
+        public DataTable ModelTable(string table)
+        {
+            Log(String.Format("Requested {0} table", table));
+            if (!ModelTabulator.Functions.ContainsKey(table))
+            {
+                Log(String.Format("Unknown table: {0}", table));
+                WebOperationContext.Current.OutgoingResponse.StatusCode = HttpStatusCode.NotFound;
+                return null;
+            }
+            return ModelTabulator.Functions[table](Scenario);
         }
 
         private void SwitchRecording(TimeSeriesLink query, bool record)

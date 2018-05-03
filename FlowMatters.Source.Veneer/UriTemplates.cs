@@ -7,12 +7,14 @@ namespace FlowMatters.Source.WebServer
 {
     class UriTemplates
     {
-        public const string Recordable = "location/{networkElement}/element/{recordingElement}/variable/{variable}";
+        public const string Recordable = "/location/{networkElement}/element/{recordingElement}/variable/{variable}";
 
-        public const string TimeSeries = "/runs/{runId}/"+Recordable;
+        public const string TimeSeries = RunResults + Recordable;
 
-        public const string AggregatedTimeSeries =
-            "/runs/{runId}/location/{networkElement}/element/{recordingElement}/variable/{variable}/aggregated/{aggregation}";
+//        public const string ResultsTable = 
+        public const string AggregatedTimeSeries = TimeSeries + "/aggregated/{aggregation}";
+
+        public const string TabulatedResults = TimeSeries + "/tabulated/{functions}";
 
         public const string RunResults = "/runs/{runId}";
         public const string Runs = "/runs";
@@ -56,6 +58,8 @@ namespace FlowMatters.Source.WebServer
         public const string DataGroupItemDetails = DataGroupItem + "/{item}";
 
         public const string DataGroupMultipleItemDetails = DataSourceGroup + "/" + MatchAll + "/{name}";
+
+        public const string ScenarioTables = "/tables/{table}";
 
         public const string MatchAll = "__all__";
     }
