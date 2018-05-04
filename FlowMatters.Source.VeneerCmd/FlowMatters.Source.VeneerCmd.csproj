@@ -66,7 +66,6 @@
   <ItemGroup>
     <Reference Include="CommandLine">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\RiverSystem\Solutions\Packages\CommandLineParser.1.9.3.34\lib\CommandLine.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="FirebirdSql.Data.FirebirdClient">
