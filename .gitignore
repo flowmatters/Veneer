@@ -15,6 +15,7 @@ obj/
 [Dd]ebug*/
 [Rr]elease*/
 Output
+.vs
 
 #MonoDevelop
 *.pidb
@@ -26,6 +27,8 @@ _ReSharper*/
 
 References
 Compiled
+Builds
+Packages
 
 *.dat
 

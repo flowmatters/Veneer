@@ -19,7 +19,7 @@
     <Prefer32Bit>false</Prefer32Bit>
     <LangVersion>6</LangVersion>
     <RootPath>..\..\</RootPath>
-    <ReferencePath>$(RootPath)Output;$(RootPath)3rdParty</ReferencePath>
+    <ReferencePath>$(RootPath)Output;$(RootPath)3rdParty;..\References;..\References\Plugins</ReferencePath>
     <OutputPath>$(RootPath)Output\Plugins\CommunityPlugins</OutputPath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x86' ">
