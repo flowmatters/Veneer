@@ -677,6 +677,11 @@ namespace FlowMatters.Source.WebServer
                 constraint[ProjectViewRow.RecorderFields.ElementName] = query.RecordingElement;
             }
 
+            if (!string.IsNullOrEmpty(query.FunctionalUnit))
+            {
+                constraint[ProjectViewRow.RecorderFields.WaterFeatureType] = query.FunctionalUnit;
+            }
+
             var table = Scenario.ProjectViewTable();
             var rows = table.Select(constraint);
             var state = record ? RecordingStates.RecordAll : RecordingStates.RecordNone;
@@ -767,11 +772,15 @@ namespace FlowMatters.Source.WebServer
 
         private static bool MatchesElements(ProjectViewRow row, string networkElement, string recordingElement)
         {
+            string functionalUnit;
+            bool haveFU = UriTemplates.TryExtractFunctionalUnit(networkElement, out networkElement, out functionalUnit);
             bool matchesNetworkElement = (networkElement == UriTemplates.MatchAll) ||
                                          (URLSafeString(row.NetworkElementName) == URLSafeString(networkElement));
+            bool satisfiesFU = !haveFU || (URLSafeString(row.WaterFeatureType) == URLSafeString(functionalUnit));
             bool matchesRecordingElement = (recordingElement == UriTemplates.MatchAll) ||
                                            (URLSafeString(row.ElementName) == URLSafeString(recordingElement));
-            return matchesNetworkElement && matchesRecordingElement;
+
+            return matchesNetworkElement && matchesRecordingElement && satisfiesFU;
         }
 
         public static string URLSafeString(string src)

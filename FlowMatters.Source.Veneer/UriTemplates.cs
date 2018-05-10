@@ -62,5 +62,24 @@ namespace FlowMatters.Source.WebServer
         public const string ScenarioTables = "/tables/{table}";
 
         public const string MatchAll = "__all__";
+
+        public const string NETWORK_ELEMENT_FU_DELIMITER = "@@";
+
+        public static bool TryExtractFunctionalUnit(string networkElement, out string newNetworkElement,
+            out string functionalUnit)
+        {
+            if (networkElement.Contains(NETWORK_ELEMENT_FU_DELIMITER))
+            {
+                var split = networkElement.Split(new string[] {UriTemplates.NETWORK_ELEMENT_FU_DELIMITER},
+                    StringSplitOptions.None);
+                newNetworkElement = split[0];
+                functionalUnit = split[1];
+                return true;
+            }
+
+            newNetworkElement = networkElement;
+            functionalUnit = null;
+            return false;
+        }
     }
 }

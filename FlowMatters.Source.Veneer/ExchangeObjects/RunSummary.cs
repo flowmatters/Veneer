@@ -45,7 +45,7 @@ namespace FlowMatters.Source.WebServer.ExchangeObjects
 
         public static TimeSeriesLink BuildLink(TimeSeries ts, ProjectViewRow row, AttributeRecordingState key, int runNumber)
         {
-            return new TimeSeriesLink
+            var result = new TimeSeriesLink
             {
                 TimeSeriesName = ts.name,
                 RunNumber = runNumber,
@@ -54,12 +54,23 @@ namespace FlowMatters.Source.WebServer.ExchangeObjects
                 RecordingElement = row.ElementName,
                 RecordingVariable = SelectRecordingVariable(key, row)
             };
+
+            if (row.NetworkElementTypeInstance == ProjectViewRow.NetworkElementType.Catchment)
+            {
+                result.FunctionalUnit = row.WaterFeatureType;
+            }
+            return result;
         }
 
         public static string BuildTimeSeriesUrl(ProjectViewRow row, AttributeRecordingState key, int runNumber)
         {
-            return string.Format(UriTemplates.TimeSeries.Replace("{runId}", "{0}").Replace("{networkElement}", "{1}").Replace("{recordingElement}","{2}").Replace("{variable}", "{3}"), 
-                runNumber, SourceService.URLSafeString(row.NetworkElementName), SourceService.URLSafeString(row.ElementName), SourceService.URLSafeString(SelectRecordingVariable(key,row)));
+            string networkElementSuffix = "";
+            if (row.NetworkElementTypeInstance == ProjectViewRow.NetworkElementType.Catchment)
+            {
+                networkElementSuffix = UriTemplates.NETWORK_ELEMENT_FU_DELIMITER + row.WaterFeatureType;
+            }
+                return string.Format(UriTemplates.TimeSeries.Replace("{runId}", "{0}").Replace("{networkElement}", "{1}").Replace("{recordingElement}","{2}").Replace("{variable}", "{3}"), 
+                runNumber, SourceService.URLSafeString(row.NetworkElementName+networkElementSuffix), SourceService.URLSafeString(row.ElementName), SourceService.URLSafeString(SelectRecordingVariable(key,row)));
         }
 
         [DataMember]
