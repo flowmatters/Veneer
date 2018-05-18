@@ -220,6 +220,7 @@
     <Compile Include="ExchangeObjects\VeneerResponse.cs" />
     <Compile Include="ExchangeObjects\GeoJSONGeometry.cs" />
     <Compile Include="ExchangeObjects\GeoJSONNetwork.cs" />
+    <Compile Include="ExchangeObjects\VeneerStatus.cs" />
     <Compile Include="Formatting\TableResponseFormatter.cs" />
     <Compile Include="Formatting\TimeSeriesResponseFormatter.cs" />
     <Compile Include="Formatting\ReplyFormatSwitchBehaviour.cs" />

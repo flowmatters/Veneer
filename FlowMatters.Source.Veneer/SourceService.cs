@@ -65,11 +65,11 @@ namespace FlowMatters.Source.WebServer
 
         [OperationContract]
         [WebGet(UriTemplate = "/", ResponseFormat = WebMessageFormat.Json)]
-        public string GetRoot()
+        public VeneerStatus GetRoot()
         {
 //            WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Origin", "*");
             Log("Requested /");
-            return "Root node of service";
+            return new VeneerStatus(Scenario);
         }
 
         [OperationContract]
