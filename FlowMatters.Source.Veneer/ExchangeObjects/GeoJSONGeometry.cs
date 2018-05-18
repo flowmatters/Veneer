@@ -2,6 +2,7 @@
 #define BeforeCaseRefactor
 #endif
 
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -15,6 +16,22 @@ namespace FlowMatters.Source.WebServer
     [DataContract]
     public class GeoJSONGeometry
     {
+        public static double RoundCoordinate(double v,int dp=-1)
+        {
+            if (dp < 0)
+            {
+                if (Math.Abs(v) > 1000.0)
+                {
+                    dp = 0;
+                }
+                else
+                {
+                    dp = 4;
+                }
+            }
+            return Math.Round(v, dp);
+        }
+
         [DataMember]
         public string type { get; set; }
 
@@ -95,18 +112,30 @@ namespace FlowMatters.Source.WebServer
 
         private static double[] GeoJSONPoint(Coordinate c)
         {
-            return new[] {c.E,c.N};
+            return new[] { RoundCoordinate(c.E), RoundCoordinate(c.N)};
         }
 
         private static double[][] GeoJSONLineString(PolyLine line)
         {
             var coords = new List<double[]>();
+            double[] last = null;
 #if BeforeCaseRefactor
-            for (int i = 0; i < line.count(); i++)
+            int nPoints = line.count();
 #else
-            for (int i = 0; i < line.Count; i++)
+            int nPoints = line.Count;
 #endif
-                coords.Add(GeoJSONPoint(line.item(i)));
+            for (int i = 0; i < nPoints; i++)
+            {
+                var newPoint = GeoJSONPoint(line.item(i));
+                if ((nPoints==2)||
+                    (last == null)||
+                    (last[0] != newPoint[0])||
+                    (last[1] != newPoint[1]))
+                {
+                    coords.Add(newPoint);
+                }
+                last = newPoint;
+            }
             return coords.ToArray();
         }
     }
