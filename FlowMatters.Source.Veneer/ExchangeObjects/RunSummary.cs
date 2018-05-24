@@ -26,7 +26,7 @@ namespace FlowMatters.Source.WebServer.ExchangeObjects
             List<TimeSeriesLink> result = new List<TimeSeriesLink>();
             foreach (ProjectViewRow row in rows)
             {
-                Dictionary<AttributeRecordingState, TimeSeries> rowResults = row.ElementRecorder.GetResultList();
+                var rowResults = row.ElementRecorder.GetResultsLookup();
                 foreach (var key in rowResults.Keys)
                 {
                     TimeSeries ts = rowResults[key];
@@ -38,12 +38,13 @@ namespace FlowMatters.Source.WebServer.ExchangeObjects
             return result.ToArray();
         }
 
-        private static string SelectRecordingVariable(AttributeRecordingState key, ProjectViewRow row)
+        private static string SelectRecordingVariable(RecordableItem key, ProjectViewRow row)
         {
-            return (key.KeyString == "") ? row.ElementName : key.KeyString;
+            var recordableItemDisplayString = RecordableItemTransitionUtil.GetLegacyKeyString(key);
+            return (recordableItemDisplayString == "") ? row.ElementName : recordableItemDisplayString;
         }
 
-        public static TimeSeriesLink BuildLink(TimeSeries ts, ProjectViewRow row, AttributeRecordingState key, int runNumber)
+        public static TimeSeriesLink BuildLink(TimeSeries ts, ProjectViewRow row, RecordableItem key, int runNumber)
         {
             var result = new TimeSeriesLink
             {
@@ -62,7 +63,7 @@ namespace FlowMatters.Source.WebServer.ExchangeObjects
             return result;
         }
 
-        public static string BuildTimeSeriesUrl(ProjectViewRow row, AttributeRecordingState key, int runNumber)
+        public static string BuildTimeSeriesUrl(ProjectViewRow row, RecordableItem key, int runNumber)
         {
             string networkElementSuffix = "";
             if (row.NetworkElementTypeInstance == ProjectViewRow.NetworkElementType.Catchment)

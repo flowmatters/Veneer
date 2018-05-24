@@ -687,12 +687,16 @@ namespace FlowMatters.Source.WebServer
             var state = record ? RecordingStates.RecordAll : RecordingStates.RecordNone;
             foreach (var row in rows)
             {
-                foreach (var recordable in row.ElementRecorder.RecordableAttributes)
+                foreach (var recordable in row.ElementRecorder.RecordableItems)
                 {
+
+                    var recordableItemDisplayString =
+                        RecordableItemTransitionUtil.GetLegacyKeyString(recordable);
+
                     if ((query.RecordingVariable.Length == 0) ||
-                        (recordable.FullKeyString.IndexOf(query.RecordingVariable, StringComparison.Ordinal) >= 0))
+                        (recordableItemDisplayString.IndexOf(query.RecordingVariable, StringComparison.Ordinal) >= 0))
                     {
-                        row.ElementRecorder.SetRecordingState(recordable.KeyString,recordable.KeyObject,state);
+                        row.ElementRecorder.SetRecordingState(recordable.Key.TrueKey, recordable.KeyObject,state);
                     }
                 }
             }
@@ -738,7 +742,7 @@ namespace FlowMatters.Source.WebServer
             {
                 var row = entry.Item2;
                 var runNumber = entry.Item1;
-                result.AddRange(row.ElementRecorder.GetResultList().Where(er=>MatchesVariable(row,er,variable)).Select(
+                result.AddRange(row.ElementRecorder.GetResultsLookup().Where(er=>MatchesVariable(row,er,variable)).Select(
                     er =>
                     {
                         return new Tuple<TimeSeriesLink, TimeSeries>(RunSummary.BuildLink(er.Value,row,er.Key,runNumber),er.Value);
@@ -750,12 +754,14 @@ namespace FlowMatters.Source.WebServer
             //    ((er.Key.KeyString=="")&&(row.ElementName==variable))).Value;            
         }
 
-        private bool MatchesVariable(ProjectViewRow row, KeyValuePair<AttributeRecordingState, TimeSeries> er, string variable)
+        private bool MatchesVariable(ProjectViewRow row, KeyValuePair<RecordableItem, TimeSeries> er, string variable)
         {
             if(variable == UriTemplates.MatchAll) return true;
 
-            return (URLSafeString(er.Key.KeyString) == URLSafeString(variable)) ||
-                ((er.Key.KeyString == "") && (row.ElementName == variable));
+            var recordableItemDisplayName = RecordableItemTransitionUtil.GetLegacyKeyString(er.Key);
+
+            return (URLSafeString(recordableItemDisplayName) == URLSafeString(variable)) ||
+                ((recordableItemDisplayName == "") && (row.ElementName == variable));
         }
 
         private SimpleTimeSeries TimeSeriesNotFound()
