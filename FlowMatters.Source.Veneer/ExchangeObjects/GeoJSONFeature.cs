@@ -10,6 +10,7 @@ using RiverSystem.Catchments;
 using RiverSystemGUI_II.SchematicBuilder;
 using TIME.DataTypes;
 using TIME.DataTypes.Polygons;
+using Network = RiverSystem.Network;
 
 namespace FlowMatters.Source.Veneer.ExchangeObjects
 {
@@ -44,7 +45,7 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects
 
         public GeoJSONFeature(Node n,RiverSystemScenario scenario,bool useSchematicLocation)
         {           
-            id = NodeURL(n);
+            id = NodeURL(n,scenario.Network);
 
             properties.Add("name",n.Name);
             properties.Add(FeatureTypeProperty, "node");
@@ -86,9 +87,9 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects
             }
         }
 
-        private static string NodeURL(INode n)
+        private static string NodeURL(Node n,Network network)
         {
-            return UriTemplates.Node.Replace("{nodeId}", n.id.ToString());
+            return UriTemplates.Node.Replace("{nodeId}", network.nodes.indexOf(n).ToString());//n.id.ToString());
         }
 
         private static string LinkURL(ILink l)
@@ -102,8 +103,8 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects
             id = LinkURL(l);
             properties.Add("name", l.Name);
             properties.Add(FeatureTypeProperty, "link");
-            properties.Add("from_node", NodeURL(l.UpstreamNode));
-            properties.Add("to_node", NodeURL(l.DownstreamNode));
+            properties.Add("from_node", NodeURL((Node)l.UpstreamNode,l.Network));
+            properties.Add("to_node", NodeURL((Node)l.DownstreamNode, l.Network));
             properties.Add("length", l.Length);
 
             if (useSchematicLocation)
