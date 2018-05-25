@@ -696,7 +696,7 @@ namespace FlowMatters.Source.WebServer
                     if ((query.RecordingVariable.Length == 0) ||
                         (recordableItemDisplayString.IndexOf(query.RecordingVariable, StringComparison.Ordinal) >= 0))
                     {
-                        row.ElementRecorder.SetRecordingState(recordable.Key.TrueKey, recordable.KeyObject,state);
+                        row.ElementRecorder.SetRecordingState(recordable.Key, recordable.KeyObject,state);
                     }
                 }
             }
