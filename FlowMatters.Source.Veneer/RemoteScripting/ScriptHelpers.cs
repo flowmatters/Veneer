@@ -10,6 +10,8 @@ using FlowMatters.Source.WebServer;
 using IronPython.Modules;
 using IronPython.Runtime.Operations;
 using RiverSystem;
+using RiverSystem.Api;
+using RiverSystem.Assurance;
 using RiverSystem.Catchments.Models.ContaminantFilteringModels;
 using RiverSystem.Catchments;
 using RiverSystem.Catchments.Constituents;
@@ -274,5 +276,59 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
             SchematicNetworkConfigurationPersistent schematic = tmp as SchematicNetworkConfigurationPersistent;
             return schematic;
         }
+
+        public static void ConfigureAssuranceRule(RiverSystemScenario scenario, string level = "Off", string name=null, string category = null)
+        {
+            var config = scenario.GetScenarioConfiguration<AssuranceConfiguration>();
+            LogLevel logLevel;
+            if (!Enum.TryParse<LogLevel>(level, true, out logLevel))
+            {
+                throw new Exception("Unknown log level");
+            }
+
+            if (name == null)
+            {
+                scenario.Network.AssuranceManager.DefaultLogLevels.ForEachItem(ar =>
+                {
+                    ConfigureAssuranceRule(scenario,level,ar.Name,ar.Category);
+                });
+                return;
+            }
+
+            bool needToAdd = false;
+            AssuranceRule rule = GetAssuranceRule(name, category, config.Entries);
+
+            if (rule == null)
+            {
+                rule = GetAssuranceRule(name, category, scenario.Network.AssuranceManager.DefaultLogLevels);
+                needToAdd = true;
+            }
+            if (rule == null)
+            {
+                throw new Exception("Unknown assurance rule");
+            }
+            rule.LogLevel = logLevel;
+            if (needToAdd)
+            {
+                config.Entries.Add(rule);
+            }
+        }
+
+        private static AssuranceRule GetAssuranceRule(string name, string category,IEnumerable<AssuranceRule> config)
+        {
+            if (category == null)
+            {
+                return config.FirstOrDefault(r => r.Name == name);
+            }
+                return config.FirstOrDefault(r => (r.Name == name) && (r.Category == category));
+        }
+
+        //public static object FindProjectViewRow(RiverSystemScenario scenario, string path)
+        //{
+        //    var pathElements = path.split("/");
+        //    var pvt = scenario.ProjectViewTable();
+        //    //pvt.Where()
+        //    scenario.Network.FunctionManager.Variables.Wh
+        //}
     }
 }
