@@ -104,6 +104,7 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects
             properties.Add(FeatureTypeProperty, "link");
             properties.Add("from_node", NodeURL(l.UpstreamNode));
             properties.Add("to_node", NodeURL(l.DownstreamNode));
+            properties.Add("length", l.Length);
 
             if (useSchematicLocation)
             {

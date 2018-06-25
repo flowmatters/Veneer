@@ -30,6 +30,8 @@ namespace FlowMatters.Source.Veneer
 {
     class ScenarioInvoker
     {
+        const string RUN_NAME_KEY = "_RunName";
+
         //private ScenarioRunWindow runControl;
         private object lockObj = new object();
         //private bool running;
@@ -47,7 +49,7 @@ namespace FlowMatters.Source.Veneer
             }
         }
 
-        public void RunScenario(RunParameters parameters,bool showWindow)
+        public void RunScenario(RunParameters parameters, bool showWindow, ServerLogListener logger)
         {
             if (Scenario == null)
             {
@@ -55,15 +57,11 @@ namespace FlowMatters.Source.Veneer
                 return;
             }
 
-//            ProjectManager.Instance.SaveAuditLogMessage("Open run scenario window");
-//            Scenario.outputManager = new Obsolete.Recording.OutputManager();
-
             if(parameters!=null)
                 ApplyRunParameters(parameters);
 
             if (!IsRunnable()) throw new Exception("Scenario not runnable");
 
-            //                JobRunner.BeforeRun += new BeforeTemporalRunHandler(JobRunner_BeforeRun);
             Scenario.RunManager.UpdateEvent = new EventHandler<JobRunEventArgs>(JobRunner_Update);
 
             ScenarioRunWindow runWindow = null;
@@ -72,9 +70,6 @@ namespace FlowMatters.Source.Veneer
             if (showWindow)
             {
                 runWindow = new ScenarioRunWindow(Scenario);
-                //runWindow.SetOwner(this);
-                //runWindow.WindowStartupLocation = WindowStartupLocation.CenterOwner;
-                //Enabled = false;
                 runWindow.Show();
                 ProjectManager.Instance.SaveAuditLogMessage("Run started at " + DateTime.Now);
             }
@@ -87,36 +82,36 @@ namespace FlowMatters.Source.Veneer
                 Application.DoEvents();
             }
 
-//                LogRunEnd(startOfRun);
-
             if (showWindow)
             {
                 ProjectManager.Instance.SaveAuditLogMessage("Run finished at " + DateTime.Now + " and took " + TimeTools.TimeSpanString(DateTime.Now - startOfRun));
                 runWindow.Close();
                 runWindow.Dispose();
             }
-            //if so then run
-            //running = true;
 
-            //runControl = new ScenarioRunWindow(Scenario);
-            //runControl.SetOwner(MainForm.Instance);
-            //runControl.Show();
+            if(parameters.Params.ContainsKey(RUN_NAME_KEY))
+            {
+                try
+                {
+                    var latestRun = Scenario.Project.ResultManager.AllRuns().Last();
+                    var runName = parameters.Params[RUN_NAME_KEY];
+                    SetPrivateRunProperty(latestRun, "_runName", runName);
+                    SetPrivateRunProperty(latestRun, "_runFullName", runName);
+                }
+                catch
+                {
+                    // Ignore. Not supported in all versions of Source
+                    if (logger != null)
+                        logger(this, "Cannot set custom run name. Not supported by this version of Source");
+                }
+            }
+        }
 
-            //Scenario.RunManager.Execute();
-            //                lock (lockObj)
-            //                {
-            //while (running)
-            //{
-            //    Thread.Sleep(50);
-            //    Application.DoEvents();
-            //    //Monitor.Wait(lockObj);
-            //}
-            //                }
-
-            //runControl.Close();
-            //runControl.Dispose();
-
-//            ProjectManager.Instance.SaveAuditLogMessage("Close run scenario window");
+        private static void SetPrivateRunProperty(object run, string field, object value)
+        {
+            var mi = run.GetType().GetMember(field, BindingFlags.NonPublic | BindingFlags.Instance)[0];
+            var ri = ReflectedItem.NewItem(mi, run);
+            ri.itemValue = value;
         }
 
         //private void LogRunEnd(DateTime startOfRun)
@@ -136,9 +131,11 @@ namespace FlowMatters.Source.Veneer
 
         private void ApplyRunParameters(RunParameters parameters)
         {
+            HashSet<string> skipKeys = new HashSet<string>(new [] { RUN_NAME_KEY});
+
             RunningConfiguration configuration = Scenario.CurrentConfiguration;
             Type configType = configuration.GetType();
-            foreach (var entry in parameters.Params)
+            foreach (var entry in parameters.Params.Where(kvp=>!skipKeys.Contains(kvp.Key)))
             {
                 var ri = ReflectedItem.NewItem(entry.Key, configuration);
                 var val = entry.Value;
