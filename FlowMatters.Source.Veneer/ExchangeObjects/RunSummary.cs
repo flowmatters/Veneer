@@ -1,4 +1,9 @@
-﻿using System.Collections.Generic;
+﻿#if V3 || V4_0 || V4_1 || V4_2 || V4_3 || V4_4 || V4_5 || QldHydro
+#define BEFORE_RECORDING_ATTRIBUTES_REFACTOR
+#endif
+
+using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Runtime.Serialization;
@@ -26,25 +31,44 @@ namespace FlowMatters.Source.WebServer.ExchangeObjects
             List<TimeSeriesLink> result = new List<TimeSeriesLink>();
             foreach (ProjectViewRow row in rows)
             {
+#if BEFORE_RECORDING_ATTRIBUTES_REFACTOR
+                                Dictionary<AttributeRecordingState, TimeSeries> rowResults = row.ElementRecorder.GetResultList();
+#else
                 var rowResults = row.ElementRecorder.GetResultsLookup();
+#endif
+                //try
+                //{
                 foreach (var key in rowResults.Keys)
                 {
                     TimeSeries ts = rowResults[key];
-                    if(ts != null)
+                    if (ts != null)
                         result.Add(BuildLink(ts, row, key, Number));
                 }
+                //}
+                //catch (ArgumentNullException) { }
             }
 
             return result.ToArray();
         }
 
+#if BEFORE_RECORDING_ATTRIBUTES_REFACTOR
+        private static string SelectRecordingVariable(AttributeRecordingState key, ProjectViewRow row)
+        {
+            return (key.KeyString == "") ? row.ElementName : key.KeyString;
+        }
+#else
         private static string SelectRecordingVariable(RecordableItem key, ProjectViewRow row)
         {
             var recordableItemDisplayString = RecordableItemTransitionUtil.GetLegacyKeyString(key);
             return (recordableItemDisplayString == "") ? row.ElementName : recordableItemDisplayString;
         }
+#endif
 
+#if BEFORE_RECORDING_ATTRIBUTES_REFACTOR
+        public static TimeSeriesLink BuildLink(TimeSeries ts, ProjectViewRow row, AttributeRecordingState key, int runNumber)
+#else
         public static TimeSeriesLink BuildLink(TimeSeries ts, ProjectViewRow row, RecordableItem key, int runNumber)
+#endif
         {
             var result = new TimeSeriesLink
             {
@@ -63,7 +87,11 @@ namespace FlowMatters.Source.WebServer.ExchangeObjects
             return result;
         }
 
+#if BEFORE_RECORDING_ATTRIBUTES_REFACTOR
+        public static string BuildTimeSeriesUrl(ProjectViewRow row, AttributeRecordingState key, int runNumber)
+#else
         public static string BuildTimeSeriesUrl(ProjectViewRow row, RecordableItem key, int runNumber)
+#endif
         {
             string networkElementSuffix = "";
             if (row.NetworkElementTypeInstance == ProjectViewRow.NetworkElementType.Catchment)

@@ -95,7 +95,12 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
             }
 
             Type t = target.GetType();
-            var member = t.GetMember(element, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)[0];
+            var members = t.GetMember(element, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            if (members.Length == 0)
+            {
+                throw new Exception("No type member found");
+            }
+            var member = members[0];
             return ReflectedItem.NewItem(member, target);
         }
 
