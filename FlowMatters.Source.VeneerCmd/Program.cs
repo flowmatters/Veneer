@@ -11,7 +11,6 @@ using RiverSystem.ApplicationLayer.Consumers;
 using RiverSystem.ApplicationLayer.Creation;
 using RiverSystem.PluginManager;
 using CommandLine;
-using CommandLine.Text;
 using FlowMatters.Source.WebServer;
 using RiverSystem.ApplicationLayer;
 using RiverSystem.ApplicationLayer.Interfaces;
@@ -39,7 +38,7 @@ namespace FlowMatters.Source.VeneerCmd
 
             //            CopyDLLs();
             var options = new Options();
-            if (CommandLineParser.Default.ParseArguments(args, options))
+            if (CommandLine.Parser.Default.ParseArguments(args, options))
             {
                 try
                 {
@@ -248,23 +247,23 @@ namespace FlowMatters.Source.VeneerCmd
 
     public class Options
     {
-        [Option("p","port",DefaultValue = (uint)SourceRESTfulService.DEFAULT_PORT,HelpText= "Port for Veneer server")]
+        [Option('p',"port",DefaultValue = (uint)SourceRESTfulService.DEFAULT_PORT,HelpText= "Port for Veneer server")]
         public uint Port { get; set; }
 
-        [Option("r", "remote-access",HelpText ="Allow access from other computers", DefaultValue= false)]
+        [Option('r', "remote-access",HelpText ="Allow access from other computers", DefaultValue= false)]
         public bool RemoteAccess { get; set; }
 
-        [Option("s","allow-scripts",HelpText = "Allow submission of Iron Python scripts",DefaultValue = false)]
+        [Option('s',"allow-scripts",HelpText = "Allow submission of Iron Python scripts",DefaultValue = false)]
         public bool AllowScripts { get; set; }
 
-        [Option("b", "backup-rsproj", HelpText = "Backup .rsproj file", DefaultValue = false)]
+        [Option('b', "backup-rsproj", HelpText = "Backup .rsproj file", DefaultValue = false)]
         public bool BackupRSPROJ { get; set; }
 
-        [Option("a", "available-models", HelpText = "List available models (scenarios) then exit", DefaultValue = false)]
+        [Option('a', "available-models", HelpText = "List available models (scenarios) then exit", DefaultValue = false)]
         public bool AvailableScenarios { get; set; }
 
 
-        [Option("m", "model", HelpText = "Model (scenario) to use", DefaultValue = null)]
+        [Option('m', "model", HelpText = "Model (scenario) to use", DefaultValue = null)]
         public string ScenarioToLoad { get; set; }
 
         [ValueList(typeof(List<string>), MaximumElements = 1)]
