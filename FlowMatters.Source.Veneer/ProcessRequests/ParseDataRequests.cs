@@ -28,9 +28,9 @@ namespace FlowMatters.Source.WebServer.ProcessRequests
 
             var latestRun = Scenario.Project.ResultManager.AllRuns().Last();
             var rows = latestRun.RunParameters.Where(x => (x.NetworkElementName == networkElement) && (x.ElementName == property)).ToArray();
-            var results = rows[0].ElementRecorder.GetResultList();
+            var results = rows[0].ElementRecorder.GetResultsLookup();
 
-            var matchingKey = (parameter=="")?null:results.Keys.FirstOrDefault(k => k.KeyString.Contains(parameter));
+            var matchingKey = (parameter=="")?null:results.Keys.FirstOrDefault(k => RecordableItemTransitionUtil.GetLegacyKeyString(k).Contains(parameter));
 
             return (matchingKey==null)?null:results[matchingKey];
         }

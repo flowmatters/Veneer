@@ -117,6 +117,9 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects
         [DataMember]
         public string RecordingVariable;
 
+        [DataMember]
+        public string FunctionalUnit;
+
         public TimeSeriesFullSummary(TimeSeriesLink link, TimeSeries source) : base(source)
         {
             RunNumber = link.RunNumber;
@@ -124,6 +127,7 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects
             NetworkElement = link.NetworkElement;
             RecordingElement = link.RecordingElement;
             RecordingVariable = link.RecordingVariable;
+            FunctionalUnit = link.FunctionalUnit;
         }
 
         public TimeSeriesFullSummary(TimeSeriesReponseMeta source) : base(source)
@@ -136,6 +140,7 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects
                 NetworkElement = full.NetworkElement;
                 RecordingElement = full.RecordingElement;
                 RecordingVariable = full.RecordingVariable;
+                FunctionalUnit = full.FunctionalUnit;
             }
         }
     }
