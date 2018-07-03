@@ -148,7 +148,7 @@ namespace FlowMatters.Source.VeneerCmd
                 }
                 else
                 {
-                    scenario = allScenarios.FirstOrDefault(s => s.ScenarioName == options.ScenarioToLoad);
+                    scenario = Enumerable.FirstOrDefault(allScenarios, s => s.ScenarioName == options.ScenarioToLoad);
                 }
             }
             return scenario.riverSystemScenario;
