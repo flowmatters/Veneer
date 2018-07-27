@@ -55,7 +55,7 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
 
                 if (ProjectHandler == null)
                 {
-                    ProjectHandler = ProjectManager.Instance.ProjectHandler;
+                    ProjectHandler = ProjectManager.Instance?.ProjectHandler;
                 }
                 scope.SetVariable("project_handler", ProjectHandler);
                 var sourceCode = engine.CreateScriptSourceFromString(script.Script);
