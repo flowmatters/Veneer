@@ -1,4 +1,8 @@
-﻿using System;
+﻿#if V3 || V4_0 || V4_1 || V4_2 || V4_3 || V4_4 || V4_5 || QldHydro
+#define BEFORE_RECORDING_ATTRIBUTES_REFACTOR
+#endif
+
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data;
@@ -687,18 +691,29 @@ namespace FlowMatters.Source.WebServer
             var state = record ? RecordingStates.RecordAll : RecordingStates.RecordNone;
             foreach (var row in rows)
             {
+#if BEFORE_RECORDING_ATTRIBUTES_REFACTOR
+                foreach (var recordable in row.ElementRecorder.RecordableAttributes)
+                {
+                    if ((query.RecordingVariable.Length == 0) ||
+                        (recordable.FullKeyString.IndexOf(query.RecordingVariable, StringComparison.Ordinal) >= 0))
+                    {
+                        row.ElementRecorder.SetRecordingState(recordable.KeyString, recordable.KeyObject, state);
+                    }
+
+                }
+#else
                 foreach (var recordable in row.ElementRecorder.RecordableItems)
                 {
-
                     var recordableItemDisplayString =
                         RecordableItemTransitionUtil.GetLegacyKeyString(recordable);
-
                     if ((query.RecordingVariable.Length == 0) ||
                         (recordableItemDisplayString.IndexOf(query.RecordingVariable, StringComparison.Ordinal) >= 0))
                     {
-                        row.ElementRecorder.SetRecordingState(recordable.Key, recordable.KeyObject,state);
+                        row.ElementRecorder.SetRecordingState(recordable.Key, recordable.KeyObject, state);
                     }
+
                 }
+#endif
             }
         }
 
@@ -742,7 +757,11 @@ namespace FlowMatters.Source.WebServer
             {
                 var row = entry.Item2;
                 var runNumber = entry.Item1;
-                result.AddRange(row.ElementRecorder.GetResultsLookup().Where(er=>MatchesVariable(row,er,variable)).Select(
+#if BEFORE_RECORDING_ATTRIBUTES_REFACTOR
+                result.AddRange(row.ElementRecorder.GetResultList().Where(er=>MatchesVariable(row,er,variable)).Select(
+#else
+                result.AddRange(row.ElementRecorder.GetResultsLookup().Where(er => MatchesVariable(row, er, variable)).Select(
+#endif
                     er =>
                     {
                         return new Tuple<TimeSeriesLink, TimeSeries>(RunSummary.BuildLink(er.Value,row,er.Key,runNumber),er.Value);
@@ -754,14 +773,23 @@ namespace FlowMatters.Source.WebServer
             //    ((er.Key.KeyString=="")&&(row.ElementName==variable))).Value;            
         }
 
+#if BEFORE_RECORDING_ATTRIBUTES_REFACTOR
+        private bool MatchesVariable(ProjectViewRow row, KeyValuePair<AttributeRecordingState, TimeSeries> er, string variable)
+#else
         private bool MatchesVariable(ProjectViewRow row, KeyValuePair<RecordableItem, TimeSeries> er, string variable)
+#endif
         {
-            if(variable == UriTemplates.MatchAll) return true;
+            if (variable == UriTemplates.MatchAll) return true;
 
+#if BEFORE_RECORDING_ATTRIBUTES_REFACTOR
+            return (URLSafeString(er.Key.KeyString) == URLSafeString(variable)) ||
+                ((er.Key.KeyString == "") && (row.ElementName == variable));
+#else
             var recordableItemDisplayName = RecordableItemTransitionUtil.GetLegacyKeyString(er.Key);
 
             return (URLSafeString(recordableItemDisplayName) == URLSafeString(variable)) ||
-                ((recordableItemDisplayName == "") && (row.ElementName == variable));
+                    ((recordableItemDisplayName == "") && (row.ElementName == variable));
+#endif
         }
 
         private SimpleTimeSeries TimeSeriesNotFound()

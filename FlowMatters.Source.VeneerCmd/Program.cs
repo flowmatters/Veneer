@@ -11,7 +11,6 @@ using RiverSystem.ApplicationLayer.Consumers;
 using RiverSystem.ApplicationLayer.Creation;
 using RiverSystem.PluginManager;
 using CommandLine;
-using CommandLine.Text;
 using FlowMatters.Source.WebServer;
 using RiverSystem.ApplicationLayer;
 using RiverSystem.ApplicationLayer.Interfaces;
@@ -260,19 +259,11 @@ namespace FlowMatters.Source.VeneerCmd
         [Option('b', "backup-rsproj", HelpText = "Backup .rsproj file", DefaultValue = false)]
         public bool BackupRSPROJ { get; set; }
 
-        //#if GBRSource
-        //        [Option('a', "available-scenarios", HelpText = "List available scenarios then exit", DefaultValue = false)]
-        //#else
         [Option('a', "available-models", HelpText = "List available models (scenarios) then exit", DefaultValue = false)]
-        //#endif
         public bool AvailableScenarios { get; set; }
 
 
-        //#if GBRSource
-        //        [Option('s', "scenario", HelpText = "Scenario to use", DefaultValue = null)]
-        //#else
         [Option('m', "model", HelpText = "Model (scenario) to use", DefaultValue = null)]
-        //#endif
         public string ScenarioToLoad { get; set; }
 
         [ValueList(typeof(List<string>), MaximumElements = 1)]
