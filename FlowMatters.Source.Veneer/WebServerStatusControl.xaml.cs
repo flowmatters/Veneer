@@ -112,11 +112,14 @@ namespace FlowMatters.Source.WebServerPanel
             if (_scenario != null)
             {
                 string projectFolder = _scenario.Project.FileDirectory;
-                foreach (string reportFn in Directory.EnumerateFiles(projectFolder, "*.htm*", SearchOption.TopDirectoryOnly))
+                if (projectFolder != null)
                 {
-                    string fn = reportFn.Replace(projectFolder + "\\", "");
-                    ToolStripItem item = reportMenu.DropDownItems.Add(NiceName(fn));
-                    item.Click += (eventSender, eventArgs) => Launch(fn);
+                    foreach (string reportFn in Directory.EnumerateFiles(projectFolder, "*.htm*", SearchOption.TopDirectoryOnly))
+                    {
+                        string fn = reportFn.Replace(projectFolder + "\\", "");
+                        ToolStripItem item = reportMenu.DropDownItems.Add(NiceName(fn));
+                        item.Click += (eventSender, eventArgs) => Launch(fn);
+                    }
                 }
             }
             ToolStripItem veneer = reportMenu.DropDownItems.Add("");
