@@ -208,13 +208,15 @@ namespace FlowMatters.Source.VeneerCmd
             }
 #else
             var manager = PluginManager.Instance;
+#endif
+
             foreach (string plugin in additionalPlugins)
             {
-                Console.Write("Loading from command line {0}... ",plugin);
+                Console.Write("Loading from command line {0}... ", plugin);
                 var result = manager.InstallPlugin(plugin, false, false);
-                Console.WriteLine(result.Status.ToString());
+                Console.WriteLine(result.Status.IsLoaded?"Loaded":result.Status.ErrorMsg);
             }
-#endif
+
             foreach (var plugin in manager.ActivePlugins)
             {
                 Show(String.Format("Loaded {0}",plugin.Path));               
