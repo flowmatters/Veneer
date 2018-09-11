@@ -1,4 +1,4 @@
-﻿#if V3 || V4_0 || V4_1 || V4_2 || V4_3 || V4_4 || V4_5 || QldHydro
+﻿#if V3 || V4_0 || V4_1 || V4_2 || V4_3 || V4_4 || V4_5
 #define BEFORE_RECORDING_ATTRIBUTES_REFACTOR
 #endif
 
