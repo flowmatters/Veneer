@@ -55,7 +55,7 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
 
                 if (ProjectHandler == null)
                 {
-                    ProjectHandler = ProjectManager.Instance.ProjectHandler;
+                    ProjectHandler = ProjectManager.Instance?.ProjectHandler;
                 }
                 scope.SetVariable("project_handler", ProjectHandler);
                 var sourceCode = engine.CreateScriptSourceFromString(script.Script);
@@ -79,7 +79,7 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
 
         private static void AddAssemblyReferences(ScriptEngine engine)
         {
-#if V3 || V4_0 || V4_1 || V4_2_0 || GBRSource
+#if V3 || V4_0 || V4_1 || V4_2_0
             List<string> ignoreList = new List<string>(Finder.DllsThatAreIrrelevantToFinder);
             List<string> myList = new List<string>
             {

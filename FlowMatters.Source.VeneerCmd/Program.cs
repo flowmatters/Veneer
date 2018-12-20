@@ -11,11 +11,11 @@ using RiverSystem.ApplicationLayer.Consumers;
 using RiverSystem.ApplicationLayer.Creation;
 using RiverSystem.PluginManager;
 using CommandLine;
-using CommandLine.Text;
 using FlowMatters.Source.WebServer;
 using RiverSystem.ApplicationLayer;
 using RiverSystem.ApplicationLayer.Interfaces;
 using RiverSystem.ApplicationLayer.Persistence.ZipContainer;
+using RiverSystem.ManagedExtensions;
 using TIME.DataTypes;
 
 namespace FlowMatters.Source.VeneerCmd
@@ -71,7 +71,7 @@ namespace FlowMatters.Source.VeneerCmd
         {
 // consume Options instance properties
             var fn = (options.ProjectFiles.Count>0)?options.ProjectFiles[0]:null;
-            LoadPlugins();
+            LoadPlugins(options.PluginsToLoad);
 
             RiverSystemScenario scenario;
             if (fn == null)
@@ -148,7 +148,7 @@ namespace FlowMatters.Source.VeneerCmd
                 }
                 else
                 {
-                    scenario = allScenarios.FirstOrDefault(s => s.ScenarioName == options.ScenarioToLoad);
+                    scenario = Enumerable.FirstOrDefault(allScenarios, s => s.ScenarioName == options.ScenarioToLoad);
                 }
             }
             return scenario.riverSystemScenario;
@@ -179,8 +179,14 @@ namespace FlowMatters.Source.VeneerCmd
         const int MAX_PLUGIN_LOAD_ATTEMPTS = 120;
         const int INCREMENT_PLUGIN_LOADING_DELAY = 10;
 
-        private static void LoadPlugins()
+        private static void LoadPlugins(string pluginsToLoad)
         {
+            string[] additionalPlugins = {};
+
+            if (pluginsToLoad != null)
+            {
+                additionalPlugins = pluginsToLoad.Split(',');
+            }
             Show("Loading plugins");
 
 #if V3 || V4_0 || V4_1 || V4_2 || V4_3_0
@@ -203,6 +209,14 @@ namespace FlowMatters.Source.VeneerCmd
 #else
             var manager = PluginManager.Instance;
 #endif
+
+            foreach (string plugin in additionalPlugins)
+            {
+                Console.Write("Loading from command line {0}... ", plugin);
+                var result = manager.InstallPlugin(plugin, false, false);
+                Console.WriteLine(result.Status.IsLoaded?"Loaded":result.Status.ErrorMsg);
+            }
+
             foreach (var plugin in manager.ActivePlugins)
             {
                 Show(String.Format("Loaded {0}",plugin.Path));               
@@ -260,20 +274,14 @@ namespace FlowMatters.Source.VeneerCmd
         [Option('b', "backup-rsproj", HelpText = "Backup .rsproj file", DefaultValue = false)]
         public bool BackupRSPROJ { get; set; }
 
-        //#if GBRSource
-        //        [Option('a', "available-scenarios", HelpText = "List available scenarios then exit", DefaultValue = false)]
-        //#else
         [Option('a', "available-models", HelpText = "List available models (scenarios) then exit", DefaultValue = false)]
-        //#endif
         public bool AvailableScenarios { get; set; }
 
-
-        //#if GBRSource
-        //        [Option('s', "scenario", HelpText = "Scenario to use", DefaultValue = null)]
-        //#else
         [Option('m', "model", HelpText = "Model (scenario) to use", DefaultValue = null)]
-        //#endif
         public string ScenarioToLoad { get; set; }
+
+        [Option('l',"load-plugin",HelpText = "Load plugins in addition to configured plugins",DefaultValue =null)]
+        public string PluginsToLoad { get; set; }
 
         [ValueList(typeof(List<string>), MaximumElements = 1)]
         public IList<string> ProjectFiles { get; set; }
