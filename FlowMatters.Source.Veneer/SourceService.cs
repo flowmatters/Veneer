@@ -579,6 +579,21 @@ namespace FlowMatters.Source.WebServer
         }
 
         [OperationContract]
+        [WebInvoke(Method = "DELETE", UriTemplate = UriTemplates.DataSourceGroup, ResponseFormat = WebMessageFormat.Json
+         )]
+        public void DeleteDataSource(string dataSourceGroup)
+        {
+            var dm = Scenario.Network.DataManager;
+            var existing = dm.DataGroups.FirstOrDefault(ds => ds.Name == dataSourceGroup);
+            if (existing == null)
+            {
+                ResourceNotFound();
+                return;
+            }
+            dm.RemoveGroup(existing);
+        }
+
+        [OperationContract]
         [WebInvoke(Method = "GET", UriTemplate = UriTemplates.DataGroupItem, ResponseFormat = WebMessageFormat.Json)]
         public SimpleDataItem GetDataGroupItem(string dataSourceGroup,string inputSet)
         {
