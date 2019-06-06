@@ -682,6 +682,25 @@ namespace FlowMatters.Source.WebServer
             return ModelTabulator.Functions[table](Scenario);
         }
 
+        [OperationContract]
+        [WebInvoke(Method = "GET", UriTemplate = UriTemplates.Configuration, ResponseFormat = WebMessageFormat.Json)]
+        public string[] GetConfiguration(string element)
+        {
+            var table = Scenario.ProjectViewTable();
+            element = element.ToLower();
+            if (element == "networkelement")
+            {
+                return table.Select(row => row.NetworkElementName).ToHashSet().ToArray();
+            }
+
+            if (element == "recordingelement")
+            {
+                return table.Select(row => row.ElementName).ToHashSet().ToArray();
+            }
+
+            return new string[0];
+        }
+
         private void SwitchRecording(TimeSeriesLink query, bool record)
         {
             Dictionary<ProjectViewRow.RecorderFields, object> constraint = new Dictionary<ProjectViewRow.RecorderFields, object>();
