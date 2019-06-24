@@ -18,7 +18,7 @@
     <WarningLevel>4</WarningLevel>
     <Prefer32Bit>false</Prefer32Bit>
     <LangVersion>6</LangVersion>
-    <RootPath>$(MSBuildThisFileDirectory)..\..\</RootPath>
+    <RootPath>..\..\</RootPath>
     <ReferencePath>$(RootPath)Output;$(RootPath)3rdParty;..\References;..\References\Plugins</ReferencePath>
     <OutputPath>$(RootPath)Output\Plugins\CommunityPlugins</OutputPath>
   </PropertyGroup>
@@ -160,5 +160,4 @@
   <Target Name="AfterBuild">
   </Target>
   -->
-  <Import Project="$(RootPath)RiverSystem\Solutions\NormalisePdbBuildRoot.targets" />
 </Project>
