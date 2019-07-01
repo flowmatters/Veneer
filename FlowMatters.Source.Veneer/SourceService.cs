@@ -579,6 +579,21 @@ namespace FlowMatters.Source.WebServer
         }
 
         [OperationContract]
+        [WebInvoke(Method = "DELETE", UriTemplate = UriTemplates.DataSourceGroup, ResponseFormat = WebMessageFormat.Json
+         )]
+        public void DeleteDataSource(string dataSourceGroup)
+        {
+            var dm = Scenario.Network.DataManager;
+            var existing = dm.DataGroups.FirstOrDefault(ds => ds.Name == dataSourceGroup);
+            if (existing == null)
+            {
+                ResourceNotFound();
+                return;
+            }
+            dm.RemoveGroup(existing);
+        }
+
+        [OperationContract]
         [WebInvoke(Method = "GET", UriTemplate = UriTemplates.DataGroupItem, ResponseFormat = WebMessageFormat.Json)]
         public SimpleDataItem GetDataGroupItem(string dataSourceGroup,string inputSet)
         {
@@ -665,6 +680,25 @@ namespace FlowMatters.Source.WebServer
                 return null;
             }
             return ModelTabulator.Functions[table](Scenario);
+        }
+
+        [OperationContract]
+        [WebInvoke(Method = "GET", UriTemplate = UriTemplates.Configuration, ResponseFormat = WebMessageFormat.Json)]
+        public string[] GetConfiguration(string element)
+        {
+            var table = Scenario.ProjectViewTable();
+            element = element.ToLower();
+            if (element == "networkelement")
+            {
+                return table.Select(row => row.NetworkElementName).ToHashSet().ToArray();
+            }
+
+            if (element == "recordingelement")
+            {
+                return table.Select(row => row.ElementName).ToHashSet().ToArray();
+            }
+
+            return new string[0];
         }
 
         private void SwitchRecording(TimeSeriesLink query, bool record)

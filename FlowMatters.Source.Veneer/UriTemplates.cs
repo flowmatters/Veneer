@@ -61,6 +61,8 @@ namespace FlowMatters.Source.WebServer
 
         public const string ScenarioTables = "/tables/{table}";
 
+        public const string Configuration = "/configuration/{element}";
+
         public const string MatchAll = "__all__";
 
         public const string NETWORK_ELEMENT_FU_DELIMITER = "@@";
