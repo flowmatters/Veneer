@@ -6,24 +6,24 @@
     <title>Veneer</title>
     <authors>Joel Rahman</authors>
     <owners>Joel Rahman</owners>
-	<iconUrl>https://wiki.ewater.org.au/download/attachments/25362606/plugins-icon.png</iconUrl>
+    <iconUrl>https://wiki.ewater.org.au/download/attachments/25362606/plugins-icon.png</iconUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>Veneer is a system for linking eWater Source to other applications, including web browsers, scripting tools and other graphical user interface based tools.</description>
     <copyright></copyright>
-	<tags></tags>
+    <tags></tags>
     <dependencies />
   </metadata>
   <files>
     <file src="..\Output\Plugins\CommunityPlugins\FlowMatters.Source.Veneer.dll" target="lib\FlowMatters.Source.Veneer.dll" />
     <file src="..\Output\Plugins\CommunityPlugins\IronPython.dll" target="lib\IronPython.dll" />
     <file src="..\Output\Plugins\CommunityPlugins\IronPython.Modules.dll" target="lib\IronPython.Modules.dll" />
-	<file src="..\Output\Plugins\CommunityPlugins\IronPython.SQLite.dll" target="lib\IronPython.SQLite.dll" />
-	<file src="..\Output\Plugins\CommunityPlugins\IronPython.Wpf.dll" target="lib\IronPython.Wpf.dll" />
-	<file src="..\Output\Plugins\CommunityPlugins\Microsoft.Scripting.dll" target="lib\Microsoft.Scripting.dll" />
-	<file src="..\Output\Plugins\CommunityPlugins\Microsoft.Scripting.Metadata.dll" target="lib\Microsoft.Scripting.Metadata.dll" />
-	<file src="..\Output\Plugins\CommunityPlugins\Microsoft.Scripting.AspNet.dll" target="lib\Microsoft.Scripting.AspNet.dll" />
-	
-	<file src="..\Output\Plugins\CommunityPlugins\FlowMatters.Source.VeneerCmd.exe" target="lib\FlowMatters.Source.VeneerCmd.exe" />
-	<file src="..\Output\Plugins\CommunityPlugins\CommandLine.dll" target="lib\CommandLine.dll" />
+    <file src="..\Output\Plugins\CommunityPlugins\IronPython.SQLite.dll" target="lib\IronPython.SQLite.dll" />
+    <file src="..\Output\Plugins\CommunityPlugins\IronPython.Wpf.dll" target="lib\IronPython.Wpf.dll" />
+    <file src="..\Output\Plugins\CommunityPlugins\Microsoft.Dynamic.dll" target="lib\Microsoft.Dynamic.dll" />
+    <file src="..\Output\Plugins\CommunityPlugins\Microsoft.Scripting.dll" target="lib\Microsoft.Scripting.dll" />
+    <file src="..\Output\Plugins\CommunityPlugins\Microsoft.Scripting.Metadata.dll" target="lib\Microsoft.Scripting.Metadata.dll" />
+    <file src="..\Output\Plugins\CommunityPlugins\Microsoft.Scripting.AspNet.dll" target="lib\Microsoft.Scripting.AspNet.dll" />
+    <file src="..\Output\Plugins\CommunityPlugins\FlowMatters.Source.VeneerCmd.exe" target="lib\FlowMatters.Source.VeneerCmd.exe" />
+    <file src="..\Output\Plugins\CommunityPlugins\CommandLine.dll" target="lib\CommandLine.dll" />
   </files>
 </package>
