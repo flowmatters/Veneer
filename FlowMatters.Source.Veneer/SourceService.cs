@@ -210,7 +210,10 @@ namespace FlowMatters.Source.WebServer
                 TIME.Management.Log.MessageRecieved -= runLogger;
             }
 
-            RunLogs[Scenario.Project.ResultManager.AllRuns().Last().RunNumber] = messages.ToArray();
+            var allRuns = Scenario.Project.ResultManager.AllRuns();
+            var last = allRuns.Last();
+
+            RunLogs[last.RunNumber] = messages.ToArray();
             Run r = RunsForId("latest")[0];
 
             WebOperationContext.Current.OutgoingResponse.StatusCode = HttpStatusCode.Redirect;
@@ -240,8 +243,18 @@ namespace FlowMatters.Source.WebServer
 //                var idx = int.Parse(runId) - 1;
 //                log = RunLogs[idx];
             }
-            log = RunLogs[run.RunNumber];
-
+            if (RunLogs.ContainsKey(run.RunNumber))
+            {
+                log = RunLogs[run.RunNumber];
+            }
+            else
+            {
+                log = new []
+                {
+                    "Run log not available",
+                    "Run log only available through Veneer for runs triggered in Veneer"
+                };
+            }
 
             Log("Requested " + msg);
 
