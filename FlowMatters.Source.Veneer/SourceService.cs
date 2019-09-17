@@ -633,16 +633,24 @@ namespace FlowMatters.Source.WebServer
             List<SimpleDataDetails> result = new List<SimpleDataDetails>();
             foreach (var item in grp.Items)
             {
-                var tmp = item.Details.FirstOrDefault(d =>
+                var matchingItem = item.Details.FirstOrDefault(d =>
                 {
                     var safeName = URLSafeString(d.Name);
-                    return safeName == name || Regex.IsMatch(safeName, name);
+                    return safeName == name;
                 });
-                if (tmp != null)
+                if (matchingItem == null)
                 {
-                    tmp.Name = item.Name + "/" + tmp.Name;
-                    tmp.Expand();
-                    result.Add(tmp);
+                    matchingItem = item.Details.FirstOrDefault(d =>
+                    {
+                        var safeName = URLSafeString(d.Name);
+                        return Regex.IsMatch(safeName, name);
+                    });
+                }
+                if (matchingItem != null)
+                {
+                    matchingItem.Name = item.Name + "/" + matchingItem.Name;
+                    matchingItem.Expand();
+                    result.Add(matchingItem);
                 }
             }
 
