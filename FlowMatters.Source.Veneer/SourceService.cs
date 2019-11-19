@@ -210,7 +210,10 @@ namespace FlowMatters.Source.WebServer
                 TIME.Management.Log.MessageRecieved -= runLogger;
             }
 
-            RunLogs[Scenario.Project.ResultManager.AllRuns().Last().RunNumber] = messages.ToArray();
+            var allRuns = Scenario.Project.ResultManager.AllRuns();
+            var last = allRuns.Last();
+
+            RunLogs[last.RunNumber] = messages.ToArray();
             Run r = RunsForId("latest")[0];
 
             WebOperationContext.Current.OutgoingResponse.StatusCode = HttpStatusCode.Redirect;
@@ -240,8 +243,18 @@ namespace FlowMatters.Source.WebServer
 //                var idx = int.Parse(runId) - 1;
 //                log = RunLogs[idx];
             }
-            log = RunLogs[run.RunNumber];
-
+            if (RunLogs.ContainsKey(run.RunNumber))
+            {
+                log = RunLogs[run.RunNumber];
+            }
+            else
+            {
+                log = new []
+                {
+                    "Run log not available",
+                    "Run log only available through Veneer for runs triggered in Veneer"
+                };
+            }
 
             Log("Requested " + msg);
 
@@ -620,16 +633,24 @@ namespace FlowMatters.Source.WebServer
             List<SimpleDataDetails> result = new List<SimpleDataDetails>();
             foreach (var item in grp.Items)
             {
-                var tmp = item.Details.FirstOrDefault(d =>
+                var matchingItem = item.Details.FirstOrDefault(d =>
                 {
                     var safeName = URLSafeString(d.Name);
-                    return safeName == name || Regex.IsMatch(safeName, name);
+                    return safeName == name;
                 });
-                if (tmp != null)
+                if (matchingItem == null)
                 {
-                    tmp.Name = item.Name + "/" + tmp.Name;
-                    tmp.Expand();
-                    result.Add(tmp);
+                    matchingItem = item.Details.FirstOrDefault(d =>
+                    {
+                        var safeName = URLSafeString(d.Name);
+                        return Regex.IsMatch(safeName, name);
+                    });
+                }
+                if (matchingItem != null)
+                {
+                    matchingItem.Name = item.Name + "/" + matchingItem.Name;
+                    matchingItem.Expand();
+                    result.Add(matchingItem);
                 }
             }
 
