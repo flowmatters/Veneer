@@ -21,7 +21,7 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects
         {
             List<GeoJSONFeature> featureList = new List<GeoJSONFeature>();
             GEORegions geometry = (GEORegions) coverage[0].geometry;
-            for (int i = 0; i < geometry.count(); i++)
+            for (int i = 0; i < geometry.Count; i++)
             {
                 var geoRegion = geometry.item(i);
                 Dictionary<string, object> values = new Dictionary<string, object>();

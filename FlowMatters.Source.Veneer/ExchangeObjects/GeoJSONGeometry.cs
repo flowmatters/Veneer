@@ -1,4 +1,9 @@
-﻿using System.Collections.Generic;
+﻿#if V3 || V4_0 || V4_1 || V4_2_0 || V4_2_1 || V4_2_2 || V4_2_3 
+#define BeforeCaseRefactor
+#endif
+
+using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Runtime.Serialization;
@@ -11,6 +16,22 @@ namespace FlowMatters.Source.WebServer
     [DataContract]
     public class GeoJSONGeometry
     {
+        public static double RoundCoordinate(double v,int dp=-1)
+        {
+            if (dp < 0)
+            {
+                if (Math.Abs(v) > 1000.0)
+                {
+                    dp = 0;
+                }
+                else
+                {
+                    dp = 4;
+                }
+            }
+            return Math.Round(v, dp);
+        }
+
         [DataMember]
         public string type { get; set; }
 
@@ -80,21 +101,41 @@ namespace FlowMatters.Source.WebServer
             type = GeoJSONGeometryType.MultiPolygon;
             
             List<double[][][]> coordTemp = new List<double[][][]>();
+#if BeforeCaseRefactor
             for(int i = 0; i < region.count(); i++)
+#else
+            for (int i = 0; i < region.Count; i++)
+#endif
                 coordTemp.Add(GeoJSONPolygon(region.item(i)));
             coordinates = coordTemp.ToArray();
         }
 
         private static double[] GeoJSONPoint(Coordinate c)
         {
-            return new[] {c.E,c.N};
+            return new[] { RoundCoordinate(c.E), RoundCoordinate(c.N)};
         }
 
         private static double[][] GeoJSONLineString(PolyLine line)
         {
             var coords = new List<double[]>();
-            for (int i = 0; i < line.count(); i++)
-                coords.Add(GeoJSONPoint(line.item(i)));
+            double[] last = null;
+#if BeforeCaseRefactor
+            int nPoints = line.count();
+#else
+            int nPoints = line.Count;
+#endif
+            for (int i = 0; i < nPoints; i++)
+            {
+                var newPoint = GeoJSONPoint(line.item(i));
+                if ((nPoints==2)||
+                    (last == null)||
+                    (last[0] != newPoint[0])||
+                    (last[1] != newPoint[1]))
+                {
+                    coords.Add(newPoint);
+                }
+                last = newPoint;
+            }
             return coords.ToArray();
         }
     }
@@ -104,7 +145,11 @@ namespace FlowMatters.Source.WebServer
         public static PolyLine Reverse(this PolyLine original)
         {
             List<Coordinate> points = new List<Coordinate>();
+#if BeforeCaseRefactor
             for(int i = 0; i < original.count(); i++)
+#else
+            for (int i = 0; i < original.Count; i++)
+#endif
                 points.Add(original.item(i));
             points.Reverse();
             PolyLine result = new PolyLine();

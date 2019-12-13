@@ -11,11 +11,11 @@ using RiverSystem.ApplicationLayer.Consumers;
 using RiverSystem.ApplicationLayer.Creation;
 using RiverSystem.PluginManager;
 using CommandLine;
-using CommandLine.Text;
 using FlowMatters.Source.WebServer;
 using RiverSystem.ApplicationLayer;
 using RiverSystem.ApplicationLayer.Interfaces;
 using RiverSystem.ApplicationLayer.Persistence.ZipContainer;
+using RiverSystem.ManagedExtensions;
 using TIME.DataTypes;
 
 namespace FlowMatters.Source.VeneerCmd
@@ -41,20 +41,17 @@ namespace FlowMatters.Source.VeneerCmd
             var options = new Options();
             if (CommandLine.Parser.Default.ParseArguments(args, options))
             {
-                if (options.ProjectFiles.Count > 0)
+                try
                 {
-                    try
-                    {
-                        RunWithOptions(options);
-                    }
-                    catch (Exception e)
-                    {
-                        Console.WriteLine(e.Message);
-                        Console.WriteLine(e.StackTrace);
-                        Console.WriteLine("Unhandled exception: {0}",e.Message);
-                    }
-                    return;
+                    RunWithOptions(options);
                 }
+                catch (Exception e)
+                {
+                    Console.WriteLine(e.Message);
+                    Console.WriteLine(e.StackTrace);
+                    Console.WriteLine("Unhandled exception: {0}", e.Message);
+                }
+                return;
             }
             // Display the default usage information
             Console.WriteLine(options.GetUsage());
@@ -73,27 +70,28 @@ namespace FlowMatters.Source.VeneerCmd
         private static void RunWithOptions(Options options)
         {
 // consume Options instance properties
-            var fn = options.ProjectFiles[0];
-            LoadPlugins();
+            var fn = (options.ProjectFiles.Count>0)?options.ProjectFiles[0]:null;
+            LoadPlugins(options.PluginsToLoad);
 
-            if (!File.Exists(fn))
+            RiverSystemScenario scenario;
+            if (fn == null)
             {
-                Console.WriteLine("Cannot find project file: {0}",fn);
+                scenario = CreateEmptyScenario(options);
+            } else if (!File.Exists(fn))
+            {
+                Console.WriteLine("Cannot find project file: {0}", fn);
                 return;
             }
+            else
+            {
+                scenario = LoadScenario(options, fn);
+            }
 
-            var project_dir = Path.GetDirectoryName(fn);
-            if (project_dir == "")
-                project_dir = ".";
-            Directory.SetCurrentDirectory(project_dir);
-            
-            RiverSystemProject project = LoadProject(fn,options);
-            Show(project.Name);
-            var scenario = project.GetRSScenarios()[0];
-            Show(scenario.ScenarioName);
+
+            Show(scenario.Name);
 
             var _server = new SourceRESTfulService((int)options.Port);
-            _server.Scenario = scenario.riverSystemScenario;
+            _server.Scenario = scenario;
             _server.LogGenerator += ServerLogEvent;
             _server.AllowRemoteConnections = options.RemoteAccess;
 
@@ -106,6 +104,54 @@ namespace FlowMatters.Source.VeneerCmd
             {
                 Console.ReadLine();
             }
+        }
+
+        private static RiverSystemScenario CreateEmptyScenario(Options options)
+        {
+            var project = RiverSystemProject.CreateProject("Created Project");
+            var scenario = new RiverSystemScenario(project);
+            var scenarioContainer = new RiverSystemScenarioContainer(scenario);
+            project.AddScenario(scenarioContainer);
+
+            return scenario;
+        }
+
+        private static RiverSystemScenario LoadScenario(Options options, string fn)
+        {
+            var project_dir = Path.GetDirectoryName(fn);
+            if (project_dir == "")
+                project_dir = ".";
+            Directory.SetCurrentDirectory(project_dir);
+
+            RiverSystemProject project = LoadProject(fn, options);
+            Show(project.Name);
+
+            RiverSystemScenarioContainer scenario;
+            var allScenarios = project.GetRSScenarios();
+
+            if (options.AvailableScenarios)
+            {
+                Show(String.Join(Environment.NewLine, allScenarios.Select(s => s.ScenarioName)));
+                Environment.Exit(0);
+            }
+
+            if (options.ScenarioToLoad == null)
+            {
+                scenario = allScenarios[0];
+            }
+            else
+            {
+                int scenarioNumber = -1;
+                if (int.TryParse(options.ScenarioToLoad, out scenarioNumber))
+                {
+                    scenario = allScenarios[scenarioNumber - 1];
+                }
+                else
+                {
+                    scenario = Enumerable.FirstOrDefault(allScenarios, s => s.ScenarioName == options.ScenarioToLoad);
+                }
+            }
+            return scenario.riverSystemScenario;
         }
 
         private static void ServerLogEvent(object sender, string msg)
@@ -133,18 +179,24 @@ namespace FlowMatters.Source.VeneerCmd
         const int MAX_PLUGIN_LOAD_ATTEMPTS = 120;
         const int INCREMENT_PLUGIN_LOADING_DELAY = 10;
 
-        private static void LoadPlugins()
+        private static void LoadPlugins(string pluginsToLoad)
         {
-            Show("Loading plugins");
-            var manager = PluginRegisterUtility.LoadPlugins();
+            string[] additionalPlugins = {};
 
+            if (pluginsToLoad != null)
+            {
+                additionalPlugins = pluginsToLoad.Split(',');
+            }
+            Show("Loading plugins");
+
+#if V3 || V4_0 || V4_1 || V4_2 || V4_3_0
+            var manager = PluginRegisterUtility.LoadPlugins();
             // NASTY HACK to counter the fact that other Source servers may be trying to rewrite the plugin file at the same time...
             int delay = 1; // 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048
             for (int attempt = 0; attempt < MAX_PLUGIN_LOAD_ATTEMPTS; attempt++)
             {
                 if (attempt > 0)
                 {
-//                    Show("No plugins loaded. Trying again to make sure its not a concurrency issue with other servers rewriting PLugins.xml");
                     Thread.Sleep(delay);
                     if (attempt % INCREMENT_PLUGIN_LOADING_DELAY == 0)
                         delay *= 2;
@@ -154,6 +206,17 @@ namespace FlowMatters.Source.VeneerCmd
                 if (manager.ActivePlugins.Count() > 0)
                     break;
             }
+#else
+            var manager = PluginManager.Instance;
+#endif
+
+            foreach (string plugin in additionalPlugins)
+            {
+                Console.Write("Loading from command line {0}... ", plugin);
+                var result = manager.InstallPlugin(plugin, false, false);
+                Console.WriteLine(result.Status.IsLoaded?"Loaded":result.Status.ErrorMsg);
+            }
+
             foreach (var plugin in manager.ActivePlugins)
             {
                 Show(String.Format("Loaded {0}",plugin.Path));               
@@ -210,6 +273,15 @@ namespace FlowMatters.Source.VeneerCmd
 
         [Option('b', "backup-rsproj", HelpText = "Backup .rsproj file", DefaultValue = false)]
         public bool BackupRSPROJ { get; set; }
+
+        [Option('a', "available-models", HelpText = "List available models (scenarios) then exit", DefaultValue = false)]
+        public bool AvailableScenarios { get; set; }
+
+        [Option('m', "model", HelpText = "Model (scenario) to use", DefaultValue = null)]
+        public string ScenarioToLoad { get; set; }
+
+        [Option('l',"load-plugin",HelpText = "Load plugins in addition to configured plugins",DefaultValue =null)]
+        public string PluginsToLoad { get; set; }
 
         [ValueList(typeof(List<string>), MaximumElements = 1)]
         public IList<string> ProjectFiles { get; set; }

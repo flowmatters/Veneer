@@ -15,5 +15,7 @@ namespace FlowMatters.Source.WebServer.ExchangeObjects
         public string TimeSeriesUrl;
 
         [DataMember] public string NetworkElement, RecordingElement, RecordingVariable;
+
+        [DataMember] public string FunctionalUnit;
     }
 }

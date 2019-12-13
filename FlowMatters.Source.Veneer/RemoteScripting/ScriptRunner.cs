@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Data;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -54,7 +55,7 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
 
                 if (ProjectHandler == null)
                 {
-                    ProjectHandler = ProjectManager.Instance.ProjectHandler;
+                    ProjectHandler = ProjectManager.Instance?.ProjectHandler;
                 }
                 scope.SetVariable("project_handler", ProjectHandler);
                 var sourceCode = engine.CreateScriptSourceFromString(script.Script);
@@ -78,6 +79,7 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
 
         private static void AddAssemblyReferences(ScriptEngine engine)
         {
+#if V3 || V4_0 || V4_1 || V4_2_0
             List<string> ignoreList = new List<string>(Finder.DllsThatAreIrrelevantToFinder);
             List<string> myList = new List<string>
             {
@@ -91,9 +93,14 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
                 // assembly
                 if (ignoreList.Contains(dllName) && !myList.Contains(dllName))
                     continue;
-
                 engine.Runtime.LoadAssembly(a);
             }
+#else
+            var myList = new HashSet<string>{ "system.core.dll" };
+            var includeList = AssemblyManager.Assemblies();
+            foreach(var a in includeList.Where(a=> !myList.Contains(a.ManifestModule.Name.ToLower())))
+                engine.Runtime.LoadAssembly(a);
+#endif
         }
 
         private VeneerResponse AsKnownDataContract(object actual)
@@ -110,6 +117,37 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
                 return new StringResponse {Value=(string)actual};
             if(actual is GEORegionData[])
                 return new GeoJSONCoverage((GEORegionData[])actual);
+            if (actual is IronPython.Runtime.PythonDictionary)
+            {
+                var dict = (IronPython.Runtime.PythonDictionary) actual;
+                var keys = dict.keys();
+                return new DictResponse
+                {
+                    Entries = keys.Select(k => new KeyValueResponse
+                    {
+                        Key = AsKnownDataContract(k),
+                        Value = AsKnownDataContract(dict.get(k))
+                    })
+                };
+            }
+            if (actual is DataTable)
+            {
+                var table = (DataTable) actual;
+                return new ListResponse
+                {
+                    Value = table.Rows.OfType<DataRow>().Select(row =>
+                    {
+                        return new DictResponse
+                        {
+                            Entries = table.Columns.OfType<DataColumn>().Select(col => new KeyValueResponse
+                            {
+                                Key = AsKnownDataContract(col.ColumnName),
+                                Value = AsKnownDataContract(row[col])
+                            })
+                        };
+                    })
+                };
+            }
             if (actual is IEnumerable)
             {
                 IEnumerable enumerable = (IEnumerable) actual;

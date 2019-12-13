@@ -7,12 +7,14 @@ namespace FlowMatters.Source.WebServer
 {
     class UriTemplates
     {
-        public const string Recordable = "location/{networkElement}/element/{recordingElement}/variable/{variable}";
+        public const string Recordable = "/location/{networkElement}/element/{recordingElement}/variable/{variable}";
 
-        public const string TimeSeries = "/runs/{runId}/"+Recordable;
+        public const string TimeSeries = RunResults + Recordable;
 
-        public const string AggregatedTimeSeries =
-            "/runs/{runId}/location/{networkElement}/element/{recordingElement}/variable/{variable}/aggregated/{aggregation}";
+//        public const string ResultsTable = 
+        public const string AggregatedTimeSeries = TimeSeries + "/aggregated/{aggregation}";
+
+        public const string TabulatedResults = TimeSeries + "/tabulated/{functions}";
 
         public const string RunResults = "/runs/{runId}";
         public const string Runs = "/runs";
@@ -57,6 +59,29 @@ namespace FlowMatters.Source.WebServer
 
         public const string DataGroupMultipleItemDetails = DataSourceGroup + "/" + MatchAll + "/{name}";
 
+        public const string ScenarioTables = "/tables/{table}";
+
+        public const string Configuration = "/configuration/{element}";
+
         public const string MatchAll = "__all__";
+
+        public const string NETWORK_ELEMENT_FU_DELIMITER = "@@";
+
+        public static bool TryExtractFunctionalUnit(string networkElement, out string newNetworkElement,
+            out string functionalUnit)
+        {
+            if (networkElement.Contains(NETWORK_ELEMENT_FU_DELIMITER))
+            {
+                var split = networkElement.Split(new string[] {UriTemplates.NETWORK_ELEMENT_FU_DELIMITER},
+                    StringSplitOptions.None);
+                newNetworkElement = split[0];
+                functionalUnit = split[1];
+                return true;
+            }
+
+            newNetworkElement = networkElement;
+            functionalUnit = null;
+            return false;
+        }
     }
 }
