@@ -387,7 +387,7 @@ namespace FlowMatters.Source.WebServer
         {
             Log("Requested function list");
             FunctionValue[] result = new FunctionValue[Scenario.Network.FunctionManager.Functions.Count];
-            for (var i = 0; i < result.Count(); i++)
+            for (var i = 0; i < result.Length; i++)
             {
                 Function fn = Scenario.Network.FunctionManager.Functions[i];
                 FunctionValue fv = new FunctionValue();
@@ -404,7 +404,7 @@ namespace FlowMatters.Source.WebServer
         {
             Log("Requested Variable List");
             VariableSummary[] result = new VariableSummary[Scenario.Network.FunctionManager.Variables.Count];
-            for (var i = 0; i < result.Count(); i++)
+            for (var i = 0; i < result.Length; i++)
                 result[i] = new VariableSummary(Scenario.Network.FunctionManager.Variables[i],Scenario);
             return result;
         }
