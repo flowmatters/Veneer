@@ -68,9 +68,9 @@ namespace FlowMatters.Source.Veneer
             if (String.IsNullOrEmpty(gddName)) return null;
 
             string[] split = gddName.Split('.');
-            if (split.Count() <= 1) return null;
+            if (split.Length <= 1) return null;
 
-            string groupName = string.Join(".", split.Take(split.Count() - 1));
+            string groupName = string.Join(".", split.Take(split.Length - 1));
             GenericDataDetails GDD =
                 Scenario.Network.DataManager.DataGroups.Where(g => g.Name == groupName)
                     .Select(@group => @group.GetUsage(split.Last()))

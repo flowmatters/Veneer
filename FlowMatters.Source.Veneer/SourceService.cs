@@ -268,24 +268,25 @@ namespace FlowMatters.Source.WebServer
             return result;
         }
 
-        [OperationContract]
-        [WebInvoke(Method = "DELETE", UriTemplate = UriTemplates.RunResults)]
-        public void DeleteRun(string runId)
-        {
-            Log(String.Format("Deleting run results ({0})", runId));
-            int id = -1;
-            if (runId == "latest")
-            {
-                id = Scenario.Project.ResultManager.AllRuns().Last().RunNumber;
-            }
-            else
-            {
-                id = int.Parse(runId);
-                //RunLogs.Remove(id);
-            }
-            RunLogs.Remove(id);
-            Scenario.Project.ResultManager.RemoveRun(id);
-        }
+        // TODO: Can't delete a run. Should delete a job which may contain multiple runs.
+        //[OperationContract]
+        //[WebInvoke(Method = "DELETE", UriTemplate = UriTemplates.RunResults)]
+        //public void DeleteRun(string runId)
+        //{
+        //    Log(String.Format("Deleting run results ({0})", runId));
+        //    int id = -1;
+        //    if (runId == "latest")
+        //    {
+        //        id = Scenario.Project.ResultManager.AllRuns().Last().RunNumber;
+        //    }
+        //    else
+        //    {
+        //        id = int.Parse(runId);
+        //        //RunLogs.Remove(id);
+        //    }
+        //    RunLogs.Remove(id);
+        //    Scenario.Project.ResultManager.RemoveRun(id);
+        //}
 
         private Run[] RunsForId(string id)
         {
@@ -386,7 +387,7 @@ namespace FlowMatters.Source.WebServer
         {
             Log("Requested function list");
             FunctionValue[] result = new FunctionValue[Scenario.Network.FunctionManager.Functions.Count];
-            for (var i = 0; i < result.Count(); i++)
+            for (var i = 0; i < result.Length; i++)
             {
                 Function fn = Scenario.Network.FunctionManager.Functions[i];
                 FunctionValue fv = new FunctionValue();
@@ -403,7 +404,7 @@ namespace FlowMatters.Source.WebServer
         {
             Log("Requested Variable List");
             VariableSummary[] result = new VariableSummary[Scenario.Network.FunctionManager.Variables.Count];
-            for (var i = 0; i < result.Count(); i++)
+            for (var i = 0; i < result.Length; i++)
                 result[i] = new VariableSummary(Scenario.Network.FunctionManager.Variables[i],Scenario);
             return result;
         }
