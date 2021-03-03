@@ -269,24 +269,33 @@ namespace FlowMatters.Source.WebServer
         }
 
         // TODO: Can't delete a run. Should delete a job which may contain multiple runs.
-        //[OperationContract]
-        //[WebInvoke(Method = "DELETE", UriTemplate = UriTemplates.RunResults)]
-        //public void DeleteRun(string runId)
-        //{
-        //    Log(String.Format("Deleting run results ({0})", runId));
-        //    int id = -1;
-        //    if (runId == "latest")
-        //    {
-        //        id = Scenario.Project.ResultManager.AllRuns().Last().RunNumber;
-        //    }
-        //    else
-        //    {
-        //        id = int.Parse(runId);
-        //        //RunLogs.Remove(id);
-        //    }
-        //    RunLogs.Remove(id);
-        //    Scenario.Project.ResultManager.RemoveRun(id);
-        //}
+        [OperationContract]
+        [WebInvoke(Method = "DELETE", UriTemplate = UriTemplates.RunResults)]
+        public void DeleteRun(string runId)
+        {
+            Log(String.Format("Deleting run results ({0})", runId));
+            int id = -1;
+            if (runId == "latest")
+            {
+                id = Scenario.Project.ResultManager.AllRuns().Last().RunNumber;
+            }
+            else
+            {
+                id = int.Parse(runId);
+                //RunLogs.Remove(id);
+            }
+            RunLogs.Remove(id);
+
+#if V3 || V4
+            Scenario.Project.ResultManager.RemoveRun(id);
+#else
+            var job = Scenario.Project.ResultManager.AllJobs.FirstOrDefault(j=>ListExtensions.FirstOrDefault(j.Runs,r=>r.RunNumber==id)!=null);
+            if (job != null)
+            {
+                Scenario.Project.ResultManager.RemoveJob(job);
+            }
+#endif
+        }
 
         private Run[] RunsForId(string id)
         {
