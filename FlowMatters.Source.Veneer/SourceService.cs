@@ -269,24 +269,33 @@ namespace FlowMatters.Source.WebServer
         }
 
         // TODO: Can't delete a run. Should delete a job which may contain multiple runs.
-        //[OperationContract]
-        //[WebInvoke(Method = "DELETE", UriTemplate = UriTemplates.RunResults)]
-        //public void DeleteRun(string runId)
-        //{
-        //    Log(String.Format("Deleting run results ({0})", runId));
-        //    int id = -1;
-        //    if (runId == "latest")
-        //    {
-        //        id = Scenario.Project.ResultManager.AllRuns().Last().RunNumber;
-        //    }
-        //    else
-        //    {
-        //        id = int.Parse(runId);
-        //        //RunLogs.Remove(id);
-        //    }
-        //    RunLogs.Remove(id);
-        //    Scenario.Project.ResultManager.RemoveRun(id);
-        //}
+        [OperationContract]
+        [WebInvoke(Method = "DELETE", UriTemplate = UriTemplates.RunResults)]
+        public void DeleteRun(string runId)
+        {
+            Log(String.Format("Deleting run results ({0})", runId));
+            int id = -1;
+            if (runId == "latest")
+            {
+                id = Scenario.Project.ResultManager.AllRuns().Last().RunNumber;
+            }
+            else
+            {
+                id = int.Parse(runId);
+                //RunLogs.Remove(id);
+            }
+            RunLogs.Remove(id);
+
+#if V3 || V4
+            Scenario.Project.ResultManager.RemoveRun(id);
+#else
+            var job = Scenario.Project.ResultManager.AllJobs.FirstOrDefault(j=>ListExtensions.FirstOrDefault(j.Runs,r=>r.RunNumber==id)!=null);
+            if (job != null)
+            {
+                Scenario.Project.ResultManager.RemoveJob(job);
+            }
+#endif
+        }
 
         private Run[] RunsForId(string id)
         {
@@ -364,7 +373,7 @@ namespace FlowMatters.Source.WebServer
         {
             Log(String.Format("Updating function {0}", functionName));
             functionName = "$" + functionName;
-            var function = Scenario.Network.FunctionManager.Functions.FirstOrDefault(f => f.Name == functionName);
+            var function = Enumerable.FirstOrDefault(Scenario.Network.FunctionManager.Functions, f => f.Name == functionName);
             if (function != null)
             {
                 Log(String.Format("Setting ${0}={1}", functionName, value.Expression));
@@ -414,7 +423,7 @@ namespace FlowMatters.Source.WebServer
         public VariableSummary GetInput(string variableName)
         {
             Log("Requested Variable : " + variableName);
-            return new VariableSummary(Scenario.Network.FunctionManager.Variables.FirstOrDefault(v => v.FullName == ("$" + variableName)), Scenario);
+            return new VariableSummary(Enumerable.FirstOrDefault(Scenario.Network.FunctionManager.Variables, v => v.FullName == ("$" + variableName)), Scenario);
         }
 
         [OperationContract]
@@ -422,7 +431,7 @@ namespace FlowMatters.Source.WebServer
         public SimpleTimeSeries GetInputTimeSeries(string variableName)
         {
             Log(String.Format("Requested time series for {0}", variableName));
-            return (new VariableSummary(Scenario.Network.FunctionManager.Variables.FirstOrDefault(v => v.FullName == ("$" + variableName)), Scenario)).TimeSeriesData;
+            return (new VariableSummary(Enumerable.FirstOrDefault(Scenario.Network.FunctionManager.Variables, v => v.FullName == ("$" + variableName)), Scenario)).TimeSeriesData;
         }
 
         [OperationContract]
@@ -433,7 +442,7 @@ namespace FlowMatters.Source.WebServer
             Log(String.Format("Updating time series for {0}", variableName));
             VariableSummary summ =
                 new VariableSummary(
-                    Scenario.Network.FunctionManager.Variables.FirstOrDefault(v => v.FullName == ("$" + variableName)),
+                    Enumerable.FirstOrDefault(Scenario.Network.FunctionManager.Variables, v => v.FullName == ("$" + variableName)),
                     Scenario);
             summ.UpdateTimeSeries(newTimeSeries);
         }
@@ -443,7 +452,7 @@ namespace FlowMatters.Source.WebServer
         public SimplePiecewise GetPiecewiseLinear(string variableName)
         {
             Log(String.Format("Requested piecewise linear function for {0}", variableName));
-            return (new VariableSummary(Scenario.Network.FunctionManager.Variables.FirstOrDefault(v => v.FullName == ("$" + variableName)), Scenario)).PiecewiseFunctionData;
+            return (new VariableSummary(Enumerable.FirstOrDefault(Scenario.Network.FunctionManager.Variables, v => v.FullName == ("$" + variableName)), Scenario)).PiecewiseFunctionData;
         }
 
         [OperationContract]
@@ -454,7 +463,7 @@ namespace FlowMatters.Source.WebServer
             Log(String.Format("Updating  piecewise linear function for {0}", variableName));
             VariableSummary summ =
                 new VariableSummary(
-                    Scenario.Network.FunctionManager.Variables.FirstOrDefault(v => v.FullName == ("$" + variableName)),
+                    Enumerable.FirstOrDefault(Scenario.Network.FunctionManager.Variables, v => v.FullName == ("$" + variableName)),
                     Scenario);
             summ.UpdatePiecewise(newPiecewise);
         }
@@ -560,7 +569,7 @@ namespace FlowMatters.Source.WebServer
         public void CreateDataSource(SimpleDataGroupItem newItem)
         {
             var dm = Scenario.Network.DataManager;
-            var existing = dm.DataGroups.FirstOrDefault(ds => ds.Name == newItem.Name);
+            var existing = Enumerable.FirstOrDefault(dm.DataGroups, ds => ds.Name == newItem.Name);
 
             if (existing != null)
             {
@@ -585,8 +594,7 @@ namespace FlowMatters.Source.WebServer
             var dm = Scenario.Network.DataManager;
 
             var res =
-                dm.DataGroups.FirstOrDefault(
-                    ds => SimpleDataGroupItem.MakeID(ds) == (UriTemplates.DataSources + "/" + dataSourceGroup));
+                Enumerable.FirstOrDefault(dm.DataGroups, ds => SimpleDataGroupItem.MakeID(ds) == (UriTemplates.DataSources + "/" + dataSourceGroup));
             if (res == null)
                 ResourceNotFound();
             return new SimpleDataGroupItem(res, summary);
@@ -598,7 +606,7 @@ namespace FlowMatters.Source.WebServer
         public void DeleteDataSource(string dataSourceGroup)
         {
             var dm = Scenario.Network.DataManager;
-            var existing = dm.DataGroups.FirstOrDefault(ds => ds.Name == dataSourceGroup);
+            var existing = Enumerable.FirstOrDefault(dm.DataGroups, ds => ds.Name == dataSourceGroup);
             if (existing == null)
             {
                 ResourceNotFound();
@@ -616,7 +624,7 @@ namespace FlowMatters.Source.WebServer
                 return null;
 
             var result =
-                grp.Items.FirstOrDefault(item => item.MatchInputSet(inputSet));
+                Enumerable.FirstOrDefault(grp.Items, item => item.MatchInputSet(inputSet));
 
             if(result==null)
                 ResourceNotFound();
@@ -634,14 +642,14 @@ namespace FlowMatters.Source.WebServer
             List<SimpleDataDetails> result = new List<SimpleDataDetails>();
             foreach (var item in grp.Items)
             {
-                var matchingItem = item.Details.FirstOrDefault(d =>
+                var matchingItem = Enumerable.FirstOrDefault(item.Details, d =>
                 {
                     var safeName = URLSafeString(d.Name);
                     return safeName == name;
                 });
                 if (matchingItem == null)
                 {
-                    matchingItem = item.Details.FirstOrDefault(d =>
+                    matchingItem = Enumerable.FirstOrDefault(item.Details, d =>
                     {
                         var safeName = URLSafeString(d.Name);
                         return Regex.IsMatch(safeName, name);
@@ -665,7 +673,7 @@ namespace FlowMatters.Source.WebServer
         public SimpleDataDetails GetDataGroupItemDetails(string dataSourceGroup, string inputSet,string item)
         {
             var retrieved = GetDataGroupItem(dataSourceGroup, inputSet);
-            var result = retrieved.Details.FirstOrDefault(d => URLSafeString(d.Name) == item);
+            var result = Enumerable.FirstOrDefault(retrieved.Details, d => URLSafeString(d.Name) == item);
 
             if(result==null)
                 ResourceNotFound();
@@ -712,12 +720,13 @@ namespace FlowMatters.Source.WebServer
             element = element.ToLower();
             if (element == "networkelement")
             {
-                return table.Select(row => row.NetworkElementName).ToHashSet().ToArray();
+                
+                return Enumerable.ToHashSet(table.Select(row => row.NetworkElementName)).ToArray();
             }
 
             if (element == "recordingelement")
             {
-                return table.Select(row => row.ElementName).ToHashSet().ToArray();
+                return Enumerable.ToHashSet(table.Select(row => row.ElementName)).ToArray();
             }
 
             return new string[0];
