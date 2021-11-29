@@ -93,7 +93,7 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects.DataSources
         }
         public static string MakeID(DataGroupItem i)
         {
-            return UriTemplates.DataSources + "/" + SourceService.URLSafeString(MakeFullName(i).Substring(1));
+            return UriTemplates.DataSources + "/" + SourceService.URLSafeString(MakeFullName(i).Substring(1)).Replace("%2F","/");
         }
 
         public void ReplaceInScenario(RiverSystemScenario scenario, DataGroupItem existing)
