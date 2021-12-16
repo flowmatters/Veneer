@@ -553,6 +553,7 @@ namespace FlowMatters.Source.WebServer
         [WebInvoke(Method = "GET", UriTemplate = UriTemplates.DataSources,ResponseFormat = WebMessageFormat.Json)]
         public SimpleDataGroupItem[] GetDataSources()
         {
+            Log("Data sources");
             var dm = Scenario.Network.DataManager;
             return dm.DataGroups.Select(dg => new SimpleDataGroupItem(dg)).ToArray();
         }
@@ -561,6 +562,7 @@ namespace FlowMatters.Source.WebServer
         [WebInvoke(Method = "GET", UriTemplate = UriTemplates.DataSourceGroup, ResponseFormat = WebMessageFormat.Json)]
         public SimpleDataGroupItem GetDataSource(string dataSourceGroup)
         {
+            Log("Data source: " + dataSourceGroup);
             return GetSimpleDataSourceInternal(dataSourceGroup, false);
         }
 
@@ -591,6 +593,7 @@ namespace FlowMatters.Source.WebServer
 
         private SimpleDataGroupItem GetSimpleDataSourceInternal(string dataSourceGroup, bool summary)
         {
+            dataSourceGroup = dataSourceGroup.Replace("%25", "%").Replace("%2F","/");
             var dm = Scenario.Network.DataManager;
 
             var res =
