@@ -5,6 +5,7 @@ using System.ServiceModel;
 using System.ServiceModel.Description;
 using System.ServiceModel.Web;
 using System.Text;
+using System.Reflection;
 using FlowMatters.Source.Veneer.CORS;
 using FlowMatters.Source.Veneer.Formatting;
 using RiverSystem;
@@ -33,6 +34,7 @@ namespace FlowMatters.Source.WebServer
 
         public override void Start()
         {
+            LeaveDotsAndSlashesEscaped();
             WebHttpBinding binding = new WebHttpBinding();
 
             binding.MaxReceivedMessageSize = 1024*1024*1024; // 1 gigabyte
@@ -42,7 +44,6 @@ namespace FlowMatters.Source.WebServer
             _host = new WebServiceHost(_singletonInstance);
             _host.UnknownMessageReceived += _host_UnknownMessageReceived;
             binding.CrossDomainScriptAccessEnabled = true;
-
             if(!AllowRemoteConnections)
                 binding.HostNameComparisonMode = HostNameComparisonMode.Exact;
 
@@ -101,6 +102,26 @@ namespace FlowMatters.Source.WebServer
             _host.Faulted += _host_Faulted;
         }
 
+        private void LeaveDotsAndSlashesEscaped()
+        {
+            var getSyntaxMethod =
+                typeof(UriParser).GetMethod("GetSyntax", BindingFlags.Static | BindingFlags.NonPublic);
+            if (getSyntaxMethod == null)
+            {
+                throw new MissingMethodException("UriParser", "GetSyntax");
+            }
+
+            var uriParser = getSyntaxMethod.Invoke(null, new object[] { "http" });
+
+            var setUpdatableFlagsMethod =
+                uriParser.GetType().GetMethod("SetUpdatableFlags", BindingFlags.Instance | BindingFlags.NonPublic);
+            if (setUpdatableFlagsMethod == null)
+            {
+                throw new MissingMethodException("UriParser", "SetUpdatableFlags");
+            }
+
+            setUpdatableFlagsMethod.Invoke(uriParser, new object[] { 0 });
+        }
         void _host_UnknownMessageReceived(object sender, UnknownMessageReceivedEventArgs e)
         {
             Log(string.Format("Unknown message received: {0}",e.Message));
