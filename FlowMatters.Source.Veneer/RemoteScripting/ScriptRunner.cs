@@ -97,7 +97,7 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
             }
 #else
             var myList = new HashSet<string>{ "system.core.dll" };
-            var includeList = AssemblyManager.Assemblies();
+            var includeList = AssemblyManager.Assemblies;
             foreach(var a in includeList.Where(a=> !myList.Contains(a.ManifestModule.Name.ToLower())))
                 engine.Runtime.LoadAssembly(a);
 #endif
