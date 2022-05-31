@@ -22,7 +22,7 @@ using RiverSystem.DataManagement.DataManager.DataDetails;
 using RiverSystem.DataManagement.DataManager.DataSources;
 using RiverSystem.ManagedExtensions;
 using RiverSystem.Quality.SourceSinkModels;
-using RiverSystemGUI_II.SchematicBuilder;
+using RiverSystem.Forms.SchematicBuilder;
 using TIME.Core;
 using TimeSeries = TIME.DataTypes.TimeSeries;
 using TIME.Management;
