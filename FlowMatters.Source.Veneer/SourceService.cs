@@ -701,6 +701,14 @@ namespace FlowMatters.Source.WebServer
         }
 
         [OperationContract]
+        [WebInvoke(Method = "GET", UriTemplate = UriTemplates.ScenarioTablesIndex,
+            ResponseFormat = WebMessageFormat.Json)]
+        public ModelTableIndex ModelTableIndex()
+        {
+            return ModelTabulator.Index();
+        }
+
+        [OperationContract]
         [WebInvoke(Method = "GET", UriTemplate = UriTemplates.ScenarioTables,
              ResponseFormat = WebMessageFormat.Json)]
         public DataTable ModelTable(string table)

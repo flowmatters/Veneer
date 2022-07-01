@@ -59,6 +59,8 @@ namespace FlowMatters.Source.WebServer
 
         public const string DataGroupMultipleItemDetails = DataSourceGroup + "/" + MatchAll + "/{name}";
 
+        public const string ScenarioTablesIndex = "/tables";
+
         public const string ScenarioTables = "/tables/{table}";
 
         public const string Configuration = "/configuration/{element}";
