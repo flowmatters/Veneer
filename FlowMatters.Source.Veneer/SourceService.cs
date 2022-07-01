@@ -24,6 +24,7 @@ using FlowMatters.Source.Veneer;
 using FlowMatters.Source.Veneer.DomainActions;
 using FlowMatters.Source.Veneer.ExchangeObjects;
 using FlowMatters.Source.Veneer.ExchangeObjects.DataSources;
+using FlowMatters.Source.Veneer.Formatting;
 using FlowMatters.Source.Veneer.RemoteScripting;
 using FlowMatters.Source.WebServer.ExchangeObjects;
 using RiverSystem;
@@ -33,6 +34,7 @@ using RiverSystem.DataManagement.DataManager;
 using RiverSystem.Functions;
 using RiverSystem.Functions.Variables;
 using RiverSystem.ManagedExtensions;
+using RiverSystem.PreProcessing.ProjectionInfo;
 using RiverSystem.ScenarioExplorer.ParameterSet;
 using TIME.Core;
 using TIME.DataTypes;
@@ -145,6 +147,15 @@ namespace FlowMatters.Source.WebServer
             Log("Requested network");
 //            WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Origin", "*");
             return new GeoJSONNetwork(Scenario.Network);
+        }
+
+        [OperationContract]
+        [WebInvoke(Method = "GET", ResponseFormat = WebMessageFormat.Json, UriTemplate = UriTemplates.NetworkGeographic)]
+        public GeoJSONNetwork GetNetworkGeographic()
+        {
+            Log("Requested network in geographic coordinates");
+            //            WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Origin", "*");
+            return NetworkToGeographic.ToGeographic(Scenario.Network,Scenario.GeographicData.Projection as AbstractProjectionInfo);
         }
 
         [OperationContract]
@@ -749,6 +760,12 @@ namespace FlowMatters.Source.WebServer
             return new string[0];
         }
 
+        [OperationContract]
+        [WebInvoke(Method = "PUT", UriTemplate = UriTemplates.Projection, ResponseFormat = WebMessageFormat.Json)]
+        public void AssignProjection(ProjectionInfo p)
+        {
+            p.AssignTo(Scenario);
+        }
         private void SwitchRecording(TimeSeriesLink query, bool record)
         {
             Dictionary<ProjectViewRow.RecorderFields, object> constraint = new Dictionary<ProjectViewRow.RecorderFields, object>();

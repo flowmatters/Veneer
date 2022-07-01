@@ -5,6 +5,7 @@ using System.Runtime.Serialization;
 using System.Text;
 using System.Threading.Tasks;
 using RiverSystem;
+using RiverSystem.PreProcessing.ProjectionInfo;
 
 namespace FlowMatters.Source.Veneer.ExchangeObjects
 {
@@ -18,6 +19,7 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects
             SourceVersion = new Constants.ProductVersion().GetFullVersionString();
             ProjectFile = s.Project.FileName;
             Scenario = s.Name;
+            Projection = new ProjectionInfo(s.GeographicData?.Projection as AbstractProjectionInfo);
         }
 
         [DataMember]
@@ -31,5 +33,8 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects
 
         [DataMember]
         public string Scenario{ get; set; }
+
+        [DataMember]
+        public ProjectionInfo Projection { get; set; }
     }
 }

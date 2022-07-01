@@ -29,7 +29,11 @@ namespace FlowMatters.Source.WebServer
 
         public const string Resources = "/resources/{resourceName}";
 
+        public const string Projection = "/projection";
+
         public const string Network = "/network";
+
+        public const string NetworkGeographic = "/network/geographic";
 
         public const string Nodes = "/network/nodes";
 
