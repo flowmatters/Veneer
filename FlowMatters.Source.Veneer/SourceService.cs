@@ -68,6 +68,12 @@ namespace FlowMatters.Source.WebServer
         }
 
         [OperationContract]
+        [WebInvoke(Method = "OPTIONS", UriTemplate = "*")]
+        public void GetOptions()
+        {
+        }
+
+        [OperationContract]
         [WebGet(UriTemplate = "/", ResponseFormat = WebMessageFormat.Json)]
         public VeneerStatus GetRoot()
         {
