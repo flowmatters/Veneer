@@ -184,10 +184,14 @@ namespace FlowMatters.Source.WebServer
             RunLink[] links = new RunLink[runs.Length];
             for(int i = 0; i < runs.Length; i++)
             {
+                var run = runs[i];
                 links[i] = new RunLink
                     {
-                        RunName = runs[i].Name,
-                        RunUrl = "/runs/" + runs[i].RunNumber
+                        RunName = run.Name,
+                        RunUrl = "/runs/" + run.RunNumber,
+                        DateRun = run.DateRun.ToString(CultureInfo.InvariantCulture),
+                        Scenario = run.Scenario.Name,
+                        Status = run.RunResultIndicator.ToString()
                     };
             }
 
