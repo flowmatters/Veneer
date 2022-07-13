@@ -70,7 +70,7 @@ namespace FlowMatters.Source.WebServer
                 {
                     RetrieveVeneerStatus();
                 }
-                catch()
+                catch
                 {
                     // Pass
                 }
