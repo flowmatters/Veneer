@@ -330,29 +330,74 @@ namespace FlowMatters.Source.WebServer
         [OperationContract]
         [WebInvoke(Method = "GET", ResponseFormat = WebMessageFormat.Json, UriTemplate = UriTemplates.TimeSeries)]
         public TimeSeriesResponse GetTimeSeries(string runId, string networkElement, string recordingElement,
-                                              string variable)
+                                              string variable,string fromDate, string toDate,string precision)
         {
             Log(String.Format("Requested time series {0}/{1}/{2}/{3}",runId,networkElement,recordingElement,variable));
-            Tuple<TimeSeriesLink, TimeSeries>[] result = MatchTimeSeries(runId, networkElement, recordingElement, variable);
-
-            if (result.Length == 1) 
-                return SimpleTimeSeries(result[0].Item2);
-            return CreateMultipleTimeSeries(result);
+            return GetTimeSeriesInternal(runId, networkElement, recordingElement, variable, null, fromDate, toDate,precision);
         }
 
         [OperationContract]
         [WebInvoke(Method = "GET", ResponseFormat = WebMessageFormat.Json,
             UriTemplate = UriTemplates.AggregatedTimeSeries)]
         public TimeSeriesResponse GetAggregatedTimeSeries(string runId, string networkElement, string recordingElement,
-                                              string variable, string aggregation)
+                                              string variable, string aggregation, string fromDate, string toDate, string precision)
         {
             Log(String.Format("Requested {4} time series {0}/{1}/{2}/{3}", runId, networkElement, recordingElement, variable,aggregation));
-            Tuple<TimeSeriesLink, TimeSeries>[] result = MatchTimeSeries(runId, WebUtility.HtmlDecode(networkElement), WebUtility.HtmlDecode(recordingElement), WebUtility.HtmlDecode(variable));
+            return GetTimeSeriesInternal(runId, networkElement, recordingElement, variable, aggregation,fromDate,toDate,precision);
+        }
 
-            result = result.Select(res=>new Tuple<TimeSeriesLink,TimeSeries>(res.Item1,AggregateTimeSeries(res.Item2, aggregation))).ToArray();
-            if(result.Length==1)
+        private TimeSeriesResponse GetTimeSeriesInternal(string runId, string networkElement, string recordingElement,
+            string variable, string aggregation,string fromDate, string toDate, string precision)
+        {
+            Tuple<TimeSeriesLink, TimeSeries>[] result = MatchTimeSeries(runId, networkElement, recordingElement, variable);
+
+            if (fromDate != null || toDate != null)
+            {
+                DateTime? from = ParsePartialDate(fromDate, false);
+                DateTime? to = ParsePartialDate(toDate, true);
+                result = TransformTimeSeriesCollection(result, (TimeSeries ts) => ts.extract(from??ts.Start,to??ts.End));
+            }
+
+            if (aggregation != null)
+            {
+                result = TransformTimeSeriesCollection(result, ts => AggregateTimeSeries(ts, aggregation));
+            }
+
+            if (precision != null)
+            {
+                var decimalPlaces = Int32.Parse(precision);
+                result = TransformTimeSeriesCollection(result, ts => ts.Round(decimalPlaces) as TimeSeries);
+            }
+
+            if (result.Length == 1)
                 return SimpleTimeSeries(result[0].Item2);
             return CreateMultipleTimeSeries(result);
+        }
+
+        private Tuple<TimeSeriesLink, TimeSeries>[] TransformTimeSeriesCollection(
+            Tuple<TimeSeriesLink, TimeSeries>[] collection, Func<TimeSeries, TimeSeries> transform)
+        {
+            return collection.Select(pair=>new Tuple<TimeSeriesLink,TimeSeries>(pair.Item1,transform(pair.Item2))).ToArray();
+        }
+
+        private DateTime? ParsePartialDate(string dateString, bool endOfPeriod)
+        {
+            if (dateString == null)
+            {
+                return null;
+            }
+
+            var components = dateString.Split('-').Select(Int32.Parse).ToList();
+            if (components.Count == 1)
+            {
+                components.Add(endOfPeriod?12:1);
+                components.Add(endOfPeriod?31:1);
+            } else if (components.Count == 2)
+            {
+                components.Add(endOfPeriod?DateTime.DaysInMonth(components[0],components[1]):1);
+            }
+
+            return new DateTime(components[0], components[1], components[2]);
         }
 
         [OperationContract]

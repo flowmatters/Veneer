@@ -9,12 +9,15 @@ namespace FlowMatters.Source.WebServer
     {
         public const string Recordable = "/location/{networkElement}/element/{recordingElement}/variable/{variable}";
 
-        public const string TimeSeries = RunResults + Recordable;
+        public const string TimeSeriesBase = RunResults + Recordable;
 
-//        public const string ResultsTable = 
-        public const string AggregatedTimeSeries = TimeSeries + "/aggregated/{aggregation}";
+        public const string TimeSeriesQuery = "?from={fromDate}&to={toDate}&precision={precision}";
 
-        public const string TabulatedResults = TimeSeries + "/tabulated/{functions}";
+        public const string TimeSeries = TimeSeriesBase + TimeSeriesQuery;
+
+        public const string AggregatedTimeSeries = TimeSeriesBase + "/aggregated/{aggregation}" + TimeSeriesQuery;
+
+        public const string TabulatedResults = TimeSeriesBase + "/tabulated/{functions}";
 
         public const string RunResults = "/runs/{runId}";
         public const string Runs = "/runs";
