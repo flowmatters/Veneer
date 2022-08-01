@@ -24,7 +24,6 @@ using RiverSystem.DataManagement.DataManager.DataSources;
 using RiverSystem.ManagedExtensions;
 using RiverSystem.Quality.SourceSinkModels;
 using RiverSystem.Forms.SchematicBuilder;
-using RiverSystemGUI_II.SchematicBuilder;
 using TIME.Core;
 using TimeSeries = TIME.DataTypes.TimeSeries;
 using TIME.Management;
