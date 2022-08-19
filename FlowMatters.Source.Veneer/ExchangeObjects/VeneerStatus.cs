@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Runtime.Serialization;
 using System.Text;
@@ -18,8 +19,11 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects
             Version = PROTOCOL_VERSION;
             SourceVersion = new Constants.ProductVersion().GetFullVersionString();
             ProjectFile = s.Project.FileName;
+            ProjectFullFilename = s.Project.FullFilename;
             Scenario = s.Name;
             Projection = new ProjectionInfo(s.GeographicData?.Projection as AbstractProjectionInfo);
+            var process = Process.GetCurrentProcess();
+            PID = process.Id;
         }
 
         [DataMember]
@@ -32,9 +36,15 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects
         public string ProjectFile { get; set; }
 
         [DataMember]
+        public string ProjectFullFilename { get; set; }
+
+        [DataMember]
         public string Scenario{ get; set; }
 
         [DataMember]
         public ProjectionInfo Projection { get; set; }
+
+        [DataMember]
+        public int PID { get; set; }
     }
 }
