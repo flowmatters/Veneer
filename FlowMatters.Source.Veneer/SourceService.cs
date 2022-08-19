@@ -334,10 +334,11 @@ namespace FlowMatters.Source.WebServer
         [OperationContract]
         [WebInvoke(Method = "GET", ResponseFormat = WebMessageFormat.Json, UriTemplate = UriTemplates.TimeSeries)]
         public TimeSeriesResponse GetTimeSeries(string runId, string networkElement, string recordingElement,
-                                              string variable,string fromDate, string toDate,string precision)
+                                              string variable,string fromDate, string toDate,string precision,
+                                              string aggregation, string aggfn)
         {
             Log(String.Format("Requested time series {0}/{1}/{2}/{3}",runId,networkElement,recordingElement,variable));
-            return GetTimeSeriesInternal(runId, networkElement, recordingElement, variable, null, fromDate, toDate,precision);
+            return GetTimeSeriesInternal(runId, networkElement, recordingElement, variable, aggregation, aggfn, fromDate, toDate,precision);
         }
 
         [OperationContract]
@@ -347,11 +348,11 @@ namespace FlowMatters.Source.WebServer
                                               string variable, string aggregation, string fromDate, string toDate, string precision)
         {
             Log(String.Format("Requested {4} time series {0}/{1}/{2}/{3}", runId, networkElement, recordingElement, variable,aggregation));
-            return GetTimeSeriesInternal(runId, networkElement, recordingElement, variable, aggregation,fromDate,toDate,precision);
+            return GetTimeSeriesInternal(runId, networkElement, recordingElement, variable, aggregation,"sum" , fromDate,toDate,precision);
         }
 
         private TimeSeriesResponse GetTimeSeriesInternal(string runId, string networkElement, string recordingElement,
-            string variable, string aggregation,string fromDate, string toDate, string precision)
+            string variable, string aggregation,string aggregationFunction, string fromDate, string toDate, string precision)
         {
             Tuple<TimeSeriesLink, TimeSeries>[] result = MatchTimeSeries(runId, networkElement, recordingElement, variable);
 
@@ -364,7 +365,8 @@ namespace FlowMatters.Source.WebServer
 
             if (aggregation != null)
             {
-                result = TransformTimeSeriesCollection(result, ts => AggregateTimeSeries(ts, aggregation));
+                aggregationFunction = aggregationFunction ?? "sum";
+                result = TransformTimeSeriesCollection(result, ts => AggregateTimeSeries(ts, aggregation, aggregationFunction));
             }
 
             if (precision != null)
@@ -865,7 +867,7 @@ namespace FlowMatters.Source.WebServer
             }
         }
 
-        private TimeSeries AggregateTimeSeries(TimeSeries result, string aggregation)
+        private TimeSeries AggregateTimeSeries(TimeSeries result, string aggregation, string aggregationFunction)
         {
             if (result == null)
                 return null;
@@ -873,15 +875,45 @@ namespace FlowMatters.Source.WebServer
             var origUnits = result.units;
 
             string name = result.name;
-            if (aggregation == "monthly")
-                result = result.toMonthly();
+            TimeStep newTimeStep = GetTimeStep(aggregation,result.timeStep);
 
-            if (aggregation == "annual")
-                result = result.toAnnual();
+            var groups = result.GroupByTimeStep(newTimeStep);
+            Tuple<DateTime, double>[] entries;
+            if (aggregationFunction == "sum")
+            {
+                entries = groups.Select(ts => new Tuple<DateTime, double>(ts.timeForItem(0), ts.Sum())).ToArray();
+            }
+            else
+            {
+                entries = groups.Select(ts => new Tuple<DateTime, double>(ts.timeForItem(0), ts.average())).ToArray();
+            }
+
+            var dates = entries.Select(v => v.Item1).ToArray();
+            var values = entries.Select(v => v.Item2).ToArray();
+
+            result = new TimeSeries(dates[0], newTimeStep, values);
+
+            //if (aggregation == "monthly")
+            //    result = result.toMonthly();
+            
+            //if (aggregation == "annual")
+            //    result = result.toAnnual();
             result.name = name;
             if (origUnits != null)
                 result.units = origUnits;
             return result;
+        }
+
+        private TimeStep GetTimeStep(string aggregation,TimeStep fallback)
+        {
+            switch (aggregation)
+            {
+                case "annual":return TimeStep.Annual;
+                case "month": return TimeStep.Monthly;
+                case "day": return TimeStep.Daily;
+            }
+
+            return fallback;
         }
 
         private SimpleTimeSeries SimpleTimeSeries(TimeSeries result)

@@ -13,7 +13,9 @@ namespace FlowMatters.Source.WebServer
 
         public const string TimeSeriesQuery = "?from={fromDate}&to={toDate}&precision={precision}";
 
-        public const string TimeSeries = TimeSeriesBase + TimeSeriesQuery;
+        public const string TimeStepOptions = "&timestep={aggregation}&aggfn={aggfn}";
+
+        public const string TimeSeries = TimeSeriesBase + TimeSeriesQuery + TimeStepOptions;
 
         public const string AggregatedTimeSeries = TimeSeriesBase + "/aggregated/{aggregation}" + TimeSeriesQuery;
 
