@@ -73,6 +73,13 @@ namespace FlowMatters.Source.WebServer
         [WebInvoke(Method = "OPTIONS", UriTemplate = "*")]
         public void GetOptions()
         {
+            WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Methods", "GET");
+            WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Methods", "PUT");
+            WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Methods", "POST");
+            WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Methods", "DELETE");
+
+            WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Accept");
+            WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Max-Age", "1728000");
         }
 
         [OperationContract]
