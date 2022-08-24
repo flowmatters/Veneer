@@ -263,6 +263,8 @@
     <Compile Include="Formatting\ReplyFormatSwitchBehaviour.cs" />
     <Compile Include="ExchangeObjects\FunctionValue.cs" />
     <Compile Include="ExchangeObjects\InputSetSummary.cs" />
+    <Compile Include="AutoStart\InitialiseOnLoadAttribute.cs" />
+    <Compile Include="AutoStart\ProjectLoadListener.cs" />
     <Compile Include="RemoteScripting\IronPythonResponse.cs" />
     <Compile Include="RemoteScripting\IronPythonScript.cs" />
     <Compile Include="ISourceService.cs" />
