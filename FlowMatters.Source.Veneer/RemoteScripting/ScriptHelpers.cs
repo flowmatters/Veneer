@@ -256,11 +256,11 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
             });
             /*
             var defaultConstituentSource = scenario.SystemConfiguration.ConstituentSources.First(cs => cs.IsDefault);
-            #if V3 || V4_0 || V4_1 || V4_2 || V4_3_0
+#if V3 || V4_0 || V4_1 || V4_2 || V4_3_0
                         constituentModel.ConstituentSources.Add(new ConstituentSourceContainer(defaultConstituentSource, new NilConstituent(), new PassThroughFilter()));
-            #else
+#else
                         constituentModel.AddConstituentSources(new ConstituentSourceContainer(defaultConstituentSource, new NilConstituent(), new PassThroughFilter()));
-            #endif
+#endif
             */
         }
 
