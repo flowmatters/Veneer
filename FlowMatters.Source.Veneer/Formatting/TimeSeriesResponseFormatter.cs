@@ -68,7 +68,8 @@ namespace FlowMatters.Source.Veneer.Formatting
         {
             string[] fields = new[]
             {
-                "RunNumber","NetworkElement","RecordingElement","RecordingVariable",
+                "RunNumber","NetworkElement","FunctionalUnit",
+                "RecordingElement","RecordingVariable",
                 "Units","StartDate","EndDate","NoDataValue",
                 "Min","Mean","Max","Sum","TimeStep"
             };

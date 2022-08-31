@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.ServiceModel;
 using System.ServiceModel.Description;
 using System.ServiceModel.Web;
@@ -8,13 +9,17 @@ using System.Text;
 using System.Reflection;
 using FlowMatters.Source.Veneer.CORS;
 using FlowMatters.Source.Veneer.Formatting;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using RiverSystem;
+using RiverSystem.ManagedExtensions;
 
 namespace FlowMatters.Source.WebServer
 {
     public class SourceRESTfulService : AbstractSourceServer
     {
         public const int DEFAULT_PORT = 9876;
+        public const string STATUS_URL = "https://www.flowmatters.com.au/veneer/status.json";
         private WebServiceHost _host;
         private SourceService _singletonInstance;
         private RiverSystemScenario _scenario;
@@ -60,7 +65,15 @@ namespace FlowMatters.Source.WebServer
             {
                 Running = false;
                 _host.Open();
-                Log("Veneer, by Flow Matters: http://www.flowmatters.com.au");
+                Log("Veneer, by Flow Matters: https://www.flowmatters.com.au");
+                try
+                {
+                    RetrieveVeneerStatus();
+                }
+                catch
+                {
+                    // Pass
+                }
                 Log(string.Format("Started Source RESTful Service on port:{0}", _port));
                 Running = true;
             }
@@ -100,6 +113,17 @@ namespace FlowMatters.Source.WebServer
                 Log(e.StackTrace);
             }
             _host.Faulted += _host_Faulted;
+        }
+
+        private void RetrieveVeneerStatus()
+        {
+            using( WebClient wc = new WebClient())
+            {
+                var notifications = wc.DownloadString(STATUS_URL);
+                dynamic status = JsonConvert.DeserializeObject(notifications);
+                JArray messages = status.message;
+                messages.Reverse().Select(e=>e.ToString()).ForEachItem(Log);
+            }
         }
 
         private void LeaveDotsAndSlashesEscaped()

@@ -18,16 +18,16 @@ namespace FlowMatters.Source.Veneer.CORS
 
         public object AfterReceiveRequest(ref Message request, IClientChannel channel, InstanceContext instanceContext)
         {
-            List<String> knownOrigins = new List<string>
-            {
-                "www.flowmatters.com.au",
-                "flowmatters.com.au",
-                "hydrograph.io",
-                "www.hydrograph.io",
-                "staging.hydrograph.io",
-                "0.0.0.0",
-                "localhost"
-            };
+            //List<String> knownOrigins = new List<string>
+            //{
+            //    "www.flowmatters.com.au",
+            //    "flowmatters.com.au",
+            //    "hydrograph.io",
+            //    "www.hydrograph.io",
+            //    "staging.hydrograph.io",
+            //    "0.0.0.0",
+            //    "localhost"
+            //};
 
             HttpRequestMessageProperty httpProp = (HttpRequestMessageProperty)request.Properties[HttpRequestMessageProperty.Name];
 
@@ -37,9 +37,10 @@ namespace FlowMatters.Source.Veneer.CORS
             origin = origin.Split(':')[1];
             origin = origin.TrimStart('/');
 
-            if (knownOrigins.Contains(origin))
-                return httpProp.Headers[Origin];
-            return null;
+            return httpProp.Headers[Origin];
+            //if (knownOrigins.Contains(origin))
+            //    return httpProp.Headers[Origin];
+            //return null;
         }
 
         public void BeforeSendReply(ref Message reply, object correlationState)

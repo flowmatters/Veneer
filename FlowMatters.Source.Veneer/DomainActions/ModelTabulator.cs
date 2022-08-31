@@ -4,6 +4,7 @@ using System.Data;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using FlowMatters.Source.Veneer.ExchangeObjects;
 using RiverSystem;
 using RiverSystem.Catchments;
 using RiverSystem.ManagedExtensions;
@@ -38,6 +39,16 @@ namespace FlowMatters.Source.Veneer.DomainActions
                 });
                 result.Rows.Add(row);
             }
+            return result;
+        }
+
+        public static ModelTableIndex Index()
+        {
+            var result = new ModelTableIndex();
+            result.Tables = new[]
+            {
+                new ModelTableIndexItem("Functional Units", "/tables/fus")
+            };
             return result;
         }
     }
