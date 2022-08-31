@@ -17,12 +17,17 @@ using RiverSystem.Catchments;
 using RiverSystem.Catchments.Constituents;
 using RiverSystem.Catchments.Models.ContaminantGenerationModels;
 using RiverSystem.Constituents;
+using RiverSystem.DataManagement;
 using RiverSystem.DataManagement.DataManager;
 using RiverSystem.DataManagement.DataManager.DataDetails;
 using RiverSystem.DataManagement.DataManager.DataSources;
 using RiverSystem.ManagedExtensions;
 using RiverSystem.Quality.SourceSinkModels;
+#if V3 || V4 || V5_0 || V5_1 || V5_2 || V5_3 || V5_4 || V5_5 || V5_6 || V5_7 || V5_8 || V5_9 || V5_10
+using RiverSystemGUI_II.SchematicBuilder;
+#else
 using RiverSystem.Forms.SchematicBuilder;
+#endif
 using TIME.Core;
 using TimeSeries = TIME.DataTypes.TimeSeries;
 using TIME.Management;

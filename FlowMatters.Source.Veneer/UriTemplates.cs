@@ -9,12 +9,17 @@ namespace FlowMatters.Source.WebServer
     {
         public const string Recordable = "/location/{networkElement}/element/{recordingElement}/variable/{variable}";
 
-        public const string TimeSeries = RunResults + Recordable;
+        public const string TimeSeriesBase = RunResults + Recordable;
 
-//        public const string ResultsTable = 
-        public const string AggregatedTimeSeries = TimeSeries + "/aggregated/{aggregation}";
+        public const string TimeSeriesQuery = "?from={fromDate}&to={toDate}&precision={precision}";
 
-        public const string TabulatedResults = TimeSeries + "/tabulated/{functions}";
+        public const string TimeStepOptions = "&timestep={aggregation}&aggfn={aggfn}";
+
+        public const string TimeSeries = TimeSeriesBase + TimeSeriesQuery + TimeStepOptions;
+
+        public const string AggregatedTimeSeries = TimeSeriesBase + "/aggregated/{aggregation}" + TimeSeriesQuery;
+
+        public const string TabulatedResults = TimeSeriesBase + "/tabulated/{functions}";
 
         public const string RunResults = "/runs/{runId}";
         public const string Runs = "/runs";
@@ -29,7 +34,11 @@ namespace FlowMatters.Source.WebServer
 
         public const string Resources = "/resources/{resourceName}";
 
+        public const string Projection = "/projection";
+
         public const string Network = "/network";
+
+        public const string NetworkGeographic = "/network/geographic";
 
         public const string Nodes = "/network/nodes";
 
@@ -58,6 +67,8 @@ namespace FlowMatters.Source.WebServer
         public const string DataGroupItemDetails = DataGroupItem + "/{item}";
 
         public const string DataGroupMultipleItemDetails = DataSourceGroup + "/" + MatchAll + "/{name}";
+
+        public const string ScenarioTablesIndex = "/tables";
 
         public const string ScenarioTables = "/tables/{table}";
 
