@@ -38,6 +38,7 @@ using RiverSystem.PreProcessing.ProjectionInfo;
 using RiverSystem.ScenarioExplorer.ParameterSet;
 using TIME.Core;
 using TIME.DataTypes;
+using TIME.DataTypes.Utils;
 using TIME.Management;
 using TIME.ScenarioManagement;
 
