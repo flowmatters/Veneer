@@ -91,9 +91,9 @@
       <SpecificVersion>False</SpecificVersion>
       <Private>False</Private>
     </Reference>
-    <Reference Include="RiverSystem.PreProcessing, Version=5.0.3.0, Culture=neutral, processorArchitecture=MSIL">
+    <Reference Include="RiverSystem.PreProcessing">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\References\RiverSystem.PreProcessing.dll</HintPath>
+      <Private>False</Private>
     </Reference>
     <Reference Include="RiverSystem.ScenarioExplorer">
       <SpecificVersion>False</SpecificVersion>
