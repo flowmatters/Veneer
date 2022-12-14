@@ -24,6 +24,7 @@ using FlowMatters.Source.Veneer;
 using FlowMatters.Source.Veneer.DomainActions;
 using FlowMatters.Source.Veneer.ExchangeObjects;
 using FlowMatters.Source.Veneer.ExchangeObjects.DataSources;
+using FlowMatters.Source.Veneer.Formatting;
 using FlowMatters.Source.Veneer.RemoteScripting;
 using FlowMatters.Source.WebServer.ExchangeObjects;
 using RiverSystem;
@@ -33,6 +34,7 @@ using RiverSystem.DataManagement.DataManager;
 using RiverSystem.Functions;
 using RiverSystem.Functions.Variables;
 using RiverSystem.ManagedExtensions;
+using RiverSystem.PreProcessing.ProjectionInfo;
 using RiverSystem.ScenarioExplorer.ParameterSet;
 using TIME.Core;
 using TIME.DataTypes;
@@ -66,6 +68,19 @@ namespace FlowMatters.Source.WebServer
         {
             AllowScript = false;
             RunningInGUI = true;
+        }
+
+        [OperationContract]
+        [WebInvoke(Method = "OPTIONS", UriTemplate = "*")]
+        public void GetOptions()
+        {
+            WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Methods", "GET");
+            WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Methods", "PUT");
+            WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Methods", "POST");
+            WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Methods", "DELETE");
+
+            WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Accept");
+            WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Max-Age", "1728000");
         }
 
         [OperationContract]
@@ -143,6 +158,15 @@ namespace FlowMatters.Source.WebServer
         }
 
         [OperationContract]
+        [WebInvoke(Method = "GET", ResponseFormat = WebMessageFormat.Json, UriTemplate = UriTemplates.NetworkGeographic)]
+        public GeoJSONNetwork GetNetworkGeographic()
+        {
+            Log("Requested network in geographic coordinates");
+            //            WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Origin", "*");
+            return NetworkToGeographic.ToGeographic(Scenario.Network,Scenario.GeographicData.Projection as AbstractProjectionInfo);
+        }
+
+        [OperationContract]
         [WebInvoke(Method = "GET", ResponseFormat = WebMessageFormat.Json, UriTemplate = UriTemplates.Node)]
         public GeoJSONFeature GetNode(string nodeId)
         {
@@ -168,10 +192,14 @@ namespace FlowMatters.Source.WebServer
             RunLink[] links = new RunLink[runs.Length];
             for(int i = 0; i < runs.Length; i++)
             {
+                var run = runs[i];
                 links[i] = new RunLink
                     {
-                        RunName = runs[i].Name,
-                        RunUrl = "/runs/" + runs[i].RunNumber
+                        RunName = run.Name,
+                        RunUrl = "/runs/" + run.RunNumber,
+                        DateRun = run.DateRun.ToString(CultureInfo.InvariantCulture),
+                        Scenario = run.Scenario.Name,
+                        Status = run.RunResultIndicator.ToString()
                     };
             }
 
@@ -314,29 +342,76 @@ namespace FlowMatters.Source.WebServer
         [OperationContract]
         [WebInvoke(Method = "GET", ResponseFormat = WebMessageFormat.Json, UriTemplate = UriTemplates.TimeSeries)]
         public TimeSeriesResponse GetTimeSeries(string runId, string networkElement, string recordingElement,
-                                              string variable)
+                                              string variable,string fromDate, string toDate,string precision,
+                                              string aggregation, string aggfn)
         {
             Log(String.Format("Requested time series {0}/{1}/{2}/{3}",runId,networkElement,recordingElement,variable));
-            Tuple<TimeSeriesLink, TimeSeries>[] result = MatchTimeSeries(runId, networkElement, recordingElement, variable);
-
-            if (result.Length == 1) 
-                return SimpleTimeSeries(result[0].Item2);
-            return CreateMultipleTimeSeries(result);
+            return GetTimeSeriesInternal(runId, networkElement, recordingElement, variable, aggregation, aggfn, fromDate, toDate,precision);
         }
 
         [OperationContract]
         [WebInvoke(Method = "GET", ResponseFormat = WebMessageFormat.Json,
             UriTemplate = UriTemplates.AggregatedTimeSeries)]
         public TimeSeriesResponse GetAggregatedTimeSeries(string runId, string networkElement, string recordingElement,
-                                              string variable, string aggregation)
+                                              string variable, string aggregation, string fromDate, string toDate, string precision)
         {
             Log(String.Format("Requested {4} time series {0}/{1}/{2}/{3}", runId, networkElement, recordingElement, variable,aggregation));
-            Tuple<TimeSeriesLink, TimeSeries>[] result = MatchTimeSeries(runId, WebUtility.HtmlDecode(networkElement), WebUtility.HtmlDecode(recordingElement), WebUtility.HtmlDecode(variable));
+            return GetTimeSeriesInternal(runId, networkElement, recordingElement, variable, aggregation,"sum" , fromDate,toDate,precision);
+        }
 
-            result = result.Select(res=>new Tuple<TimeSeriesLink,TimeSeries>(res.Item1,AggregateTimeSeries(res.Item2, aggregation))).ToArray();
-            if(result.Length==1)
+        private TimeSeriesResponse GetTimeSeriesInternal(string runId, string networkElement, string recordingElement,
+            string variable, string aggregation,string aggregationFunction, string fromDate, string toDate, string precision)
+        {
+            Tuple<TimeSeriesLink, TimeSeries>[] result = MatchTimeSeries(runId, networkElement, recordingElement, variable);
+
+            if (fromDate != null || toDate != null)
+            {
+                DateTime? from = ParsePartialDate(fromDate, false);
+                DateTime? to = ParsePartialDate(toDate, true);
+                result = TransformTimeSeriesCollection(result, (TimeSeries ts) => ts.extract(from??ts.Start,to??ts.End));
+            }
+
+            if (aggregation != null)
+            {
+                aggregationFunction = aggregationFunction ?? "sum";
+                result = TransformTimeSeriesCollection(result, ts => AggregateTimeSeries(ts, aggregation, aggregationFunction));
+            }
+
+            if (precision != null)
+            {
+                var decimalPlaces = Int32.Parse(precision);
+                result = TransformTimeSeriesCollection(result, ts => ts.Round(decimalPlaces) as TimeSeries);
+            }
+
+            if (result.Length == 1)
                 return SimpleTimeSeries(result[0].Item2);
             return CreateMultipleTimeSeries(result);
+        }
+
+        private Tuple<TimeSeriesLink, TimeSeries>[] TransformTimeSeriesCollection(
+            Tuple<TimeSeriesLink, TimeSeries>[] collection, Func<TimeSeries, TimeSeries> transform)
+        {
+            return collection.Select(pair=>new Tuple<TimeSeriesLink,TimeSeries>(pair.Item1,transform(pair.Item2))).ToArray();
+        }
+
+        private DateTime? ParsePartialDate(string dateString, bool endOfPeriod)
+        {
+            if (dateString == null)
+            {
+                return null;
+            }
+
+            var components = dateString.Split('-').Select(Int32.Parse).ToList();
+            if (components.Count == 1)
+            {
+                components.Add(endOfPeriod?12:1);
+                components.Add(endOfPeriod?31:1);
+            } else if (components.Count == 2)
+            {
+                components.Add(endOfPeriod?DateTime.DaysInMonth(components[0],components[1]):1);
+            }
+
+            return new DateTime(components[0], components[1], components[2]);
         }
 
         [OperationContract]
@@ -702,6 +777,14 @@ namespace FlowMatters.Source.WebServer
         }
 
         [OperationContract]
+        [WebInvoke(Method = "GET", UriTemplate = UriTemplates.ScenarioTablesIndex,
+            ResponseFormat = WebMessageFormat.Json)]
+        public ModelTableIndex ModelTableIndex()
+        {
+            return ModelTabulator.Index();
+        }
+
+        [OperationContract]
         [WebInvoke(Method = "GET", UriTemplate = UriTemplates.ScenarioTables,
              ResponseFormat = WebMessageFormat.Json)]
         public DataTable ModelTable(string table)
@@ -736,6 +819,12 @@ namespace FlowMatters.Source.WebServer
             return new string[0];
         }
 
+        [OperationContract]
+        [WebInvoke(Method = "PUT", UriTemplate = UriTemplates.Projection, ResponseFormat = WebMessageFormat.Json)]
+        public void AssignProjection(ProjectionInfo p)
+        {
+            p.AssignTo(Scenario);
+        }
         private void SwitchRecording(TimeSeriesLink query, bool record)
         {
             Dictionary<ProjectViewRow.RecorderFields, object> constraint = new Dictionary<ProjectViewRow.RecorderFields, object>();
@@ -786,7 +875,7 @@ namespace FlowMatters.Source.WebServer
             }
         }
 
-        private TimeSeries AggregateTimeSeries(TimeSeries result, string aggregation)
+        private TimeSeries AggregateTimeSeries(TimeSeries result, string aggregation, string aggregationFunction)
         {
             if (result == null)
                 return null;
@@ -794,15 +883,45 @@ namespace FlowMatters.Source.WebServer
             var origUnits = result.units;
 
             string name = result.name;
-            if (aggregation == "monthly")
-                result = result.toMonthly();
+            TimeStep newTimeStep = GetTimeStep(aggregation,result.timeStep);
 
-            if (aggregation == "annual")
-                result = result.toAnnual();
+            var groups = result.GroupByTimeStep(newTimeStep);
+            Tuple<DateTime, double>[] entries;
+            if (aggregationFunction == "sum")
+            {
+                entries = groups.Select(ts => new Tuple<DateTime, double>(ts.timeForItem(0), ts.Sum())).ToArray();
+            }
+            else
+            {
+                entries = groups.Select(ts => new Tuple<DateTime, double>(ts.timeForItem(0), ts.average())).ToArray();
+            }
+
+            var dates = entries.Select(v => v.Item1).ToArray();
+            var values = entries.Select(v => v.Item2).ToArray();
+
+            result = new TimeSeries(dates[0], newTimeStep, values);
+
+            //if (aggregation == "monthly")
+            //    result = result.toMonthly();
+            
+            //if (aggregation == "annual")
+            //    result = result.toAnnual();
             result.name = name;
             if (origUnits != null)
                 result.units = origUnits;
             return result;
+        }
+
+        private TimeStep GetTimeStep(string aggregation,TimeStep fallback)
+        {
+            switch (aggregation)
+            {
+                case "annual":return TimeStep.Annual;
+                case "month": return TimeStep.Monthly;
+                case "day": return TimeStep.Daily;
+            }
+
+            return fallback;
         }
 
         private SimpleTimeSeries SimpleTimeSeries(TimeSeries result)

@@ -89,7 +89,7 @@ namespace FlowMatters.Source.Veneer
                 runWindow.Dispose();
             }
 
-            if(parameters.Params.ContainsKey(RUN_NAME_KEY))
+            if((parameters!=null)&&parameters.Params.ContainsKey(RUN_NAME_KEY))
             {
                 try
                 {

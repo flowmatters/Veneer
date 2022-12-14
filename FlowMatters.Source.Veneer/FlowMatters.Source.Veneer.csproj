@@ -91,6 +91,10 @@
       <SpecificVersion>False</SpecificVersion>
       <Private>False</Private>
     </Reference>
+    <Reference Include="RiverSystem.PreProcessing">
+      <SpecificVersion>False</SpecificVersion>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="RiverSystem.ScenarioExplorer">
       <SpecificVersion>False</SpecificVersion>
       <Private>False</Private>
@@ -232,8 +236,10 @@
     <Compile Include="ExchangeObjects\GeoJSONCoverage.cs" />
     <Compile Include="ExchangeObjects\GeoJSONFeature.cs" />
     <Compile Include="ExchangeObjects\ListResponse.cs" />
+    <Compile Include="ExchangeObjects\ModelTableIndex.cs" />
     <Compile Include="ExchangeObjects\MultipleTimeSeries.cs" />
     <Compile Include="ExchangeObjects\NumericResponse.cs" />
+    <Compile Include="ExchangeObjects\ProjectionInfo.cs" />
     <Compile Include="ExchangeObjects\RecordingInstructions.cs" />
     <Compile Include="ExchangeObjects\RunLink.cs" />
     <Compile Include="ExchangeObjects\RunParameters.cs" />
@@ -251,6 +257,7 @@
     <Compile Include="ExchangeObjects\GeoJSONGeometry.cs" />
     <Compile Include="ExchangeObjects\GeoJSONNetwork.cs" />
     <Compile Include="ExchangeObjects\VeneerStatus.cs" />
+    <Compile Include="Formatting\NetworkToGeographic.cs" />
     <Compile Include="Formatting\TableResponseFormatter.cs" />
     <Compile Include="Formatting\TimeSeriesResponseFormatter.cs" />
     <Compile Include="Formatting\ReplyFormatSwitchBehaviour.cs" />

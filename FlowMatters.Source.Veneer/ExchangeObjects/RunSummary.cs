@@ -98,7 +98,7 @@ namespace FlowMatters.Source.WebServer.ExchangeObjects
             {
                 networkElementSuffix = UriTemplates.NETWORK_ELEMENT_FU_DELIMITER + row.WaterFeatureType;
             }
-                return string.Format(UriTemplates.TimeSeries.Replace("{runId}", "{0}").Replace("{networkElement}", "{1}").Replace("{recordingElement}","{2}").Replace("{variable}", "{3}"), 
+            return string.Format(UriTemplates.TimeSeriesBase.Replace("{runId}", "{0}").Replace("{networkElement}", "{1}").Replace("{recordingElement}","{2}").Replace("{variable}", "{3}"), 
                 runNumber, SourceService.URLSafeString(row.NetworkElementName+networkElementSuffix), SourceService.URLSafeString(row.ElementName), SourceService.URLSafeString(SelectRecordingVariable(key,row)));
         }
 
