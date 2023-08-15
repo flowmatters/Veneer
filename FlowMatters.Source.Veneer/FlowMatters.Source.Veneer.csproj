@@ -232,6 +232,7 @@
     <Compile Include="DomainActions\ModelTabulator.cs" />
     <Compile Include="DomainActions\ScenarioInvoker.cs" />
     <Compile Include="DomainActions\TimeSeriesFunctions.cs" />
+    <Compile Include="DomainActions\TrimNetwork.cs" />
     <Compile Include="ExchangeObjects\BooleanResponse.cs" />
     <Compile Include="ExchangeObjects\DataSources\SimpleDataDetails.cs" />
     <Compile Include="ExchangeObjects\DataSources\SimpleDataGroupItem.cs" />
