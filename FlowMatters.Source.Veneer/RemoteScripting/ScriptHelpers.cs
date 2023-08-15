@@ -33,6 +33,7 @@ using TimeSeries = TIME.DataTypes.TimeSeries;
 using TIME.Management;
 using TIME.Tools.Reflection;
 using TIME.Core.Metadata;
+using Newtonsoft.Json.Linq;
 
 namespace FlowMatters.Source.Veneer.RemoteScripting
 {
@@ -284,6 +285,12 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
             object tmp;
             scenario.AuxiliaryInformation.TryGetValue(SchematicNetworkControl.AUX_CONFIG, out tmp);
             SchematicNetworkConfigurationPersistent schematic = tmp as SchematicNetworkConfigurationPersistent;
+            if (schematic == null)
+            {
+                var _config = new SchematicNetworkConfiguration(null);
+                scenario.AuxiliaryInformation[SchematicNetworkControl.AUX_CONFIG] = _config.InnerPersister;
+                schematic = _config.InnerPersister;
+            }
             return schematic;
         }
 

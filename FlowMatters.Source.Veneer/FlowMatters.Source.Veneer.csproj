@@ -219,6 +219,10 @@
       <SpecificVersion>False</SpecificVersion>
       <Private>False</Private>
     </Reference>
+    <Reference Include="NetronGraphLib">
+      <SpecificVersion>False</SpecificVersion>
+      <Private>False</Private>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AbstractSourceServer.cs" />
