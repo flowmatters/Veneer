@@ -31,21 +31,24 @@ namespace FlowMatters.Source.WebServer.ExchangeObjects
             List<TimeSeriesLink> result = new List<TimeSeriesLink>();
             foreach (ProjectViewRow row in rows)
             {
+                try
+                {
+
 #if BEFORE_RECORDING_ATTRIBUTES_REFACTOR
                                 Dictionary<AttributeRecordingState, TimeSeries> rowResults = row.ElementRecorder.GetResultList();
 #else
-                var rowResults = row.ElementRecorder.GetResultsLookup();
+                    var rowResults = row.ElementRecorder.GetResultsLookup();
 #endif
-                //try
-                //{
-                foreach (var key in rowResults.Keys)
-                {
-                    TimeSeries ts = rowResults[key];
-                    if (ts != null)
-                        result.Add(BuildLink(ts, row, key, Number));
+                    foreach (var key in rowResults.Keys)
+                    {
+                        TimeSeries ts = rowResults[key];
+                        if (ts != null)
+                            result.Add(BuildLink(ts, row, key, Number));
+                    }
                 }
-                //}
-                //catch (ArgumentNullException) { }
+                catch (ArgumentNullException)
+                {
+                }
             }
 
             return result.ToArray();
