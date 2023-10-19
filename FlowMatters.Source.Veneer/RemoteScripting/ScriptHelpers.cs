@@ -130,6 +130,20 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
             return dm.GetUsedTimeSeries(theInputSet,ri);
         }
 
+        public static string FindFunction(RiverSystemScenario scenario, object target, string element)
+        {
+            var ri = GetReflectedItem(target, element);
+            Network theNetwork = scenario.Network;
+            var fm = theNetwork.FunctionManager;
+            var function = fm.GetFunction(ri);
+            if (function == null)
+            {
+                return "";
+            }
+
+            return function.FullName;
+        }
+
         public static string GetFullPath(this DataGroupItem dgi, ReflectedItem ri,InputSet inputSet)
         {
             var gdd = dgi.DataDetails.FirstOrDefault(dd => dd.Usages.Any(u => u.ReflectedItem.Equals(ri)));
