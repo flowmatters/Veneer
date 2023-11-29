@@ -97,7 +97,7 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
             }
 #else
             var myList = new HashSet<string>{ "system.core.dll" };
-#if V4 || V5_0 || V5_1 || V5_2 || V5_3 || V5_4 || V5_5 || V5_6 || V5_7 || V5_8 || V5_9 || V5_10
+#if BEFORE_V4 || BEFORE_V5 || BEFORE_V5_13
             var includeList = AssemblyManager.Assemblies();
 #else
             var includeList = AssemblyManager.Assemblies;

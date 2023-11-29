@@ -108,8 +108,15 @@ namespace FlowMatters.Source.VeneerCmd
 
         private static RiverSystemScenario CreateEmptyScenario(Options options)
         {
+            var callback = new CommandLineProjectCallback(options, _pluginManager);
+            var loader = ProjectHandlerFactory.CreateProjectHandler<RiverSystemProject>(callback);
+            callback.OutputFileName = "new-project.rsproj";
+            loader.CreateProject();
+            projectHandler = loader;
+
             var project = RiverSystemProject.CreateProject("Created Project");
-            var scenario = new RiverSystemScenario(project);
+            projectHandler.ProjectMetaStructure.Project = project;
+            var scenario = (RiverSystemScenario)project.ConstructNewScenario();
             var scenarioContainer = new RiverSystemScenarioContainer(scenario);
             project.AddScenario(scenarioContainer);
 
