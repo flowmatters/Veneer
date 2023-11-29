@@ -219,6 +219,10 @@
       <SpecificVersion>False</SpecificVersion>
       <Private>False</Private>
     </Reference>
+    <Reference Include="NetronGraphLib">
+      <SpecificVersion>False</SpecificVersion>
+      <Private>False</Private>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AbstractSourceServer.cs" />
@@ -228,6 +232,7 @@
     <Compile Include="DomainActions\ModelTabulator.cs" />
     <Compile Include="DomainActions\ScenarioInvoker.cs" />
     <Compile Include="DomainActions\TimeSeriesFunctions.cs" />
+    <Compile Include="DomainActions\TrimNetwork.cs" />
     <Compile Include="ExchangeObjects\BooleanResponse.cs" />
     <Compile Include="ExchangeObjects\DataSources\SimpleDataDetails.cs" />
     <Compile Include="ExchangeObjects\DataSources\SimpleDataGroupItem.cs" />
@@ -263,6 +268,8 @@
     <Compile Include="Formatting\ReplyFormatSwitchBehaviour.cs" />
     <Compile Include="ExchangeObjects\FunctionValue.cs" />
     <Compile Include="ExchangeObjects\InputSetSummary.cs" />
+    <Compile Include="AutoStart\InitialiseOnLoadAttribute.cs" />
+    <Compile Include="AutoStart\ProjectLoadListener.cs" />
     <Compile Include="RemoteScripting\IronPythonResponse.cs" />
     <Compile Include="RemoteScripting\IronPythonScript.cs" />
     <Compile Include="ISourceService.cs" />

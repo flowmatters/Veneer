@@ -33,13 +33,19 @@ namespace FlowMatters.Source.WebServerPanel
     /// </summary>
     public partial class WebServerStatusControl : UserControl, IRiverSystemPlugin, IDisposable
     {
+        public static int DefaultPort = SourceRESTfulService.DEFAULT_PORT;
+        public static bool DefaultAllowRemote = false;
+        public static bool DefaultAllowScripts = false;
+
         private RiverSystemScenario _scenario;
         private SynchronizationContext _originalContext;
         private Timer _timer;
 
         public WebServerStatusControl()
         {
-            Port = SourceRESTfulService.DEFAULT_PORT;
+            Port = DefaultPort;
+            AllowRemoteConnections = DefaultAllowRemote;
+            AllowScripts = DefaultAllowScripts;
             InitializeComponent();
             _originalContext = SynchronizationContext.Current;
             this.DataContext = this;
