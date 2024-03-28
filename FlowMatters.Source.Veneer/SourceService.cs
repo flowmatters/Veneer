@@ -675,7 +675,11 @@ namespace FlowMatters.Source.WebServer
             var res =
                 Enumerable.FirstOrDefault(dm.DataGroups, ds => SimpleDataGroupItem.MakeID(ds) == (UriTemplates.DataSources + "/" + dataSourceGroup));
             if (res == null)
+            {
                 ResourceNotFound();
+                return null;
+            }
+
             return new SimpleDataGroupItem(res, summary);
         }
 
