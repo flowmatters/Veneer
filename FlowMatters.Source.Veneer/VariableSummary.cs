@@ -76,8 +76,7 @@ namespace FlowMatters.Source.Veneer
                     .Select(@group => @group.GetUsage(split.Last()))
                     .FirstOrDefault(gdd => gdd != null);
 //                        DataUsage DU = GDD.Usages.First(x => x.ReflectedItem.Equals(ri));
-            return GDD.AssociatedData.FirstOrDefault(d => d.DataInformation.Name.Replace(".","_") == split.Last())
-                .Data.TimeSeries;
+            return GDD?.AssociatedData.FirstOrDefault(d => d.DataInformation.Name.Replace(".","_") == split.Last()).Data.TimeSeries;
         }
 
         public void UpdateTimeSeries(SimpleTimeSeries newTS)
