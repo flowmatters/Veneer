@@ -60,6 +60,7 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects
             }
             properties.Add(ResourceProperty,
                 UriTemplates.Resources.Replace("{resourceName}", ResourceName(n)));
+            properties.Add("elevation", n.elevation);
 
             geometry = new GeoJSONGeometry(loc);
         }

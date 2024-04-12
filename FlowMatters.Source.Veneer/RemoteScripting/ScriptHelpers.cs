@@ -23,7 +23,7 @@ using RiverSystem.DataManagement.DataManager.DataDetails;
 using RiverSystem.DataManagement.DataManager.DataSources;
 using RiverSystem.ManagedExtensions;
 using RiverSystem.Quality.SourceSinkModels;
-#if V3 || V4 || V5_0 || V5_1 || V5_2 || V5_3 || V5_4 || V5_5 || V5_6 || V5_7 || V5_8 || V5_9 || V5_10
+#if BEFORE_V4 || BEFORE_V5 || BEFORE_V5_13
 using RiverSystemGUI_II.SchematicBuilder;
 #else
 using RiverSystem.Forms.SchematicBuilder;
@@ -33,6 +33,7 @@ using TimeSeries = TIME.DataTypes.TimeSeries;
 using TIME.Management;
 using TIME.Tools.Reflection;
 using TIME.Core.Metadata;
+using Newtonsoft.Json.Linq;
 
 namespace FlowMatters.Source.Veneer.RemoteScripting
 {
@@ -127,6 +128,20 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
             
             DataManager dm = theNetwork.DataManager;
             return dm.GetUsedTimeSeries(theInputSet,ri);
+        }
+
+        public static string FindFunction(RiverSystemScenario scenario, object target, string element)
+        {
+            var ri = GetReflectedItem(target, element);
+            Network theNetwork = scenario.Network;
+            var fm = theNetwork.FunctionManager;
+            var function = fm.GetFunction(ri);
+            if (function == null)
+            {
+                return "";
+            }
+
+            return function.FullName;
         }
 
         public static string GetFullPath(this DataGroupItem dgi, ReflectedItem ri,InputSet inputSet)
@@ -256,11 +271,11 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
             });
             /*
             var defaultConstituentSource = scenario.SystemConfiguration.ConstituentSources.First(cs => cs.IsDefault);
-            #if V3 || V4_0 || V4_1 || V4_2 || V4_3_0
+#if V3 || V4_0 || V4_1 || V4_2 || V4_3_0
                         constituentModel.ConstituentSources.Add(new ConstituentSourceContainer(defaultConstituentSource, new NilConstituent(), new PassThroughFilter()));
-            #else
+#else
                         constituentModel.AddConstituentSources(new ConstituentSourceContainer(defaultConstituentSource, new NilConstituent(), new PassThroughFilter()));
-            #endif
+#endif
             */
         }
 
@@ -284,6 +299,12 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
             object tmp;
             scenario.AuxiliaryInformation.TryGetValue(SchematicNetworkControl.AUX_CONFIG, out tmp);
             SchematicNetworkConfigurationPersistent schematic = tmp as SchematicNetworkConfigurationPersistent;
+            if (schematic == null)
+            {
+                var _config = new SchematicNetworkConfiguration(null);
+                scenario.AuxiliaryInformation[SchematicNetworkControl.AUX_CONFIG] = _config.InnerPersister;
+                schematic = _config.InnerPersister;
+            }
             return schematic;
         }
 
