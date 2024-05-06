@@ -110,6 +110,31 @@ namespace FlowMatters.Source.WebServer
         }
 
         [OperationContract]
+        [WebInvoke(Method="POST",UriTemplate=UriTemplates.Scenario)]
+        public void SetScenario(string scenario)
+        {
+            if (RunningInGUI)
+            {
+                throw new InvalidOperationException("Cannot set scenario when running Veneer in Source user interface");
+            }
+
+            Log($"Setting scenario: {scenario}");
+            var scenarios = Scenario.RiverSystemProject.GetRSScenarios();
+            RiverSystemScenario newScenario;
+            int scenarioIdx;
+            bool isInt = Int32.TryParse(scenario, out scenarioIdx);
+            if (isInt)
+            {
+                newScenario = scenarios[scenarioIdx].riverSystemScenario;
+            }
+            else
+            {
+                newScenario = Scenario.RiverSystemProject.GetRSScenario(scenario).riverSystemScenario;
+            }
+            Scenario = newScenario;
+        }
+
+        [OperationContract]
         [WebInvoke(Method = "GET", UriTemplate = UriTemplates.Files)]
         public Stream GetFile(string fn)
         {
