@@ -583,7 +583,8 @@ namespace FlowMatters.Source.WebServer
                 {
                     URL = String.Format("{0}/{1}",UriTemplates.InputSets,URLSafeString(inputSet.Name)),
                     Name = inputSet.Name,
-                    Configuration = sets.Instructions(inputSet)
+                    Configuration = sets.Instructions(inputSet),
+                    HierarchicalName = inputSet.HierarchicalName
                 };
 
                 string fn = sets.Filename(inputSet);

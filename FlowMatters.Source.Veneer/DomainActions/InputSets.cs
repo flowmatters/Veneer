@@ -32,6 +32,12 @@ namespace FlowMatters.Source.Veneer.DomainActions
         {
             var set = new InputSet(summary.Name);
             Scenario.Network.InputSets.Add(set);
+            if (!String.IsNullOrEmpty(summary.HierarchicalName))
+            {
+                var hierarchy = summary.HierarchicalName.Substring(0,summary.HierarchicalName.Length-(summary.Name.Length+1));
+                var parentInputSet = Scenario.Network.InputSets.FirstOrDefault(s=>s.HierarchicalName== hierarchy);
+                set.ParentInputSet = parentInputSet;
+            }
             UpdateInstructions(set, summary.Configuration);
         }
 
