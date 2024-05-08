@@ -327,9 +327,15 @@ namespace FlowMatters.Source.WebServer
         [WebInvoke(Method = "DELETE", UriTemplate = UriTemplates.RunResults)]
         public void DeleteRun(string runId)
         {
+            runId = runId.ToLower();
             Log(String.Format("Deleting run results ({0})", runId));
             int id = -1;
-            if (runId == "latest")
+            if (runId == "all")
+            {
+                Scenario.Project.ResultManager.AllRuns().Select(r=>r.RunNumber).Reverse().ForEachItem(r=>DeleteRun(r.ToString()));
+                return;
+            }
+            else if (runId == "latest")
             {
                 id = Scenario.Project.ResultManager.AllRuns().Last().RunNumber;
             }
