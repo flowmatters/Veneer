@@ -76,6 +76,8 @@ namespace FlowMatters.Source.WebServer
 
         public const string Configuration = "/configuration/{element}";
 
+        public const string CustomEndPoint = "/custom/{action}";
+
         public const string MatchAll = "__all__";
 
         public const string NETWORK_ELEMENT_FU_DELIMITER = "@@";

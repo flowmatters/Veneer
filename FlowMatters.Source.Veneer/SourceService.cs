@@ -807,6 +807,11 @@ namespace FlowMatters.Source.WebServer
                 return null;
             }
             Log(String.Format("Running IronyPython script:\n{0}",(script.Script.Length>80)?(script.Script.Substring(0,75)+"..."):script.Script));
+            return runIronPythonWithScenario(script);
+        }
+
+        private IronPythonResponse runIronPythonWithScenario(IronPythonScript script)
+        {
             scriptRunner.Scenario = Scenario;
             scriptRunner.ProjectHandler = ProjectHandler;
             return scriptRunner.Run(script);
@@ -861,6 +866,27 @@ namespace FlowMatters.Source.WebServer
         {
             p.AssignTo(Scenario);
         }
+
+        [OperationContract]
+        [WebInvoke(Method = "POST", UriTemplate = UriTemplates.CustomEndPoint, ResponseFormat = WebMessageFormat.Json)]
+        public IronPythonResponse RunCustomEndPoint(string action, string[] parameters)
+        {
+            var custom = CustomEndPoints.FirstOrDefault(ep => ep.endpoint == action);
+            if (custom == null)
+            {
+                return null;
+            }
+
+            return runIronPythonWithScenario(new IronPythonScript{Script= custom.GetScript(parameters)});
+        }
+
+        public void RegisterEndPoint(CustomEndPoint ep)
+        {
+            CustomEndPoints.Add(ep);
+        }
+
+        private List<CustomEndPoint> CustomEndPoints = new List<CustomEndPoint>();
+
         private void SwitchRecording(TimeSeriesLink query, bool record)
         {
             Dictionary<ProjectViewRow.RecorderFields, object> constraint = new Dictionary<ProjectViewRow.RecorderFields, object>();

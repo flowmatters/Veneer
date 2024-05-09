@@ -11,7 +11,9 @@ using RiverSystem.ApplicationLayer.Consumers;
 using RiverSystem.ApplicationLayer.Creation;
 using RiverSystem.PluginManager;
 using CommandLine;
+using FlowMatters.Source.Veneer.RemoteScripting;
 using FlowMatters.Source.WebServer;
+using Newtonsoft.Json;
 using RiverSystem.ApplicationLayer;
 using RiverSystem.ApplicationLayer.Interfaces;
 using RiverSystem.ApplicationLayer.Persistence.ZipContainer;
@@ -73,6 +75,13 @@ namespace FlowMatters.Source.VeneerCmd
             var fn = (options.ProjectFiles.Count>0)?options.ProjectFiles[0]:null;
             LoadPlugins(options.PluginsToLoad);
 
+            var customEndpoints = Array.Empty<CustomEndPoint>();
+            if (options.CustomEndPointFiles != null)
+            {
+                var files = options.CustomEndPointFiles.Split(',');
+                customEndpoints = files.SelectMany(f => JsonConvert.DeserializeObject<List<CustomEndPoint>>(File.ReadAllText(f))).ToArray();
+            }
+
             RiverSystemScenario scenario;
             if (fn == null)
             {
@@ -99,6 +108,13 @@ namespace FlowMatters.Source.VeneerCmd
             _server.Service.AllowScript = options.AllowScripts;
             _server.Service.RunningInGUI = false;
             _server.Service.ProjectHandler = projectHandler;
+
+            customEndpoints.ForEachItem(ep=> _server.Service.RegisterEndPoint(ep));
+            if (customEndpoints.Length>0)
+            {
+                Console.WriteLine($"Registered {customEndpoints.Length} custom endpoints");
+            }
+
             Show("Server started. Ctrl-C to exit, or POST /shutdown command");
             while (true)
             {
@@ -289,6 +305,10 @@ namespace FlowMatters.Source.VeneerCmd
 
         [Option('l',"load-plugin",HelpText = "Load plugins in addition to configured plugins",DefaultValue =null)]
         public string PluginsToLoad { get; set; }
+
+        [Option('c', "custom-endpoints", HelpText = "Custom endpoints to enable, specified as command separated list of filenames", DefaultValue = null)]
+        public string CustomEndPointFiles{ get; set; }
+
 
         [ValueList(typeof(List<string>), MaximumElements = 1)]
         public IList<string> ProjectFiles { get; set; }
