@@ -17,13 +17,13 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
         public string[] script { get; set; }
         public string[] parameters { get; set; }
 
-        public string GetScript(string[] parametetValues)
+        public string GetScript(string[] parameterValues)
         {
             var fullScript = String.Join(Environment.NewLine, script);
             for (var i = 0; i < parameters.Length; i++)
             {
                 var paramName = parameters[i];
-                var paramValue = (parameters.Length > i) ? parameters[i] : "";
+                var paramValue = (parameterValues.Length > i) ? parameterValues[i] : "";
                 var key = "{{" + paramName + "}}";
                 fullScript = fullScript.Replace(key, paramValue);
             }
