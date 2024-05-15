@@ -7,6 +7,8 @@ namespace FlowMatters.Source.WebServer
 {
     class UriTemplates
     {
+        public const string Scenario = "/scenario/{scenario}";
+
         public const string Recordable = "/location/{networkElement}/element/{recordingElement}/variable/{variable}";
 
         public const string TimeSeriesBase = RunResults + Recordable;
@@ -73,6 +75,8 @@ namespace FlowMatters.Source.WebServer
         public const string ScenarioTables = "/tables/{table}";
 
         public const string Configuration = "/configuration/{element}";
+
+        public const string CustomEndPoint = "/custom/{action}";
 
         public const string MatchAll = "__all__";
 
