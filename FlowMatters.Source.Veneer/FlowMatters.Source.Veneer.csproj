@@ -270,6 +270,7 @@
     <Compile Include="ExchangeObjects\InputSetSummary.cs" />
     <Compile Include="AutoStart\InitialiseOnLoadAttribute.cs" />
     <Compile Include="AutoStart\ProjectLoadListener.cs" />
+    <Compile Include="RemoteScripting\CustomEndPoint.cs" />
     <Compile Include="RemoteScripting\IronPythonResponse.cs" />
     <Compile Include="RemoteScripting\IronPythonScript.cs" />
     <Compile Include="ISourceService.cs" />
