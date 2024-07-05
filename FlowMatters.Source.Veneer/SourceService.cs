@@ -129,7 +129,7 @@ namespace FlowMatters.Source.WebServer
             }
             else
             {
-                newScenario = Scenario.RiverSystemProject.GetRSScenario(scenario).riverSystemScenario;
+                newScenario = scenarios.First(sc=>sc.ScenarioName==scenario).riverSystemScenario;
             }
             Scenario = newScenario;
         }
