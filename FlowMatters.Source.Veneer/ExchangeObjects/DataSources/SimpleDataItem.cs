@@ -44,6 +44,12 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects.DataSources
             Details = isi.DataSource.Data.Select(ddi => new SimpleDataDetails(ddi, summary)).ToArray();
 #endif
             ReloadOnRun = isi.DataSource.Data.Any(ddi => ddi.DataInformation.ReloadOnRun);
+            var dataFile = isi.DataSource.SourceInformation as FileCentralDataSource;
+            if (dataFile != null)
+            {
+                Filename = dataFile.Filename;
+                FilenameIsRelative = dataFile.RelativePath;
+            }
         }
 
         public SimpleDataItem(GenericDataDetails gdd)
@@ -196,5 +202,8 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects.DataSources
         [DataMember] public string UnitsForNewTS;
 
         [DataMember] public bool ReloadOnRun;
+        [DataMember] public string Filename;
+        [DataMember] public bool FilenameIsRelative;
+
     }
 }

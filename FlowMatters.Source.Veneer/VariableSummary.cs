@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Runtime.Serialization;
 using System.Text;
+using FlowMatters.Source.Veneer.RemoteScripting;
 using FlowMatters.Source.WebServer.ExchangeObjects;
 using RiverSystem;
 using RiverSystem.DataManagement.DataManager;
@@ -55,6 +56,11 @@ namespace FlowMatters.Source.Veneer
                                    kvp("ResultUnit", tsV.ResultUnit.Name);
                 TimeSeriesData = new SimpleTimeSeries(FindTimeSeries());
                 TimeSeries = String.Format("/variables/{0}/TimeSeries", FullName.Replace("$", ""));
+                TimeSeriesDataSources = new Dictionary<string, string>();
+                foreach (var inputSet in Scenario.Network.InputSets)
+                {
+                    TimeSeriesDataSources[inputSet.HierarchicalName] = ScriptHelpers.FindDataSource(Scenario, v, "Value",inputSet.Name);
+                }
             }
         }
 
@@ -76,8 +82,7 @@ namespace FlowMatters.Source.Veneer
                     .Select(@group => @group.GetUsage(split.Last()))
                     .FirstOrDefault(gdd => gdd != null);
 //                        DataUsage DU = GDD.Usages.First(x => x.ReflectedItem.Equals(ri));
-            return GDD.AssociatedData.FirstOrDefault(d => d.DataInformation.Name.Replace(".","_") == split.Last())
-                .Data.TimeSeries;
+            return GDD?.AssociatedData.FirstOrDefault(d => d.DataInformation.Name.Replace(".","_") == split.Last()).Data.TimeSeries;
         }
 
         public void UpdateTimeSeries(SimpleTimeSeries newTS)
@@ -109,6 +114,8 @@ namespace FlowMatters.Source.Veneer
         [DataMember] public string VeneerDebugInfo;
         [DataMember] public string TimeSeries;
         [DataMember] public string PiecewiseFunction;
+        [DataMember] public Dictionary<string,string> TimeSeriesDataSources;
+
         public SimpleTimeSeries TimeSeriesData;
         public SimplePiecewise PiecewiseFunctionData { get; set; }
 
