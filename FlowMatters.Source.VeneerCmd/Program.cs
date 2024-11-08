@@ -73,7 +73,7 @@ namespace FlowMatters.Source.VeneerCmd
         {
 // consume Options instance properties
             var fn = (options.ProjectFiles.Count>0)?options.ProjectFiles[0]:null;
-            LoadPlugins(options.PluginsToLoad);
+            LoadPlugins(options.PluginsToLoad,!options.SkipRegisteredPlugins);
 
             var customEndpoints = Array.Empty<CustomEndPoint>();
             if (options.CustomEndPointFiles != null)
@@ -202,7 +202,7 @@ namespace FlowMatters.Source.VeneerCmd
         const int MAX_PLUGIN_LOAD_ATTEMPTS = 120;
         const int INCREMENT_PLUGIN_LOADING_DELAY = 10;
 
-        private static void LoadPlugins(string pluginsToLoad)
+        private static void LoadPlugins(string pluginsToLoad, bool loadRegistered=true)
         {
             string[] additionalPlugins = {};
 
@@ -230,9 +230,12 @@ namespace FlowMatters.Source.VeneerCmd
                     break;
             }
 #else
+            if (!loadRegistered)
+            {
+                PluginManager.ManagementFile = Path.GetTempFileName();
+            }
             var manager = PluginManager.Instance;
 #endif
-
             foreach (string plugin in additionalPlugins)
             {
                 Console.Write("Loading from command line {0}... ", plugin);
@@ -305,6 +308,9 @@ namespace FlowMatters.Source.VeneerCmd
 
         [Option('l',"load-plugin",HelpText = "Load plugins in addition to configured plugins",DefaultValue =null)]
         public string PluginsToLoad { get; set; }
+
+        [Option('x',"skip-registered",HelpText="Skip loading of already registered plugins",DefaultValue=false)]
+        public bool SkipRegisteredPlugins { get; set; }
 
         [Option('c', "custom-endpoints", HelpText = "Custom endpoints to enable, specified as command separated list of filenames", DefaultValue = null)]
         public string CustomEndPointFiles{ get; set; }
