@@ -16,12 +16,16 @@ using System.Windows.Media.Imaging;
 using System.Windows.Media.TextFormatting;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using FlowMatters.Source.Veneer.Addons;
+using FlowMatters.Source.Veneer.RemoteScripting;
 using FlowMatters.Source.WebServer;
+using Newtonsoft.Json;
 using RiverSystem;
 using RiverSystem.Controls.ManagedExtensions;
 using RiverSystem.TaskDefinitions;
 using Application = System.Windows.Forms.Application;
 using Button = System.Windows.Controls.Button;
+using Path = System.IO.Path;
 using TextBox = System.Windows.Controls.TextBox;
 using Timer = System.Timers.Timer;
 using UserControl = System.Windows.Controls.UserControl;
@@ -82,6 +86,43 @@ namespace FlowMatters.Source.WebServerPanel
             }
         }
 
+        private string ConfigurationFilename
+        {
+            get
+            {
+                if (Scenario == null)
+                {
+                    return null;
+                }
+
+                if (Scenario.Project.FullFilename == null)
+                {
+                    return null;
+                }
+
+                var result = Scenario.Project.FullFilename.Replace(".rsproj", ".rsproj.veneer");
+                if (File.Exists(result))
+                {
+                    return result;
+                }
+
+                return null;
+            }
+        }
+
+        private VeneerConfiguration Configuration
+        {
+            get
+            {
+                var fn = ConfigurationFilename;
+                if (fn == null)
+                {
+                    return null;
+                }
+                return JsonConvert.DeserializeObject<VeneerConfiguration>(File.ReadAllText(fn));
+            }
+        }
+
         private void PopulateMenu()
         {
             Form parent = FindParent();
@@ -127,11 +168,37 @@ namespace FlowMatters.Source.WebServerPanel
                         item.Click += (eventSender, eventArgs) => Launch(fn);
                     }
                 }
+
+                var config = Configuration;
+                if (config?.addons != null)
+                {
+                    foreach (var addon in config.addons)
+                    {
+                        ToolStripItem item = reportMenu.DropDownItems.Add(addon.name);
+                        switch (addon.type)
+                        {
+                            case "exe":
+                                item.Click += (o, args) => LaunchExeAddon(addon.path);
+                                break;
+
+                        }
+                    }
+                }
             }
             ToolStripItem veneer = reportMenu.DropDownItems.Add("");
             veneer.BackgroundImage = Veneer.Properties.Resources.Logo_RGB;
             veneer.BackgroundImageLayout = ImageLayout.Zoom;
             veneer.Click += (eventSender, eventArgs) => Process.Start("http://www.flowmatters.com.au");
+        }
+
+        private void LaunchExeAddon(string addonPath)
+        {
+            var fullPath = Path.Combine(Scenario.Project.FileDirectory, addonPath);
+            var startInfo = new ProcessStartInfo();
+            startInfo.FileName = fullPath;
+            startInfo.Environment["VENEER_PORT"] = this.Port.ToString();
+            startInfo.UseShellExecute = false;
+            Process.Start(startInfo);
         }
 
         private string NiceName(string reportFn)
