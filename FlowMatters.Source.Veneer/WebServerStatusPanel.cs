@@ -13,7 +13,7 @@ using TIME.Core.Metadata;
 
 namespace FlowMatters.Source.WebServerPanel
 {
-#ifdef V3
+#if V3
     [Aka("Veneer Server"), DisplayPath("General Tool"),MenuPlugin("Veneer.Properties.Resources.Logo_Only")]
 #else
     [Aka("Veneer Server"), InitialiseOnLoad(RiverSystemOptions.GENERAL_TOOL),MenuPlugin("Veneer.Properties.Resources.Logo_Only")]
