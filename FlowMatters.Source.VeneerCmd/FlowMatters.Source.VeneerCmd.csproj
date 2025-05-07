@@ -68,7 +68,7 @@
     <Reference Include="CommandLine">
       <SpecificVersion>False</SpecificVersion>
       <Private>True</Private>
-      <HintPath>..\RiverSystem\Solutions\packages\CommandLineParser.1.9.71\lib\net45\CommandLine.dll</HintPath>
+      <HintPath>..\..\RiverSystem\Solutions\packages\CommandLineParser.1.9.71\lib\net45\CommandLine.dll</HintPath>
     </Reference>
     <Reference Include="FirebirdSql.Data.FirebirdClient">
       <SpecificVersion>False</SpecificVersion>
