@@ -13,7 +13,11 @@ using TIME.Core.Metadata;
 
 namespace FlowMatters.Source.WebServerPanel
 {
+#ifdef V3
+    [Aka("Veneer Server"), DisplayPath("General Tool"),MenuPlugin("Veneer.Properties.Resources.Logo_Only")]
+#else
     [Aka("Veneer Server"), InitialiseOnLoad(RiverSystemOptions.GENERAL_TOOL),MenuPlugin("Veneer.Properties.Resources.Logo_Only")]
+#endif
     //    MenuPlugin("FlowMatters.Source.Veneer.Resources.Icon_Only_RGB_for_LI.png")]
     public partial class WebServerStatusPanel : UserControl, RiverSystemScenarioProxy.IRiverSystemScenarioHandler
     {
