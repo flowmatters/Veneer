@@ -50,42 +50,42 @@
     <Reference Include="IronPython">
       <SpecificVersion>False</SpecificVersion>
       <Private>True</Private>
-      <HintPath>.\packages\IronPython.2.7.5\lib\net45\IronPython.dll</HintPath>
+      <HintPath>..\RiverSystem\Solutions\packages\IronPython.2.7.5\lib\net45\IronPython.dll</HintPath>
     </Reference>
     <Reference Include="IronPython.Modules">
       <SpecificVersion>False</SpecificVersion>
       <Private>True</Private>
-      <HintPath>.\packages\IronPython.2.7.5\lib\net45\IronPython.Modules.dll</HintPath>
+      <HintPath>..\RiverSystem\Solutions\packages\IronPython.2.7.5\lib\net45\IronPython.Modules.dll</HintPath>
     </Reference>
     <Reference Include="IronPython.SQLite">
       <SpecificVersion>False</SpecificVersion>
       <Private>True</Private>
-      <HintPath>.\packages\IronPython.2.7.5\lib\net45\IronPython.SQLite.dll</HintPath>
+      <HintPath>..\RiverSystem\Solutions\packages\IronPython.2.7.5\lib\net45\IronPython.SQLite.dll</HintPath>
     </Reference>
     <Reference Include="IronPython.Wpf">
       <SpecificVersion>False</SpecificVersion>
       <Private>True</Private>
-      <HintPath>.\packages\IronPython.2.7.5\lib\net45\IronPython.Wpf.dll</HintPath>
+      <HintPath>..\RiverSystem\Solutions\packages\IronPython.2.7.5\lib\net45\IronPython.Wpf.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Dynamic">
       <SpecificVersion>False</SpecificVersion>
       <Private>True</Private>
-      <HintPath>.\packages\IronPython.2.7.5\lib\net45\Microsoft.Dynamic.dll</HintPath>
+      <HintPath>..\RiverSystem\Solutions\packages\IronPython.2.7.5\lib\net45\Microsoft.Dynamic.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Scripting">
       <SpecificVersion>False</SpecificVersion>
       <Private>True</Private>
-      <HintPath>.\packages\IronPython.2.7.5\lib\net45\Microsoft.Scripting.dll</HintPath>
+      <HintPath>..\RiverSystem\Solutions\packages\IronPython.2.7.5\lib\net45\Microsoft.Scripting.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Scripting.AspNet">
       <SpecificVersion>False</SpecificVersion>
       <Private>True</Private>
-      <HintPath>.\packages\IronPython.2.7.5\lib\net45\Microsoft.Scripting.AspNet.dll</HintPath>
+      <HintPath>..\RiverSystem\Solutions\packages\IronPython.2.7.5\lib\net45\Microsoft.Scripting.AspNet.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Scripting.Metadata">
       <SpecificVersion>False</SpecificVersion>
       <Private>True</Private>
-      <HintPath>.\packages\IronPython.2.7.5\lib\net45\Microsoft.Scripting.Metadata.dll</HintPath>
+      <HintPath>..\RiverSystem\Solutions\packages\IronPython.2.7.5\lib\net45\Microsoft.Scripting.Metadata.dll</HintPath>
     </Reference>
     <Reference Include="Newtonsoft.Json">
       <SpecificVersion>False</SpecificVersion>
