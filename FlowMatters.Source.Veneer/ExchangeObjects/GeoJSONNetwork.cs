@@ -1,12 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Drawing;
 using System.Linq;
 using System.Runtime.Serialization;
 using FlowMatters.Source.Veneer.ExchangeObjects;
 using RiverSystem;
 using RiverSystem.Catchments;
-using RiverSystem.Controls.Icons;
 using TIME.ManagedExtensions;
 using Network = RiverSystem.Network;
 
@@ -23,14 +21,14 @@ namespace FlowMatters.Source.WebServer
                     .All(n => n.location.E.EqualWithTolerance(0.0) && n.location.N.EqualWithTolerance(0.0));
 
             List<GeoJSONFeature> featureList = new List<GeoJSONFeature>();
-            featureList.AddRange(from Node n in source.nodes select new GeoJSONFeature(n,source.Scenario,schematicAsCoordinates));
+            featureList.AddRange(source.Nodes.OfType<Node>().Select(n => new GeoJSONFeature(n, source.Scenario, schematicAsCoordinates)));
             foreach (Link link in source.links)
             {
                 if (link.Network == null)
                     link.Network = source;
             }
 
-            featureList.AddRange(from Link l in source.links select new GeoJSONFeature(l,source.Scenario,schematicAsCoordinates));
+            featureList.AddRange(source.Links.OfType<Link>().Select(l => new GeoJSONFeature(l,source.Scenario,schematicAsCoordinates)));
             featureList.AddRange(catchments.Select(c => new GeoJSONFeature((Catchment)c,source.Scenario.BoundaryForCatchment(c))));
             features = featureList.ToArray();
         }

@@ -21,7 +21,7 @@ using FlowMatters.Source.Veneer.RemoteScripting;
 using FlowMatters.Source.WebServer;
 using Newtonsoft.Json;
 using RiverSystem;
-using RiverSystem.Controls.ManagedExtensions;
+using RiverSystem.Controls.UI.ManagedExtensions;
 using RiverSystem.TaskDefinitions;
 using Application = System.Windows.Forms.Application;
 using Button = System.Windows.Controls.Button;

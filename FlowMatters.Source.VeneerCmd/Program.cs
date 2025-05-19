@@ -39,12 +39,15 @@ namespace FlowMatters.Source.VeneerCmd
                 
             }
 
+            // TODO: RM-20834 RM-21455 Needs testing
             //            CopyDLLs();
             var options = new Options();
-            if (CommandLine.Parser.Default.ParseArguments(args, options))
+            var result = CommandLine.Parser.Default.ParseArguments<Options>(args);
+            if (result != null)
             {
                 try
                 {
+                    options = result.Value;
                     RunWithOptions(options);
                 }
                 catch (Exception e)
@@ -56,7 +59,7 @@ namespace FlowMatters.Source.VeneerCmd
                 return;
             }
             // Display the default usage information
-            Console.WriteLine(options.GetUsage());
+            //Console.WriteLine(options.GetUsage());
         }
 
         //private static void CopyDLLs()
@@ -236,18 +239,31 @@ namespace FlowMatters.Source.VeneerCmd
             }
             var manager = PluginManager.Instance;
 #endif
+
+            // TODO: RM-20834 RM-21455 Below needs testing
+            var allDomainPluginsToLoad = new List<string>();
+
             foreach (string plugin in additionalPlugins)
             {
                 Console.Write("Loading from command line {0}... ", plugin);
-                var result = manager.InstallPlugin(plugin, false, false);
+
+                var result = manager.InstallPlugin(plugin, out var domainPluginsToLoad, false, false);
+                allDomainPluginsToLoad.AddRange(domainPluginsToLoad);
                 Console.WriteLine(result.Status.IsLoaded?"Loaded":result.Status.ErrorMsg);
+            }
+
+            foreach (var plugin in allDomainPluginsToLoad)
+            {
+                // Don't care about loading extra plugins here
+                manager.InstallPlugin(plugin, out _, false, false);
             }
 
             foreach (var plugin in manager.ActivePlugins)
             {
-                Show(String.Format("Loaded {0}",plugin.Path));               
+                Show($"Loaded {plugin.Path}");
             }
-            Show(String.Format("Plugins loaded ({0}/{1})",manager.ActivePlugins.Count(),manager.Plugins.Count));
+
+            Show($"Plugins loaded ({manager.ActivePlugins.Count()}/{manager.Plugins.Count})");
             _pluginManager = manager;
         }
 
@@ -288,43 +304,44 @@ namespace FlowMatters.Source.VeneerCmd
 
     public class Options
     {
-        [Option('p',"port",DefaultValue = (uint)SourceRESTfulService.DEFAULT_PORT,HelpText= "Port for Veneer server")]
+        [Option('p',"port",Default = (uint)SourceRESTfulService.DEFAULT_PORT,HelpText= "Port for Veneer server")]
         public uint Port { get; set; }
 
-        [Option('r', "remote-access",HelpText ="Allow access from other computers", DefaultValue= false)]
+        [Option('r', "remote-access",HelpText ="Allow access from other computers", Default = false)]
         public bool RemoteAccess { get; set; }
 
-        [Option('s',"allow-scripts",HelpText = "Allow submission of Iron Python scripts",DefaultValue = false)]
+        [Option('s',"allow-scripts",HelpText = "Allow submission of Iron Python scripts", Default = false)]
         public bool AllowScripts { get; set; }
 
-        [Option('b', "backup-rsproj", HelpText = "Backup .rsproj file", DefaultValue = false)]
+        [Option('b', "backup-rsproj", HelpText = "Backup .rsproj file", Default = false)]
         public bool BackupRSPROJ { get; set; }
 
-        [Option('a', "available-models", HelpText = "List available models (scenarios) then exit", DefaultValue = false)]
+        [Option('a', "available-models", HelpText = "List available models (scenarios) then exit", Default = false)]
         public bool AvailableScenarios { get; set; }
 
-        [Option('m', "model", HelpText = "Model (scenario) to use", DefaultValue = null)]
+        [Option('m', "model", HelpText = "Model (scenario) to use", Default = null)]
         public string ScenarioToLoad { get; set; }
 
-        [Option('l',"load-plugin",HelpText = "Load plugins in addition to configured plugins",DefaultValue =null)]
+        [Option('l',"load-plugin",HelpText = "Load plugins in addition to configured plugins",Default =null)]
         public string PluginsToLoad { get; set; }
 
-        [Option('x',"skip-registered",HelpText="Skip loading of already registered plugins",DefaultValue=false)]
+        [Option('x',"skip-registered",HelpText="Skip loading of already registered plugins",Default =false)]
         public bool SkipRegisteredPlugins { get; set; }
 
-        [Option('c', "custom-endpoints", HelpText = "Custom endpoints to enable, specified as command separated list of filenames", DefaultValue = null)]
+        [Option('c', "custom-endpoints", HelpText = "Custom endpoints to enable, specified as command separated list of filenames", Default = null)]
         public string CustomEndPointFiles{ get; set; }
 
-
-        [ValueList(typeof(List<string>), MaximumElements = 1)]
+        // TODO: RM-20834 RM-21455 Uncertain about replacement here
+        //[ValueList(typeof(List<string>), MaximumElements = 1)]
+        [Value(0, Max = 1)]
         public IList<string> ProjectFiles { get; set; }
 
-        [HelpOption]
-        public string GetUsage()
-        {
-            var usage = new StringBuilder();
-            usage.AppendLine("Veneer by Flow Matters");
-            return usage.ToString();
-        }
+        //[Help]
+        //public string GetUsage()
+        //{
+        //    var usage = new StringBuilder();
+        //    usage.AppendLine("Veneer by Flow Matters");
+        //    return usage.ToString();
+        //}
     }
 }

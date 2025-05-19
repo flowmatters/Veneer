@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 using RiverSystem;
 
 namespace FlowMatters.Source.WebServer
@@ -14,7 +15,7 @@ namespace FlowMatters.Source.WebServer
         }
 
         public event ServerLogListener LogGenerator;
-        public abstract void Start();
+        public abstract Task Start();
         public abstract void Stop();
         public abstract RiverSystemScenario Scenario { get; set; }
 

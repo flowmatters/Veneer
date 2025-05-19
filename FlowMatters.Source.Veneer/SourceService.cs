@@ -13,13 +13,8 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Reflection;
-using System.ServiceModel;
-using System.ServiceModel.Channels;
-using System.ServiceModel.Web;
-using System.Text;
 using System.Text.RegularExpressions;
-using System.Windows.Forms;
-using System.Xml;
+using CoreWCF.Web;
 using FlowMatters.Source.Veneer;
 using FlowMatters.Source.Veneer.DomainActions;
 using FlowMatters.Source.Veneer.ExchangeObjects;
@@ -29,14 +24,10 @@ using FlowMatters.Source.Veneer.RemoteScripting;
 using FlowMatters.Source.WebServer.ExchangeObjects;
 using RiverSystem;
 using RiverSystem.ApplicationLayer.Interfaces;
-using RiverSystem.Controls.Icons;
 using RiverSystem.DataManagement.DataManager;
 using RiverSystem.Functions;
-using RiverSystem.Functions.Variables;
 using RiverSystem.ManagedExtensions;
 using RiverSystem.PreProcessing.ProjectionInfo;
-using RiverSystem.ScenarioExplorer.ParameterSet;
-using TIME.Core;
 using TIME.DataTypes;
 using TIME.DataTypes.Utils;
 using TIME.Management;
@@ -44,12 +35,14 @@ using TIME.ScenarioManagement;
 
 namespace FlowMatters.Source.WebServer
 {
-    [ServiceContract,ServiceBehavior(InstanceContextMode = InstanceContextMode.Single)]
-    [ServiceKnownType(typeof(double[]))]
-    [ServiceKnownType(typeof(double[][]))]
-    [ServiceKnownType(typeof(double[][][]))]
-    [ServiceKnownType(typeof(double[][][][]))]
-    public class SourceService //: ISourceService
+    // TODO: RM-20834 RM-21455 If a class is marked with ServiceContractAttribute, it must be the only type in the hierarchy with ServiceContractAttribute.
+    //       because the ServiceContractAttribute is on ISourceService it can't be here
+    //[System.ServiceModel.ServiceContract,ServiceBehavior(InstanceContextMode = InstanceContextMode.Single)]
+    [System.ServiceModel.ServiceKnownType(typeof(double[]))]
+    [System.ServiceModel.ServiceKnownType(typeof(double[][]))]
+    [System.ServiceModel.ServiceKnownType(typeof(double[][][]))]
+    [System.ServiceModel.ServiceKnownType(typeof(double[][][][]))]
+    public class SourceService : ISourceService
     {
         public Dictionary<int,string[]> RunLogs = new Dictionary<int,string[]>();
 
@@ -70,8 +63,6 @@ namespace FlowMatters.Source.WebServer
             RunningInGUI = true;
         }
 
-        [OperationContract]
-        [WebInvoke(Method = "OPTIONS", UriTemplate = "*")]
         public void GetOptions()
         {
             WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Methods", "GET");
@@ -83,8 +74,6 @@ namespace FlowMatters.Source.WebServer
             WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Max-Age", "1728000");
         }
 
-        [OperationContract]
-        [WebGet(UriTemplate = "/", ResponseFormat = WebMessageFormat.Json)]
         public VeneerStatus GetRoot()
         {
 //            WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Origin", "*");
@@ -92,8 +81,11 @@ namespace FlowMatters.Source.WebServer
             return new VeneerStatus(Scenario);
         }
 
-        [OperationContract]
-        [WebInvoke(Method = "POST", UriTemplate = "/shutdown")]
+        public object GetRunResults()
+        {
+            throw new NotImplementedException();
+        }
+
         public void ShutdownServer()
         {
             Log("Shutdown Requested");
@@ -109,8 +101,6 @@ namespace FlowMatters.Source.WebServer
             throw new Exception("Shutdown not supported");
         }
 
-        [OperationContract]
-        [WebInvoke(Method="POST",UriTemplate=UriTemplates.Scenario)]
         public void SetScenario(string scenario)
         {
             if (RunningInGUI)
@@ -134,8 +124,6 @@ namespace FlowMatters.Source.WebServer
             Scenario = newScenario;
         }
 
-        [OperationContract]
-        [WebInvoke(Method = "GET", UriTemplate = UriTemplates.Files)]
         public Stream GetFile(string fn)
         {
             Log(string.Format("Requested {0}",fn));
@@ -150,15 +138,11 @@ namespace FlowMatters.Source.WebServer
             return ms;
         }
 
-        [OperationContract]
-        [WebInvoke(Method = "GET", UriTemplate = UriTemplates.FilesQuery)]
         public Stream GetFileQuery(string fn, string version)
         {
             return GetFile(fn);
         }
 
-        [OperationContract]
-        [WebInvoke(Method="GET",UriTemplate = UriTemplates.Resources)]
         public Stream GetResource(string resourceName)
         {
             Log(string.Format("Requested resource {0}", resourceName));
@@ -173,8 +157,6 @@ namespace FlowMatters.Source.WebServer
             return ms;
         }
 
-        [OperationContract]
-        [WebInvoke(Method = "GET", ResponseFormat = WebMessageFormat.Json, UriTemplate = UriTemplates.Network)]
         public GeoJSONNetwork GetNetwork()
         {
             Log("Requested network");
@@ -182,8 +164,6 @@ namespace FlowMatters.Source.WebServer
             return new GeoJSONNetwork(Scenario.Network);
         }
 
-        [OperationContract]
-        [WebInvoke(Method = "GET", ResponseFormat = WebMessageFormat.Json, UriTemplate = UriTemplates.NetworkGeographic)]
         public GeoJSONNetwork GetNetworkGeographic()
         {
             Log("Requested network in geographic coordinates");
@@ -191,24 +171,18 @@ namespace FlowMatters.Source.WebServer
             return NetworkToGeographic.ToGeographic(Scenario.Network,Scenario.GeographicData.Projection as AbstractProjectionInfo);
         }
 
-        [OperationContract]
-        [WebInvoke(Method = "GET", ResponseFormat = WebMessageFormat.Json, UriTemplate = UriTemplates.Node)]
         public GeoJSONFeature GetNode(string nodeId)
         {
             Log(string.Format("Requested node {0} (NOT IMPLEMENTED)", nodeId));
             return null;                
         }
 
-        [OperationContract]
-        [WebInvoke(Method = "GET", ResponseFormat = WebMessageFormat.Json, UriTemplate = UriTemplates.Link)]
         public GeoJSONFeature GetLink(string linkId)
         {
             Log(string.Format("Requested link {0} (NOT IMPLEMENTED)", linkId));
             return null;
         }
 
-        [OperationContract]
-        [WebInvoke(Method = "GET", ResponseFormat = WebMessageFormat.Json, UriTemplate = UriTemplates.Runs)]
         public RunLink[] GetRunList()
         {
             Log("Requested run list");
@@ -232,10 +206,6 @@ namespace FlowMatters.Source.WebServer
             return links;
         }
 
-        [OperationContract]
-        [WebInvoke(Method = "POST", UriTemplate = UriTemplates.Runs,
-         RequestFormat = WebMessageFormat.Json,ResponseFormat = WebMessageFormat.Json)]
-        [FaultContract(typeof(SimulationFault))]
         public void TriggerRun(RunParameters parameters)
         {
             Log("Triggering a run.");
@@ -277,8 +247,6 @@ namespace FlowMatters.Source.WebServer
                                                                      String.Format("runs/{0}", r.RunNumber));
         }
 
-        [OperationContract]
-        [WebInvoke(Method = "GET", ResponseFormat = WebMessageFormat.Json, UriTemplate = UriTemplates.RunResults)]
         public RunSummary GetRunResults(string runId)
         {
             Log(String.Format("Requested run results ({0})",runId));
@@ -323,8 +291,6 @@ namespace FlowMatters.Source.WebServer
         }
 
         // TODO: Can't delete a run. Should delete a job which may contain multiple runs.
-        [OperationContract]
-        [WebInvoke(Method = "DELETE", UriTemplate = UriTemplates.RunResults)]
         public void DeleteRun(string runId)
         {
             runId = runId.ToLower();
@@ -370,8 +336,6 @@ namespace FlowMatters.Source.WebServer
             return new Run[] { Scenario.Project.ResultManager.AllRuns().FirstOrDefault(x => x.RunNumber.ToString(CultureInfo.InvariantCulture) == id)};
         }
 
-        [OperationContract]
-        [WebInvoke(Method = "GET", ResponseFormat = WebMessageFormat.Json, UriTemplate = UriTemplates.TimeSeries)]
         public TimeSeriesResponse GetTimeSeries(string runId, string networkElement, string recordingElement,
                                               string variable,string fromDate, string toDate,string precision,
                                               string aggregation, string aggfn)
@@ -380,9 +344,6 @@ namespace FlowMatters.Source.WebServer
             return GetTimeSeriesInternal(runId, networkElement, recordingElement, variable, aggregation, aggfn, fromDate, toDate,precision);
         }
 
-        [OperationContract]
-        [WebInvoke(Method = "GET", ResponseFormat = WebMessageFormat.Json,
-            UriTemplate = UriTemplates.AggregatedTimeSeries)]
         public TimeSeriesResponse GetAggregatedTimeSeries(string runId, string networkElement, string recordingElement,
                                               string variable, string aggregation, string fromDate, string toDate, string precision)
         {
@@ -445,9 +406,6 @@ namespace FlowMatters.Source.WebServer
             return new DateTime(components[0], components[1], components[2]);
         }
 
-        [OperationContract]
-        [WebInvoke(Method = "GET", ResponseFormat = WebMessageFormat.Json,
-            UriTemplate = UriTemplates.TabulatedResults)]
         public DataTable GetTabulatedResults(string runId, string networkElement, string recordingElement,
                                               string variable, string functions)
         {
@@ -474,8 +432,6 @@ namespace FlowMatters.Source.WebServer
             return new MultipleTimeSeries(result);
         }
 
-        [OperationContract]
-        [WebInvoke(Method="PUT",UriTemplate = "/functions/{functionName}",RequestFormat = WebMessageFormat.Json)]
         public void SetFunction(string functionName, FunctionValue value)
         {
             Log(String.Format("Updating function {0}", functionName));
@@ -497,8 +453,6 @@ namespace FlowMatters.Source.WebServer
             }
         }
 
-        [OperationContract]
-        [WebInvoke(Method = "GET", UriTemplate = "/functions", ResponseFormat = WebMessageFormat.Json)]
         public FunctionValue[] GetFunctionList()
         {
             Log("Requested function list");
@@ -514,8 +468,6 @@ namespace FlowMatters.Source.WebServer
             return result;
         }
 
-        [OperationContract]
-        [WebInvoke(Method = "GET", UriTemplate = "/variables", ResponseFormat = WebMessageFormat.Json)]
         public VariableSummary[] GetInputList()
         {
             Log("Requested Variable List");
@@ -525,25 +477,18 @@ namespace FlowMatters.Source.WebServer
             return result;
         }
 
-        [OperationContract]
-        [WebInvoke(Method="GET",UriTemplate="/variables/{variableName}",ResponseFormat=WebMessageFormat.Json)]
         public VariableSummary GetInput(string variableName)
         {
             Log("Requested Variable : " + variableName);
             return new VariableSummary(Enumerable.FirstOrDefault(Scenario.Network.FunctionManager.Variables, v => v.FullName == ("$" + variableName)), Scenario);
         }
 
-        [OperationContract]
-        [WebInvoke(Method = "GET", UriTemplate = "/variables/{variableName}/TimeSeries", ResponseFormat = WebMessageFormat.Json)]
         public SimpleTimeSeries GetInputTimeSeries(string variableName)
         {
             Log(String.Format("Requested time series for {0}", variableName));
             return (new VariableSummary(Enumerable.FirstOrDefault(Scenario.Network.FunctionManager.Variables, v => v.FullName == ("$" + variableName)), Scenario)).TimeSeriesData;
         }
 
-        [OperationContract]
-        [WebInvoke(Method = "PUT", UriTemplate = "/variables/{variableName}/TimeSeries",
-            RequestFormat = WebMessageFormat.Json)]
         public void ChangeInputTimeSeries(string variableName, SimpleTimeSeries newTimeSeries)
         {
             Log(String.Format("Updating time series for {0}", variableName));
@@ -554,17 +499,12 @@ namespace FlowMatters.Source.WebServer
             summ.UpdateTimeSeries(newTimeSeries);
         }
 
-        [OperationContract]
-        [WebInvoke(Method = "GET", UriTemplate = "/variables/{variableName}/Piecewise", ResponseFormat = WebMessageFormat.Json)]
         public SimplePiecewise GetPiecewiseLinear(string variableName)
         {
             Log(String.Format("Requested piecewise linear function for {0}", variableName));
             return (new VariableSummary(Enumerable.FirstOrDefault(Scenario.Network.FunctionManager.Variables, v => v.FullName == ("$" + variableName)), Scenario)).PiecewiseFunctionData;
         }
 
-        [OperationContract]
-        [WebInvoke(Method = "PUT", UriTemplate = "/variables/{variableName}/Piecewise",
-            RequestFormat = WebMessageFormat.Json)]
         public void ChangePiecewiseLinear(string variableName, SimplePiecewise newPiecewise)
         {
             Log(String.Format("Updating  piecewise linear function for {0}", variableName));
@@ -575,8 +515,6 @@ namespace FlowMatters.Source.WebServer
             summ.UpdatePiecewise(newPiecewise);
         }
 
-        [OperationContract]
-        [WebInvoke(Method="GET",UriTemplate=UriTemplates.InputSets,ResponseFormat = WebMessageFormat.Json)]
         public InputSetSummary[] GetInputSets()
         {
             Log("Requested input sets");
@@ -604,8 +542,6 @@ namespace FlowMatters.Source.WebServer
             return result;
         }
 
-        [OperationContract]
-        [WebInvoke(Method = "POST", UriTemplate = UriTemplates.InputSets, RequestFormat = WebMessageFormat.Json)]
         public void CreateInputSet(InputSetSummary newInputSet)
         {
             Log("Creating new Input Set: " + newInputSet.Name);
@@ -614,8 +550,6 @@ namespace FlowMatters.Source.WebServer
             sets.Create(newInputSet);
         }
 
-        [OperationContract]
-        [WebInvoke(Method = "PUT", UriTemplate = UriTemplates.InputSet, RequestFormat = WebMessageFormat.Json)]
         public void UpdateInputSet(string inputSetName, InputSetSummary summary)
         {
             Log("Updating Input Set Commands for " + inputSetName);
@@ -624,8 +558,6 @@ namespace FlowMatters.Source.WebServer
             sets.UpdateInstructions(set, summary.Configuration);
         }
 
-        [OperationContract]
-        [WebInvoke(Method = "POST", UriTemplate = UriTemplates.RunInputSet,RequestFormat = WebMessageFormat.Json)]
         public void RunInputSet(string inputSetName,string action)
         {
             if (action != "run")
@@ -637,8 +569,6 @@ namespace FlowMatters.Source.WebServer
             sets.Run(inputSetName);
         }
 
-        [OperationContract]
-        [WebInvoke(Method = "PUT", UriTemplate = "/recorders", RequestFormat = WebMessageFormat.Json)]
         public void UpdateRecorders(RecordingInstructions ri)
         {
 
@@ -657,8 +587,6 @@ namespace FlowMatters.Source.WebServer
             }
         }
 
-        [OperationContract]
-        [WebInvoke(Method = "GET", UriTemplate = UriTemplates.DataSources,ResponseFormat = WebMessageFormat.Json)]
         public SimpleDataGroupItem[] GetDataSources()
         {
             Log("Data sources");
@@ -666,16 +594,12 @@ namespace FlowMatters.Source.WebServer
             return dm.DataGroups.Select(dg => new SimpleDataGroupItem(dg)).ToArray();
         }
 
-        [OperationContract]
-        [WebInvoke(Method = "GET", UriTemplate = UriTemplates.DataSourceGroup, ResponseFormat = WebMessageFormat.Json)]
         public SimpleDataGroupItem GetDataSource(string dataSourceGroup)
         {
             Log("Data source: " + dataSourceGroup);
             return GetSimpleDataSourceInternal(dataSourceGroup, false);
         }
 
-        [OperationContract]
-        [WebInvoke(Method = "POST", UriTemplate = UriTemplates.DataSources, RequestFormat = WebMessageFormat.Json)]
         public void CreateDataSource(SimpleDataGroupItem newItem)
         {
             var dm = Scenario.Network.DataManager;
@@ -691,8 +615,6 @@ namespace FlowMatters.Source.WebServer
             }
         }
 
-        [OperationContract]
-        [WebInvoke(Method = "PUT", UriTemplate = UriTemplates.DataSourceGroup, ResponseFormat = WebMessageFormat.Json)]
         public void UpdateDataSource(string dataSourceGroup, SimpleDataGroupItem newItem)
         {
             newItem.Name = dataSourceGroup;
@@ -715,9 +637,6 @@ namespace FlowMatters.Source.WebServer
             return new SimpleDataGroupItem(res, summary);
         }
 
-        [OperationContract]
-        [WebInvoke(Method = "DELETE", UriTemplate = UriTemplates.DataSourceGroup, ResponseFormat = WebMessageFormat.Json
-         )]
         public void DeleteDataSource(string dataSourceGroup)
         {
             var dm = Scenario.Network.DataManager;
@@ -730,8 +649,6 @@ namespace FlowMatters.Source.WebServer
             dm.RemoveGroup(existing);
         }
 
-        [OperationContract]
-        [WebInvoke(Method = "GET", UriTemplate = UriTemplates.DataGroupItem, ResponseFormat = WebMessageFormat.Json)]
         public SimpleDataItem GetDataGroupItem(string dataSourceGroup,string inputSet)
         {
             var grp = GetSimpleDataSourceInternal(dataSourceGroup,false);
@@ -746,8 +663,6 @@ namespace FlowMatters.Source.WebServer
             return result;
         }
 
-        [OperationContract]
-        [WebInvoke(Method = "GET", UriTemplate = UriTemplates.DataGroupMultipleItemDetails, ResponseFormat = WebMessageFormat.Json)]
         public SimpleDataDetails[] GetMultipleDataGroupItemDetails(string dataSourceGroup, string name)
         {
             var grp = GetSimpleDataSourceInternal(dataSourceGroup,true);
@@ -783,8 +698,6 @@ namespace FlowMatters.Source.WebServer
             return result.ToArray();
         }
 
-        [OperationContract]
-        [WebInvoke(Method = "GET", UriTemplate = UriTemplates.DataGroupItemDetails, ResponseFormat = WebMessageFormat.Json)]
         public SimpleDataDetails GetDataGroupItemDetails(string dataSourceGroup, string inputSet,string item)
         {
             var retrieved = GetDataGroupItem(dataSourceGroup, inputSet);
@@ -795,9 +708,6 @@ namespace FlowMatters.Source.WebServer
             return result;
         }
 
-        [OperationContract]
-        [WebInvoke(Method = "POST", UriTemplate = "/ironpython", 
-            RequestFormat = WebMessageFormat.Json, ResponseFormat = WebMessageFormat.Json)]
         public IronPythonResponse RunIronPython(IronPythonScript script)
         {
             if (!AllowScript)
@@ -817,17 +727,11 @@ namespace FlowMatters.Source.WebServer
             return scriptRunner.Run(script);
         }
 
-        [OperationContract]
-        [WebInvoke(Method = "GET", UriTemplate = UriTemplates.ScenarioTablesIndex,
-            ResponseFormat = WebMessageFormat.Json)]
         public ModelTableIndex ModelTableIndex()
         {
             return ModelTabulator.Index();
         }
 
-        [OperationContract]
-        [WebInvoke(Method = "GET", UriTemplate = UriTemplates.ScenarioTables,
-             ResponseFormat = WebMessageFormat.Json)]
         public DataTable ModelTable(string table)
         {
             Log(String.Format("Requested {0} table", table));
@@ -840,8 +744,6 @@ namespace FlowMatters.Source.WebServer
             return ModelTabulator.Functions[table](Scenario);
         }
 
-        [OperationContract]
-        [WebInvoke(Method = "GET", UriTemplate = UriTemplates.Configuration, ResponseFormat = WebMessageFormat.Json)]
         public string[] GetConfiguration(string element)
         {
             var table = Scenario.ProjectViewTable();
@@ -860,15 +762,11 @@ namespace FlowMatters.Source.WebServer
             return new string[0];
         }
 
-        [OperationContract]
-        [WebInvoke(Method = "PUT", UriTemplate = UriTemplates.Projection, ResponseFormat = WebMessageFormat.Json)]
         public void AssignProjection(ProjectionInfo p)
         {
             p.AssignTo(Scenario);
         }
 
-        [OperationContract]
-        [WebInvoke(Method = "POST", UriTemplate = UriTemplates.CustomEndPoint, ResponseFormat = WebMessageFormat.Json)]
         public IronPythonResponse RunCustomEndPoint(string action, string[] parameters)
         {
             var custom = CustomEndPoints.FirstOrDefault(ep => ep.endpoint == action);

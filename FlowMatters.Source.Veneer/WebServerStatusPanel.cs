@@ -10,6 +10,7 @@ using RiverSystem.Options;
 #endif
 using RiverSystem.SubjectProxies;
 using TIME.Core.Metadata;
+using TIME.UI.Core.Metadata;
 
 namespace FlowMatters.Source.WebServerPanel
 {

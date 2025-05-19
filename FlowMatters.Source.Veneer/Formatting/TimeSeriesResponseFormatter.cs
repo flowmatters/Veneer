@@ -1,17 +1,16 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Net;
-using System.ServiceModel;
-using System.ServiceModel.Channels;
-using System.ServiceModel.Dispatcher;
-using System.ServiceModel.Web;
 using System.Text;
-using System.Threading.Tasks;
 using System.Xml;
+using CoreWCF.Channels;
+using CoreWCF.Dispatcher;
+using CoreWCF.Web;
 using FlowMatters.Source.Veneer.ExchangeObjects;
 using FlowMatters.Source.WebServer.ExchangeObjects;
 using RiverSystem.ManagedExtensions;
+using BodyWriter = System.ServiceModel.Channels.BodyWriter;
+using HttpResponseMessageProperty = System.ServiceModel.Channels.HttpResponseMessageProperty;
 
 namespace FlowMatters.Source.Veneer.Formatting
 {
@@ -20,12 +19,12 @@ namespace FlowMatters.Source.Veneer.Formatting
         public IDispatchMessageFormatter DefaultDispatchMessageFormatter { get; set; }
 
         // Reference from http://stackoverflow.com/a/23980924
-        public void DeserializeRequest(Message message, object[] parameters)
+        public void DeserializeRequest(CoreWCF.Channels.Message message, object[] parameters)
         {
             throw new NotSupportedException("This is a reply-only formatter");
         }
 
-        public Message SerializeReply(MessageVersion messageVersion, object[] parameters, object result)
+        public CoreWCF.Channels.Message SerializeReply(CoreWCF.Channels.MessageVersion messageVersion, object[] parameters, object result)
         {
             string accept = WebOperationContext.Current.IncomingRequest.Accept ?? "";
 
@@ -40,7 +39,7 @@ namespace FlowMatters.Source.Veneer.Formatting
             return DefaultDispatchMessageFormatter.SerializeReply(messageVersion, parameters, result);
         }
 
-        public Message CSVMessage(MessageVersion messageVersion, TimeSeriesResponse origResult)
+        public CoreWCF.Channels.Message CSVMessage(CoreWCF.Channels.MessageVersion messageVersion, TimeSeriesResponse origResult)
         {
             MultipleTimeSeries result = null;
             if (origResult is MultipleTimeSeries)
@@ -55,7 +54,7 @@ namespace FlowMatters.Source.Veneer.Formatting
             sb.AppendLine("-----------------------");
             sb.Append(BuildBody(result));
 
-            Message reply = Message.CreateMessage(messageVersion, null, new RawBodyWriter(sb.ToString()));
+            var reply = CoreWCF.Channels.Message.CreateMessage(messageVersion, null, new RawBodyWriter(sb.ToString()));
             reply.Properties.Add(WebBodyFormatMessageProperty.Name,
                 new WebBodyFormatMessageProperty(WebContentFormat.Raw));
             HttpResponseMessageProperty httpResp = new HttpResponseMessageProperty();
