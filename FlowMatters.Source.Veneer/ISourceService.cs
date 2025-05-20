@@ -253,5 +253,9 @@ namespace FlowMatters.Source.WebServer
         [OperationContract]
         [WebInvoke(Method = "POST", UriTemplate = UriTemplates.CustomEndPoint, ResponseFormat = WebMessageFormat.Json)]
         IronPythonResponse RunCustomEndPoint(string action, string[] parameters);
+
+        [OperationContract]
+        [WebGet(UriTemplate = "/ping", ResponseFormat = WebMessageFormat.Json)]
+        string Ping();
     }
 }

@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using CoreWCF;
 using CoreWCF.Configuration;
 using CoreWCF.Description;
+using CoreWCF.Web;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
@@ -25,6 +26,7 @@ namespace FlowMatters.Source.WebServer
         private SourceService _singletonInstance;
         private RiverSystemScenario _scenario;
         private List<int> _registeredOnPorts = new List<int>();
+        private bool _isEndpointRegistered = false;
          
         public bool AllowRemoteConnections { get; set; }
 
@@ -50,10 +52,17 @@ namespace FlowMatters.Source.WebServer
             var builder = Microsoft.AspNetCore.WebHost.CreateDefaultBuilder()
                 .ConfigureServices(services =>
                 {
+                    // Add base service model services
                     services.AddServiceModelServices();
-                    services.AddServiceModelMetadata();
+                    
+                    // Add web services
+                    services.AddServiceModelWebServices();
+
+                    // Register the service instance as singleton
+                    services.AddSingleton<SourceService>(_singletonInstance);
+                    
+                    // Add any custom behaviors as singletons
                     services.AddSingleton<IServiceBehavior, UseRequestHeadersForMetadataAddressBehavior>();
-                    services.AddSingleton(_singletonInstance);
                 })
                 .UseKestrel(options =>
                 {
@@ -63,20 +72,28 @@ namespace FlowMatters.Source.WebServer
                 {
                     app.UseServiceModel(builder =>
                     {
-                        var binding = new WebHttpBinding
+                        if (!_isEndpointRegistered)
                         {
-                            MaxReceivedMessageSize = 1024 * 1024 * 1024, // 1 gigabyte
-                            CrossDomainScriptAccessEnabled = true
-                        };
+                            var binding = new WebHttpBinding
+                            {
+                                MaxReceivedMessageSize = 1024 * 1024 * 1024, // 1 gigabyte
+                                //CrossDomainScriptAccessEnabled = true
+                            };
 
-                        // TODO: RM-20834 RM-21455 Implement
-                        //if (!AllowRemoteConnections)
-                        //{
-                        //    binding.HostNameComparisonMode = HostNameComparisonMode.Exact;
-                        //}
+                            // TODO: RM-20834 RM-21455 Implement
+                            //if (!AllowRemoteConnections)
+                            //{
+                            //    binding.HostNameComparisonMode = HostNameComparisonMode.Exact;
+                            //}
 
-                        builder.AddService<SourceService>();
-                        builder.AddServiceEndpoint<SourceService, ISourceService>(binding, $"http://localhost:{_port}/");
+                            // Register the service type
+                            builder.AddService<SourceService>();
+
+                            // Add the web endpoint
+                            builder.AddServiceWebEndpoint<SourceService, ISourceService>(binding, $"http://localhost:{_port}");
+                            
+                            _isEndpointRegistered = true;
+                        }
                     });
                 });
 
@@ -174,13 +191,14 @@ namespace FlowMatters.Source.WebServer
             Log(msg);
         }
 
-        public override void Stop()
+        public override async Task Stop()
         {
             if (_host != null)
             {
                 Log("Stopping Service");
-                _host.StopAsync().Wait();
+                await _host.StopAsync();
                 _host = null;
+                _isEndpointRegistered = false;
             }
             Running = false;
         }
@@ -196,5 +214,4 @@ namespace FlowMatters.Source.WebServer
             }
         }
     }
-
 }

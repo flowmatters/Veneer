@@ -16,7 +16,7 @@ namespace FlowMatters.Source.WebServer
 
         public event ServerLogListener LogGenerator;
         public abstract Task Start();
-        public abstract void Stop();
+        public abstract Task Stop();
         public abstract RiverSystemScenario Scenario { get; set; }
 
         public bool Running { get; protected set; }

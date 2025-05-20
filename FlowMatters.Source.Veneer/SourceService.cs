@@ -159,7 +159,7 @@ namespace FlowMatters.Source.WebServer
 
         public GeoJSONNetwork GetNetwork()
         {
-            Log("Requested network");
+            Log($"Requested network at {DateTime.Now:HH:mm:ss.fff}");
 //            WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Origin", "*");
             return new GeoJSONNetwork(Scenario.Network);
         }
@@ -974,6 +974,18 @@ namespace FlowMatters.Source.WebServer
         {
             if (LogGenerator != null)
                 LogGenerator(this, query);
+        }
+
+        public string Ping()
+        {
+            try
+            {
+                return "pong";
+            }
+            catch (Exception ex)
+            {
+                return $"Ping failed: {ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}";
+            }
         }
     }
 }
