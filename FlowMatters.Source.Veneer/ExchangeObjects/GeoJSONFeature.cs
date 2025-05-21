@@ -15,6 +15,8 @@ using Network = RiverSystem.Network;
 namespace FlowMatters.Source.Veneer.ExchangeObjects
 {
     [DataContract]
+    [KnownType(typeof(GeoJSONGeometry))]
+    [KnownType(typeof(GeoJSONProperties))]
     public class GeoJSONFeature
     {
         private const string FeatureTypeProperty = "feature_type";

@@ -11,6 +11,12 @@ using Network = RiverSystem.Network;
 namespace FlowMatters.Source.WebServer
 {
     [DataContract]
+    [KnownType(typeof(GeoJSONFeature))]
+    [KnownType(typeof(GeoJSONGeometry))]
+    [KnownType(typeof(double[]))]
+    [KnownType(typeof(double[][]))]
+    [KnownType(typeof(double[][][]))]
+    [KnownType(typeof(double[][][][]))]
     public class GeoJSONNetwork : GeoJSONCoverage
     {
         public GeoJSONNetwork(Network source)
@@ -43,31 +49,5 @@ namespace FlowMatters.Source.WebServer
         public const string MultiLineString = "MultiLineString";
         public const string MultiPolygon = "MultiPolygon";
         public const string GeometryCollection = "GeometryCollection";
-    }
-
-    [Serializable]
-    public class GeoJSONProperties : ISerializable
-    {
-        public GeoJSONProperties()
-        {
-            
-        }
-
-        public GeoJSONProperties(SerializationInfo info, StreamingContext context)
-        {
-        }
-
-        private Dictionary<string,object> properties = new Dictionary<string, object>();
-
-        public void Add(string key, object value)
-        {
-            properties[key] = value;
-        }
-
-        public void GetObjectData(SerializationInfo info, StreamingContext context)
-        {
-            foreach (KeyValuePair<string, object> kvp in properties)
-                info.AddValue(kvp.Key,kvp.Value);
-        }
     }
 }

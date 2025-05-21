@@ -28,10 +28,13 @@ using RiverSystem.DataManagement.DataManager;
 using RiverSystem.Functions;
 using RiverSystem.ManagedExtensions;
 using RiverSystem.PreProcessing.ProjectionInfo;
+using TIME.Core;
 using TIME.DataTypes;
+using TIME.DataTypes.Polygons;
 using TIME.DataTypes.Utils;
 using TIME.Management;
 using TIME.ScenarioManagement;
+using Network = RiverSystem.Network;
 
 namespace FlowMatters.Source.WebServer
 {
@@ -173,14 +176,42 @@ namespace FlowMatters.Source.WebServer
 
         public GeoJSONFeature GetNode(string nodeId)
         {
-            Log(string.Format("Requested node {0} (NOT IMPLEMENTED)", nodeId));
-            return null;                
+            Log($"Requested node {nodeId}");
+            if (!int.TryParse(nodeId, out var id))
+            {
+                Log($"Failed to parse {nodeId} as a valid node index!");
+                return null;
+            }
+
+            // To match GeoJSONFeature.NodeURL
+            var matchingNode = Scenario.Network.nodes[id];
+            if (matchingNode == null)
+            {
+                Log($"Failed to find node with id {nodeId}!");
+                return null;
+            }
+
+            return new GeoJSONFeature(matchingNode as Node, Scenario, true);
         }
 
         public GeoJSONFeature GetLink(string linkId)
         {
-            Log(string.Format("Requested link {0} (NOT IMPLEMENTED)", linkId));
-            return null;
+            Log($"Requested link {linkId}");
+            if (!int.TryParse(linkId, out var id))
+            {
+                Log($"Failed to parse {linkId} as a valid link index!");
+                return null;
+            }
+
+            // To match GeoJSONFeature.LinkURL
+            var matchingLink = Scenario.Network.links[id];
+            if (matchingLink == null)
+            {
+                Log($"Failed to find link with id {linkId}!");
+                return null;
+            }
+
+            return new GeoJSONFeature(matchingLink as Link, Scenario, true);
         }
 
         public RunLink[] GetRunList()
