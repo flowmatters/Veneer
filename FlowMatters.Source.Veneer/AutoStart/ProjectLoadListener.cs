@@ -85,6 +85,8 @@ namespace FlowMatters.Source.Veneer.AutoStart
 
         private void _timer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
+#if V4 && BEFORE_V4_3
+#else
             MainForm.Instance.Invoke(new Action(() =>
             {
                 var t = typeof(MenuPluginHelper);
@@ -95,6 +97,7 @@ namespace FlowMatters.Source.Veneer.AutoStart
                     //null
                 });
             }));
+#endif
         }
 
         private void Project_ScenarioAdded(object sender, TIME.ScenarioManagement.ScenarioArgs e)
