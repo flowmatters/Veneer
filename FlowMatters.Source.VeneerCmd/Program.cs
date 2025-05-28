@@ -106,6 +106,7 @@ namespace FlowMatters.Source.VeneerCmd
             _server.Scenario = scenario;
             _server.LogGenerator += ServerLogEvent;
             _server.AllowRemoteConnections = options.RemoteAccess;
+            _server.AllowSsl = options.AllowSsl;
 
             _server.Start();
             _server.Service.AllowScript = options.AllowScripts;
@@ -309,6 +310,9 @@ namespace FlowMatters.Source.VeneerCmd
 
         [Option('r', "remote-access",HelpText ="Allow access from other computers", Default = false)]
         public bool RemoteAccess { get; set; }
+
+        [Option('r', "enable-ssl", HelpText = "Enable SSL access", Default = false)]
+        public bool AllowSsl { get; set; }
 
         [Option('s',"allow-scripts",HelpText = "Allow submission of Iron Python scripts", Default = false)]
         public bool AllowScripts { get; set; }

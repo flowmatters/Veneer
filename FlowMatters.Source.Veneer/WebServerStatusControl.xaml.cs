@@ -40,6 +40,7 @@ namespace FlowMatters.Source.WebServerPanel
         public static int DefaultPort = SourceRESTfulService.DEFAULT_PORT;
         public static bool DefaultAllowRemote = false;
         public static bool DefaultAllowScripts = false;
+        public static bool DefaultAllowSsl = false;
 
         private RiverSystemScenario _scenario;
         private SynchronizationContext _originalContext;
@@ -49,6 +50,7 @@ namespace FlowMatters.Source.WebServerPanel
         {
             Port = DefaultPort;
             AllowRemoteConnections = DefaultAllowRemote;
+            AllowSsl = DefaultAllowSsl;
             AllowScripts = DefaultAllowScripts;
             InitializeComponent();
             _originalContext = SynchronizationContext.Current;
@@ -259,6 +261,20 @@ namespace FlowMatters.Source.WebServerPanel
                 RestartIfRunning();
             }
         }
+
+        private bool _allowSsl;
+        public bool AllowSsl
+        {
+            get { return _allowSsl; }
+            set
+            {
+                _allowSsl = value;
+                if (value)
+                    ServerLogEvent(this, "Note: Enabling SSL requires a valid SSL certificate.");
+                RestartIfRunning();
+            }
+        }
+
         private void RestartIfRunning()
         {
             if (Running)
@@ -269,7 +285,7 @@ namespace FlowMatters.Source.WebServerPanel
 
         private void StartServer()
         {
-            _server = new SourceRESTfulService(Port) {AllowRemoteConnections = AllowRemoteConnections};
+            _server = new SourceRESTfulService(Port) {AllowRemoteConnections = AllowRemoteConnections, AllowSsl = AllowSsl};
             _server.Scenario = Scenario;
             _server.LogGenerator += ServerLogEvent;
             _server.Start();

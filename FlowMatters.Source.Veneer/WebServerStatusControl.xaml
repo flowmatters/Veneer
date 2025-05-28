@@ -14,6 +14,8 @@
             <ColumnDefinition Width="20"/>
             <ColumnDefinition />
             <ColumnDefinition Width="20"/>
+            <ColumnDefinition />
+            <ColumnDefinition Width="20"/>
         </Grid.ColumnDefinitions>
 
         <Grid.RowDefinitions>
@@ -24,15 +26,16 @@
         <Button Name="StartBtn" IsEnabled="{Binding Path=NotRunning}" Grid.Row="0" Grid.Column="0" Content="Start" Click="StartBtn_OnClick"/>
         <Button Name="StopBtn" IsEnabled="{Binding Path=Running}" Grid.Row="0" Grid.Column="1" Content="Stop" Click="StopBtn_OnClick"/>
         <Button Name="RestartBtn" IsEnabled="{Binding Path=Running}" Grid.Row="0" Grid.Column="2" Content="Restart" Click="RestartBtn_OnClick"/>
-        <Button Name="ClearBtn" Grid.Row="0" Grid.Column="5" Grid.ColumnSpan="2" Content="Clear Log" Click="ClearBtn_OnClick"/>
+        <Button Name="ClearBtn" Grid.Row="0" Grid.Column="7" Grid.ColumnSpan="2" Content="Clear Log" Click="ClearBtn_OnClick"/>
 
         <Label Grid.Row="1" Grid.Column="0" HorizontalAlignment="Right" Content="Port:"/>
         <TextBox Name="PortTxt" Grid.Row="1" Text="{Binding Path=Port}" Grid.Column="1" Grid.ColumnSpan="2"/>
-        <Label Grid.Row="1" Grid.Column="3" HorizontalAlignment="Right" Content="Allow Remote Connections:"/>
-        <CheckBox Grid.Row="1" IsChecked="{Binding Path=AllowRemoteConnections}"  Grid.Column="4" VerticalAlignment="Center"/>
-        <Label Grid.Row="1" Grid.Column="5" HorizontalAlignment="Right" Content="Allow Scripts:"/>
-        <CheckBox Grid.Row="1" IsChecked="{Binding Path=AllowScripts}"  Grid.Column="6" VerticalAlignment="Center"/>
-
-        <TextBox Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="7" Name="LogBox" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" FontSize="10pt" Margin="2,0,-2,0" IsReadOnly="True" VerticalScrollBarVisibility="Auto"></TextBox>
+        <Label Grid.Row="1" Grid.Column="3" HorizontalAlignment="Right" Content="Enable SSL:"/>
+        <CheckBox Grid.Row="1" IsChecked="{Binding Path=AllowSsl, Mode=TwoWay}"  Grid.Column="4" VerticalAlignment="Center"/>
+        <Label Grid.Row="1" Grid.Column="5" HorizontalAlignment="Right" Content="Allow Remote Connections:"/>
+        <CheckBox Grid.Row="1" IsChecked="{Binding Path=AllowRemoteConnections}"  Grid.Column="6" VerticalAlignment="Center"/>
+        <Label Grid.Row="1" Grid.Column="7" HorizontalAlignment="Right" Content="Allow Scripts:"/>
+        <CheckBox Grid.Row="1" IsChecked="{Binding Path=AllowScripts}"  Grid.Column="8" VerticalAlignment="Center"/>
+        <TextBox Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="9" Name="LogBox" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" FontSize="10pt" Margin="2,0,-2,0" IsReadOnly="True" VerticalScrollBarVisibility="Auto"></TextBox>
     </Grid>
 </UserControl>

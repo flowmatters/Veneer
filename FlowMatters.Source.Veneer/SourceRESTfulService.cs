@@ -32,6 +32,8 @@ namespace FlowMatters.Source.WebServer
          
         public bool AllowRemoteConnections { get; set; }
 
+        public bool AllowSsl { get; set; }
+
         public override SourceService Service
         {
             get { return _singletonInstance; }
@@ -68,11 +70,30 @@ namespace FlowMatters.Source.WebServer
                 })
                 .UseKestrel(options =>
                 {
-                    options.ListenLocalhost(_port);
-                    options.ListenLocalhost(_sslPort, listenOptions =>
+                    if (AllowSsl)
                     {
-                        listenOptions.UseHttps();
-                    });
+                        if (AllowRemoteConnections){
+                            options.ListenAnyIP(_port, listenOptions =>
+                            {
+                                listenOptions.UseHttps();
+                            });
+                        }
+                        else
+                        {
+                            options.ListenLocalhost(_port, listenOptions =>
+                            {
+                                listenOptions.UseHttps();
+                            });
+                        }
+                    }
+                    else
+                    {
+                        if (AllowRemoteConnections)
+                            options.ListenAnyIP(_port);
+                        else
+                            options.ListenLocalhost(_port);
+                    }
+                    
                 })
                 .Configure(app =>
                 {
@@ -100,17 +121,21 @@ namespace FlowMatters.Source.WebServer
                             // Register the service type
                             builder.AddService<SourceService>();
 
+                            // In CoreWCF, we handle host restrictions through the endpoint address
                             if (!AllowRemoteConnections)
                             {
-                                // In CoreWCF, we handle host restrictions through the endpoint address
-                                builder.AddServiceWebEndpoint<SourceService, ISourceService>(binding, $"http://localhost:{_port}");
-                                builder.AddServiceWebEndpoint<SourceService, ISourceService>(httpsBinding, $"https://localhost:{_sslPort}");
+                                if (AllowSsl)
+                                    builder.AddServiceWebEndpoint<SourceService, ISourceService>(httpsBinding, $"https://localhost:{_port}");
+                                else
+                                    builder.AddServiceWebEndpoint<SourceService, ISourceService>(binding, $"http://localhost:{_port}");
                             }
                             else
                             {
                                 // Allow connections from any host
-                                builder.AddServiceWebEndpoint<SourceService, ISourceService>(binding, $"http://*:{_port}");
-                                builder.AddServiceWebEndpoint<SourceService, ISourceService>(httpsBinding, $"https://*:{_sslPort}");
+                                if (AllowSsl)
+                                    builder.AddServiceWebEndpoint<SourceService, ISourceService>(httpsBinding, $"https://0.0.0.0:{_port}");
+                                else
+                                    builder.AddServiceWebEndpoint<SourceService, ISourceService>(binding, $"http://0.0.0.0:{_port}");
                             }
 
                             builder.ConfigureServiceHostBase<SourceService>(serviceHost =>
@@ -125,7 +150,7 @@ namespace FlowMatters.Source.WebServer
                                         endpoint.EndpointBehaviors.Add(reply);
 
                                         // Only add CORS if not ssl
-                                        if (b.Security.Mode != WebHttpSecurityMode.Transport)
+                                        if (b.Security.Mode != WebHttpSecurityMode.Transport && AllowSsl)
                                             endpoint.EndpointBehaviors.Add(cors);
                                     }
                                 }
@@ -151,7 +176,11 @@ namespace FlowMatters.Source.WebServer
                 {
                     // Pass
                 }
-                Log($"Started Source RESTful Service on http port:{_port} and https port:{_sslPort}");
+
+                Log(AllowSsl
+                        ? $"Started Source RESTful Service on https port:{_port}"
+                        : $"Started Source RESTful Service on http port:{_port}");
+
                 Running = true;
 
                 await task;
@@ -180,6 +209,18 @@ namespace FlowMatters.Source.WebServer
             //    }
             //    Log($"COULD NOT START VENEER ON PORT {_port}");
             //}
+            catch (InvalidOperationException ioe) when
+                (AllowSsl &&
+                ioe.Message.Contains("No server certificate was specified") &&
+                ioe.Message.Contains("Unable to configure HTTPS endpoint"))
+            {
+                Log("Enabling SSL requires a server certificate.");
+                Log("To generate a developer certificate, run 'dotnet dev-certs https' in a Powershell/Command Prompt window.");
+                Log("To trust the certificate (Windows and macOS only) run 'dotnet dev-certs https --trust'.");
+                Log("Falling back to HTTP only.");
+                AllowSsl = false;
+                await Start();
+            }
             catch (Exception e)
             {
                 Log("COULD NOT START VENEER");
