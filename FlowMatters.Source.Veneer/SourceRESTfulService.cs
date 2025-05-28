@@ -8,6 +8,8 @@ using CoreWCF;
 using CoreWCF.Configuration;
 using CoreWCF.Description;
 using CoreWCF.Web;
+using FlowMatters.Source.Veneer.CORS;
+using FlowMatters.Source.Veneer.Formatting;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
@@ -110,6 +112,24 @@ namespace FlowMatters.Source.WebServer
                                 builder.AddServiceWebEndpoint<SourceService, ISourceService>(binding, $"http://*:{_port}");
                                 builder.AddServiceWebEndpoint<SourceService, ISourceService>(httpsBinding, $"https://*:{_sslPort}");
                             }
+
+                            builder.ConfigureServiceHostBase<SourceService>(serviceHost =>
+                            {
+                                var reply = new ReplyFormatSwitchBehaviour();
+                                var cors = new EnableCrossOriginResourceSharingBehavior();
+
+                                foreach (var endpoint in serviceHost.Description.Endpoints)
+                                {
+                                    if (endpoint.Binding is WebHttpBinding b)
+                                    {
+                                        endpoint.EndpointBehaviors.Add(reply);
+
+                                        // Only add CORS if not ssl
+                                        if (b.Security.Mode != WebHttpSecurityMode.Transport)
+                                            endpoint.EndpointBehaviors.Add(cors);
+                                    }
+                                }
+                            });
                             
                             _isEndpointRegistered = true;
                         }

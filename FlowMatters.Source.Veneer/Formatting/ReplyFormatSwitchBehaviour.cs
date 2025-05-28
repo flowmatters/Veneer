@@ -1,37 +1,48 @@
-using System;
-using System.ServiceModel.Dispatcher;
 using CoreWCF.Description;
 using CoreWCF.Dispatcher;
-using OperationDescription = System.ServiceModel.Description.OperationDescription;
-using ServiceEndpoint = System.ServiceModel.Description.ServiceEndpoint;
+using CoreWCF.Channels;
 
 namespace FlowMatters.Source.Veneer.Formatting
 {
-    // TODO: RM-20834 RM-21455 Implement
-    //public class ReplyFormatSwitchBehaviour : WebHttpBehavior
-    //{
-    //    public ReplyFormatSwitchBehaviour(IServiceProvider serviceProvider) : base(serviceProvider)
-    //    {
-    //    }
+    public class ReplyFormatSwitchBehaviour : IEndpointBehavior
+    {
+        public void AddBindingParameters(ServiceEndpoint endpoint, BindingParameterCollection bindingParameters)
+        {
+        }
 
-    //    // TODO: RM-20834 RM-21455 Need the replacement for this, or somewhere to call it
-    //    protected override IDispatchMessageFormatter GetReplyDispatchFormatter(
-    //        OperationDescription operationDescription, ServiceEndpoint endpoint)
-    //    {
-    //        switch (operationDescription.Name)
-    //        {
-    //            case "GetTimeSeries":
-    //            case "GetAggregatedTimeSeries":
-    //                return new TimeSeriesResponseFormatter()
-    //                {
-    //                    DefaultDispatchMessageFormatter = base.GetReplyDispatchFormatter(operationDescription, endpoint)
-    //                };
-    //            case "GetTabulatedResults":
-    //            case "ModelTable":
-    //                return new TableResponseFormatter();
-    //            default:
-    //                return base.GetReplyDispatchFormatter(operationDescription, endpoint);
-    //        }
-    //    }
-    //}
+        public void ApplyClientBehavior(ServiceEndpoint endpoint, CoreWCF.Dispatcher.ClientRuntime clientRuntime)
+        {
+        }
+
+        public void ApplyDispatchBehavior(ServiceEndpoint endpoint, CoreWCF.Dispatcher.EndpointDispatcher endpointDispatcher)
+        {
+            foreach (var operation in endpoint.Contract.Operations)
+            {
+                var formatter = GetReplyDispatchFormatter(operation, endpoint);
+                if (formatter != null)
+                {
+                    endpointDispatcher.DispatchRuntime.Operations[operation.Name].Formatter = formatter;
+                }
+            }
+        }
+
+        public void Validate(ServiceEndpoint endpoint)
+        {
+        }
+
+        private IDispatchMessageFormatter GetReplyDispatchFormatter(OperationDescription operationDescription, ServiceEndpoint endpoint)
+        {
+            switch (operationDescription.Name)
+            {
+                case "GetTimeSeries":
+                case "GetAggregatedTimeSeries":
+                    return new TimeSeriesResponseFormatter();
+                case "GetTabulatedResults":
+                case "ModelTable":
+                    return new TableResponseFormatter();
+                default:
+                    return null;
+            }
+        }
+    }
 }
