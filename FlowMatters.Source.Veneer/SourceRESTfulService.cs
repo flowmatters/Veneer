@@ -67,6 +67,10 @@ namespace FlowMatters.Source.WebServer
                 .UseKestrel(options =>
                 {
                     options.ListenLocalhost(_port);
+                    options.ListenLocalhost(_sslPort, listenOptions =>
+                    {
+                        listenOptions.UseHttps();
+                    });
                 })
                 .Configure(app =>
                 {
@@ -80,17 +84,32 @@ namespace FlowMatters.Source.WebServer
                                 //CrossDomainScriptAccessEnabled = true
                             };
 
-                            // TODO: RM-20834 RM-21455 Implement
-                            //if (!AllowRemoteConnections)
-                            //{
-                            //    binding.HostNameComparisonMode = HostNameComparisonMode.Exact;
-                            //}
+                            // Create HTTPS binding
+                            var httpsBinding = new WebHttpBinding
+                            {
+                                MaxReceivedMessageSize = 1024 * 1024 * 1024, // 1 gigabyte
+                                Security = new WebHttpSecurity
+                                {
+                                    Mode = WebHttpSecurityMode.Transport
+                                },
+                                //CrossDomainScriptAccessEnabled = true
+                            };
 
                             // Register the service type
                             builder.AddService<SourceService>();
 
-                            // Add the web endpoint
-                            builder.AddServiceWebEndpoint<SourceService, ISourceService>(binding, $"http://localhost:{_port}");
+                            if (!AllowRemoteConnections)
+                            {
+                                // In CoreWCF, we handle host restrictions through the endpoint address
+                                builder.AddServiceWebEndpoint<SourceService, ISourceService>(binding, $"http://localhost:{_port}");
+                                builder.AddServiceWebEndpoint<SourceService, ISourceService>(httpsBinding, $"https://localhost:{_sslPort}");
+                            }
+                            else
+                            {
+                                // Allow connections from any host
+                                builder.AddServiceWebEndpoint<SourceService, ISourceService>(binding, $"http://*:{_port}");
+                                builder.AddServiceWebEndpoint<SourceService, ISourceService>(httpsBinding, $"https://*:{_sslPort}");
+                            }
                             
                             _isEndpointRegistered = true;
                         }
@@ -112,7 +131,7 @@ namespace FlowMatters.Source.WebServer
                 {
                     // Pass
                 }
-                Log($"Started Source RESTful Service on port:{_port}");
+                Log($"Started Source RESTful Service on http port:{_port} and https port:{_sslPort}");
                 Running = true;
 
                 await task;
