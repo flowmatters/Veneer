@@ -46,7 +46,7 @@ namespace FlowMatters.Source.WebServer
 
         public override async Task Start()
         {
-            // TODO: RM-20834 RM-21455 No longer works as SetUpdatableFlags doesn't exist
+            // TODO: RM-20834 RM-21455 This doesn't look to be necessary anymore with CoreWCF, but leaving commented out in case it needs to be revisited
             //LeaveDotsAndSlashesEscaped();
             
             _singletonInstance = new SourceService();
@@ -104,7 +104,6 @@ namespace FlowMatters.Source.WebServer
                             var binding = new WebHttpBinding
                             {
                                 MaxReceivedMessageSize = 1024 * 1024 * 1024, // 1 gigabyte
-                                //CrossDomainScriptAccessEnabled = true
                             };
 
                             // Create HTTPS binding
@@ -114,8 +113,7 @@ namespace FlowMatters.Source.WebServer
                                 Security = new WebHttpSecurity
                                 {
                                     Mode = WebHttpSecurityMode.Transport
-                                },
-                                //CrossDomainScriptAccessEnabled = true
+                                }
                             };
 
                             // Register the service type
@@ -244,7 +242,7 @@ namespace FlowMatters.Source.WebServer
             }
         }
 
-        // TODO: RM-20834 RM-21455 No longer works as SetUpdatableFlags doesn't exist
+        // TODO: RM-20834 RM-21455 This doesn't look to be necessary anymore with CoreWCF, but leaving commented out in case it needs to be revisited
         //private void LeaveDotsAndSlashesEscaped()
         //{
         //    var getSyntaxMethod =
