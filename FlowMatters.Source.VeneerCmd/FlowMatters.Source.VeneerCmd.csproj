@@ -4,9 +4,9 @@
     <OutputType>Exe</OutputType>
     <RootNamespace>FlowMatters.Source.VeneerCmd</RootNamespace>
     <AssemblyName>FlowMatters.Source.VeneerCmd</AssemblyName>
-    <LangVersion>7.3</LangVersion>
+    <LangVersion>9.0</LangVersion>
     <RootPath>$(MSBuildThisFileDirectory)..\..\</RootPath>
-    <OutputPath>$(RootPath)Output\Plugins\CommunityPlugins</OutputPath>
+    <OutputPath>$(RootPath)Output\Plugins\CommunityPlugins\Veneer</OutputPath>
     <NoWarn>1591,1587</NoWarn>
     <WarningLevel>4</WarningLevel>
     <PlatformTarget>x64</PlatformTarget>
@@ -21,6 +21,10 @@
   <ItemGroup>
     <PackageReference Include="CommandLineParser" Version="2.9.1" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
+    <PackageReference Include="System.Text.Encoding.CodePages" Version="4.0.1" />
+    <PackageReference Include="FirebirdSql.Data.FirebirdClient" Version="10.3.1" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj" />
@@ -52,9 +56,24 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <None Include="app.config" />
+    <None Update="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Properties\" />
-  </ItemGroup>
+  <!-- To run this from CommunityPlugins we need to make sure everything required is copied across -->
+  <Target Name="CopyToPlugins" AfterTargets="Build">
+    <!--<Copy SourceFiles="$(OutputPath)$(AssemblyName).dll" DestinationFolder="$(RootPath)Output\Plugins\CommunityPlugins" />
+    <Copy SourceFiles="$(OutputPath)$(AssemblyName).exe" DestinationFolder="$(RootPath)Output\Plugins\CommunityPlugins" />
+    <Copy SourceFiles="$(OutputPath)$(AssemblyName).deps.json" DestinationFolder="$(RootPath)Output\Plugins\CommunityPlugins" />
+    <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll.config" DestinationFolder="$(RootPath)Output\Plugins\CommunityPlugins" />
+    <Copy SourceFiles="$(OutputPath)$(AssemblyName).runtimeconfig.json" DestinationFolder="$(RootPath)Output\Plugins\CommunityPlugins" />-->
+
+    <!--Firebird dependencies-->
+    <Copy SourceFiles="$(RootPath)Output\fbclient.dll" DestinationFolder="$(OutputPath)" />
+    <Copy SourceFiles="$(RootPath)Output\fbembed.dll" DestinationFolder="$(OutputPath)" />
+    <Copy SourceFiles="$(RootPath)Output\icudt63.dll" DestinationFolder="$(OutputPath)" />
+    <Copy SourceFiles="$(RootPath)Output\icuin63.dll" DestinationFolder="$(OutputPath)" />
+    <Copy SourceFiles="$(RootPath)Output\icuuc63.dll" DestinationFolder="$(OutputPath)" />
+    <Copy SourceFiles="$(RootPath)Output\Plugins\engine13.dll" DestinationFolder="$(OutputPath)\Plugins" />
+  </Target>
 </Project>

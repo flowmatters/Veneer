@@ -1,33 +1,128 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Data.Common;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Text;
 using System.Threading;
+using Microsoft.Extensions.Configuration;
 using RiverSystem;
 using RiverSystem.ApplicationLayer.Consumers;
 using RiverSystem.ApplicationLayer.Creation;
 using RiverSystem.PluginManager;
 using CommandLine;
+using FlowMatters.Source.Veneer;
 using FlowMatters.Source.Veneer.RemoteScripting;
-using FlowMatters.Source.WebServer;
 using Newtonsoft.Json;
 using RiverSystem.ApplicationLayer;
 using RiverSystem.ApplicationLayer.Interfaces;
 using RiverSystem.ApplicationLayer.Persistence.ZipContainer;
 using RiverSystem.ManagedExtensions;
 using TIME.DataTypes;
+using System.Text;
+using System.Runtime.CompilerServices;
+using TIME.Management;
 
 namespace FlowMatters.Source.VeneerCmd
 {
-    class Program
+    public class Program
     {
         private static PluginManager _pluginManager;
+        private static IConfiguration _configuration;
+
+        private static readonly List<string> _searchPaths = new List<string>()
+                                                            {
+                                                                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", ".."),  // Output folder
+                                                                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "Plugins"),  // Output/Plugins folder
+                                                                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "Plugins", "CommunityPlugins") // Output/Plugins/CommunityPlugins folder
+                                                            };
+
+        /// <summary>
+        /// This code runs before Main(). Initializes the assembly resolver to load required assemblies for TIME and then catch failing assembly loading and redirect appropriately.
+        /// </summary>
+        [ModuleInitializer]
+        public static void InitializeAssemblyResolver()
+        {
+            // Have to manually load TIME on its own first in order to access the AssemblyManager
+            LoadRequiredAssembly("TIME");
+            LoadRequiredAssemblyWithAssemblyManager("TIME");
+
+            // Catch any assemblies that fail to load and try them in the Source directory itself
+            AppDomain.CurrentDomain.AssemblyResolve += CurrentDomain_AssemblyResolve;
+        }
+
+        private static Assembly CurrentDomain_AssemblyResolve(object sender, ResolveEventArgs args)
+        {
+            // Extract the assembly name without version info
+            var assemblyName = new AssemblyName(args.Name).Name;
+
+            return LoadRequiredAssemblyWithAssemblyManager(assemblyName);
+        }
+
+        /// <summary>
+        /// Attempt to load the required assembly using the AssemblyManager in either Output, Output/Plugins or Output/Plugins/CommunityPlugins
+        /// </summary>
+        /// <param name="assemblyName"></param>
+        /// <returns></returns>
+        private static void LoadRequiredAssembly(string assemblyName)
+        {
+            foreach (var searchPath in _searchPaths)
+            {
+                var assemblyPath = Path.Combine(searchPath, assemblyName + ".dll");
+                if (File.Exists(assemblyPath))
+                {
+                    try
+                    {
+                        Assembly.LoadFrom(assemblyPath);
+                        Console.WriteLine($@"Loaded required assembly: {assemblyName}");
+                        break;
+                    }
+                    catch
+                    {
+                        // Continue to next path if loading fails
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Attempt to load the required assembly using the AssemblyManager in either Output, Output/Plugins or Output/Plugins/CommunityPlugins
+        /// </summary>
+        /// <param name="assemblyName"></param>
+        /// <returns></returns>
+        private static Assembly LoadRequiredAssemblyWithAssemblyManager(string assemblyName)
+        {
+            foreach (var searchPath in _searchPaths)
+            {
+                var assemblyPath = Path.Combine(searchPath, assemblyName + ".dll");
+                if (File.Exists(assemblyPath))
+                {
+                    try
+                    {
+                        var assembly = AssemblyManager.AssemblyLoadFrom(assemblyPath);
+                        Console.WriteLine($@"Loaded required assembly with assembly manager: {assemblyName}");
+                        return assembly;
+                    }
+                    catch
+                    {
+                        // Continue to next path if loading fails
+                    }
+                }
+            }
+
+            return null;
+        }
 
         static void Main(string[] args)
         {
+            // Required for log4net used in RiverSystem.Persistence
+            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+
+            // Set up configuration
+            _configuration = new ConfigurationBuilder()
+                .SetBasePath(Directory.GetCurrentDirectory())
+                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+                .Build();
+
             SynchronizationContext.SetSynchronizationContext(new SynchronizationContext());
             Constants.SetLargeDataOptions();
             try
@@ -39,8 +134,6 @@ namespace FlowMatters.Source.VeneerCmd
                 
             }
 
-            // TODO: RM-20834 RM-21455 Needs testing
-            //            CopyDLLs();
             var options = new Options();
             var result = CommandLine.Parser.Default.ParseArguments<Options>(args);
             if (result != null)
@@ -61,16 +154,6 @@ namespace FlowMatters.Source.VeneerCmd
             // Display the default usage information
             //Console.WriteLine(options.GetUsage());
         }
-
-        //private static void CopyDLLs()
-        //{
-        //    if (!File.Exists("fbembed.dll"))
-        //    {
-        //        Show("Copying required DLLs locally");
-        //        string dir = Path.GetDirectoryName((typeof (RiverSystemScenario).Assembly.Location));
-        //        File.Copy($"{dir}\\fbembed.dll","fbembed.dll");
-        //    }
-        //}
 
         private static void RunWithOptions(Options options)
         {

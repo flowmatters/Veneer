@@ -5,7 +5,7 @@
     <NoWarn>1591,1587</NoWarn>
     <RootPath>$(MSBuildThisFileDirectory)..\..\</RootPath>
     <ReferencePath>$(RootPath)Output;$(RootPath)3rdParty</ReferencePath>
-    <OutputPath>$(RootPath)Output\Plugins\CommunityPlugins</OutputPath>
+    <OutputPath>$(RootPath)Output\Plugins\CommunityPlugins\Veneer</OutputPath>
     <ExcludeEWaterPdbPathMap>true</ExcludeEWaterPdbPathMap>
     <UseWindowsForms>true</UseWindowsForms>
     <UseWPF>true</UseWPF>

@@ -1,15 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
-using System.Reflection;
 using System.Threading.Tasks;
 using CoreWCF;
 using CoreWCF.Configuration;
 using CoreWCF.Description;
-using CoreWCF.Web;
 using FlowMatters.Source.Veneer.CORS;
 using FlowMatters.Source.Veneer.Formatting;
+using FlowMatters.Source.WebServer;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
@@ -17,7 +17,7 @@ using Newtonsoft.Json.Linq;
 using RiverSystem;
 using RiverSystem.ManagedExtensions;
 
-namespace FlowMatters.Source.WebServer
+namespace FlowMatters.Source.Veneer
 {
     public class SourceRESTfulService : AbstractSourceServer
     {
@@ -63,7 +63,7 @@ namespace FlowMatters.Source.WebServer
                     services.AddServiceModelWebServices();
 
                     // Register the service instance as singleton
-                    services.AddSingleton<SourceService>(_singletonInstance);
+                    services.AddSingleton(_singletonInstance);
                     
                     // Add any custom behaviors as singletons
                     services.AddSingleton<IServiceBehavior, UseRequestHeadersForMetadataAddressBehavior>();
@@ -188,29 +188,18 @@ namespace FlowMatters.Source.WebServer
                 _port++; // Keep retrying until we run out of allocated ports
                 await Start();
             }
-            // TODO: RM-20834 RM-21455 Implement
-            //catch (AddressAccessDeniedException)
-            //{
-            //    Log("For details, see: https://github.com/flowmatters/veneer");
-
-            //    if (AllowRemoteConnections)
-            //    {
-            //        Log("If you require external connections, you must select a port where Veneer has permissions to accept external connections.");
-            //        Log($"Veneer does not have permission to accept external (ie non-local) connections on port {_port}");
-            //    }
-            //    else
-            //    {
-            //        Log("Alternatively, enable 'Allow Remote Connections' and restart Veneer.");
-            //        Log("To establish a local-only connection, select a port where Veneer is NOT registered for external connections.");
-            //        Log($"This is most likely because Veneer is registered to accept external/non-local connections on port {_port}.");
-            //        Log($"Veneer does not have permission to accept local-only connections on port {_port}");
-            //    }
-            //    Log($"COULD NOT START VENEER ON PORT {_port}");
-            //}
-            catch (InvalidOperationException ioe) when
-                (AllowSsl &&
-                ioe.Message.Contains("No server certificate was specified") &&
-                ioe.Message.Contains("Unable to configure HTTPS endpoint"))
+            catch (IOException ex) when (ex.HResult == -2147024891) // ERROR_ACCESS_DENIED
+            {
+                LogVeneerPermissionsIssue();
+            }
+            catch (HttpRequestException hre) when (hre.Message.Contains("access denied") ||
+                                                   hre.Message.Contains("permission denied"))
+            {
+                LogVeneerPermissionsIssue();
+            }
+            catch (InvalidOperationException ioe) when (AllowSsl &&
+                                                        ioe.Message.Contains("No server certificate was specified") &&
+                                                        ioe.Message.Contains("Unable to configure HTTPS endpoint"))
             {
                 Log("Enabling SSL requires a server certificate.");
                 Log("To generate a developer certificate, run 'dotnet dev-certs https' in a Powershell/Command Prompt window.");
@@ -225,6 +214,25 @@ namespace FlowMatters.Source.WebServer
                 Log(e.Message);
                 Log(e.StackTrace);
             }
+        }
+
+        private void LogVeneerPermissionsIssue()
+        {
+            Log("For details, see: https://github.com/flowmatters/veneer");
+
+            if (AllowRemoteConnections)
+            {
+                Log("If you require external connections, you must select a port where Veneer has permissions to accept external connections.");
+                Log($"Veneer does not have permission to accept external (ie non-local) connections on port {_port}");
+            }
+            else
+            {
+                Log("Alternatively, enable 'Allow Remote Connections' and restart Veneer.");
+                Log("To establish a local-only connection, select a port where Veneer is NOT registered for external connections.");
+                Log($"This is most likely because Veneer is registered to accept external/non-local connections on port {_port}.");
+                Log($"Veneer does not have permission to accept local-only connections on port {_port}");
+            }
+            Log($"COULD NOT START VENEER ON PORT {_port}");
         }
 
         private void RetrieveVeneerStatus()

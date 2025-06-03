@@ -15,12 +15,12 @@ using System.Net;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using CoreWCF.Web;
-using FlowMatters.Source.Veneer;
 using FlowMatters.Source.Veneer.DomainActions;
 using FlowMatters.Source.Veneer.ExchangeObjects;
 using FlowMatters.Source.Veneer.ExchangeObjects.DataSources;
 using FlowMatters.Source.Veneer.Formatting;
 using FlowMatters.Source.Veneer.RemoteScripting;
+using FlowMatters.Source.WebServer;
 using FlowMatters.Source.WebServer.ExchangeObjects;
 using RiverSystem;
 using RiverSystem.ApplicationLayer.Interfaces;
@@ -28,19 +28,15 @@ using RiverSystem.DataManagement.DataManager;
 using RiverSystem.Functions;
 using RiverSystem.ManagedExtensions;
 using RiverSystem.PreProcessing.ProjectionInfo;
-using TIME.Core;
 using TIME.DataTypes;
-using TIME.DataTypes.Polygons;
 using TIME.DataTypes.Utils;
 using TIME.Management;
 using TIME.ScenarioManagement;
-using Network = RiverSystem.Network;
 
-namespace FlowMatters.Source.WebServer
+namespace FlowMatters.Source.Veneer
 {
-    // TODO: RM-20834 RM-21455 If a class is marked with ServiceContractAttribute, it must be the only type in the hierarchy with ServiceContractAttribute.
-    //       because the ServiceContractAttribute is on ISourceService it can't be here
-    //[System.ServiceModel.ServiceContract,ServiceBehavior(InstanceContextMode = InstanceContextMode.Single)]
+    // If a class is marked with ServiceContractAttribute, it must be the only type in the hierarchy with ServiceContractAttribute.
+    // Because the ServiceContractAttribute is on ISourceService it can't be here
     [System.ServiceModel.ServiceKnownType(typeof(double[]))]
     [System.ServiceModel.ServiceKnownType(typeof(double[][]))]
     [System.ServiceModel.ServiceKnownType(typeof(double[][][]))]

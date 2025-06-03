@@ -1,27 +1,14 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Drawing;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Windows;
-using System.Windows.Data;
-using System.Windows.Documents;
 using System.Windows.Forms;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Media.TextFormatting;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
 using FlowMatters.Source.Veneer.Addons;
-using FlowMatters.Source.Veneer.RemoteScripting;
 using FlowMatters.Source.WebServer;
 using Newtonsoft.Json;
 using RiverSystem;
-using RiverSystem.Controls.UI.ManagedExtensions;
 using RiverSystem.TaskDefinitions;
 using Application = System.Windows.Forms.Application;
 using Button = System.Windows.Controls.Button;
@@ -30,7 +17,7 @@ using TextBox = System.Windows.Controls.TextBox;
 using Timer = System.Timers.Timer;
 using UserControl = System.Windows.Controls.UserControl;
 
-namespace FlowMatters.Source.WebServerPanel
+namespace FlowMatters.Source.Veneer
 {
     /// <summary>
     /// Interaction logic for WebServerStatusControl.xaml

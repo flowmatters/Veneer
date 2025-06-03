@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.Serialization;
+using FlowMatters.Source.Veneer;
 using FlowMatters.Source.WebServer.ExchangeObjects;
 
 namespace FlowMatters.Source.WebServer
