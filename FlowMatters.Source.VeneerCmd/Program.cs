@@ -78,6 +78,20 @@ namespace FlowMatters.Source.VeneerCmd
                 // This is where assembly loading will happen, but now paths are set up
                 RunWithRiverSystemDependencies(options);
             }
+            catch (TypeInitializationException tie)
+            {
+                // This is most likely due to the Source path not being findable
+                Console.WriteLine(string.IsNullOrEmpty(result.Value?.SourcePath)
+                                      ? $"An exception occurred trying to load type: {tie.TypeName}. This most likely means the Source directory was unable to be found. Please try again with the -d option to specify your Source directory."
+                                      : $"An exception occurred trying to load type: {tie.TypeName}. This most likely means the Source directory was unable to be found. You may need to specify a different path with -d other than [{result.Value?.SourcePath}].");
+            }
+            catch (FileNotFoundException ffe)
+            {
+                // This is most likely due to the Source path not being findable
+                Console.WriteLine(string.IsNullOrEmpty(result.Value?.SourcePath)
+                                      ? $"An exception occurred trying to load assembly: {ffe.FileName}. This most likely means the Source directory was unable to be found. Please try again with the -d option to specify your Source directory."
+                                      : $"An exception occurred trying to load assembly: {ffe.FileName}. This most likely means the Source directory was unable to be found. You may need to specify a different path with -d other than [{result.Value?.SourcePath}].");
+            }
             catch (Exception e)
             {
                 Console.WriteLine(e.Message);
