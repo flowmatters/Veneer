@@ -16,6 +16,7 @@
     <ImportWindowsDesktopTargets>true</ImportWindowsDesktopTargets>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <Title>FlowMatters.Source.VeneerCmd</Title>
+    <Product>FlowMatters.Source.VeneerCmd</Product>
     <Copyright>FlowMatters @ 2013</Copyright>
   </PropertyGroup>
   <ItemGroup>
