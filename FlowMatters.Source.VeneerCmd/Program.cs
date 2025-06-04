@@ -19,7 +19,6 @@ using RiverSystem.ApplicationLayer.Persistence.ZipContainer;
 using RiverSystem.ManagedExtensions;
 using TIME.DataTypes;
 using System.Text;
-using System.Runtime.CompilerServices;
 using TIME.Management;
 
 namespace FlowMatters.Source.VeneerCmd
@@ -29,27 +28,70 @@ namespace FlowMatters.Source.VeneerCmd
         private static PluginManager _pluginManager;
         private static IConfiguration _configuration;
 
-        private static readonly List<string> _searchPaths = new List<string>()
-                                                            {
-                                                                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", ".."),  // Output folder
-                                                                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "Plugins"),  // Output/Plugins folder
-                                                                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "Plugins", "CommunityPlugins") // Output/Plugins/CommunityPlugins folder
-                                                            };
-
         /// <summary>
-        /// This code runs before Main(). Initializes the assembly resolver to load required assemblies for TIME and then catch failing assembly loading and redirect appropriately.
+        /// List of dynamic search paths for RiverSystem related assemblies. This may change depending on the passed in -d argument.
         /// </summary>
-        [ModuleInitializer]
-        public static void InitializeAssemblyResolver()
-        {
-            // Have to manually load TIME on its own first in order to access the AssemblyManager
-            LoadRequiredAssembly("TIME");
-            LoadRequiredAssemblyWithAssemblyManager("TIME");
+        private static List<string> _dynamicSearchPaths = new()
+                                                          {
+                                                              Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", ".."),  // Output folder
+                                                              Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "Plugins"),  // Output/Plugins folder
+                                                              Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "Plugins", "CommunityPlugins") // Output/Plugins/CommunityPlugins folder
+                                                          };
 
-            // Catch any assemblies that fail to load and try them in the Source directory itself
-            AppDomain.CurrentDomain.AssemblyResolve += CurrentDomain_AssemblyResolve;
+        static void Main(string[] args)
+        {
+            // Required for log4net used in RiverSystem.Persistence
+            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+
+            // Set up configuration (no RiverSystem dependencies here)
+            _configuration = new ConfigurationBuilder()
+                .SetBasePath(Directory.GetCurrentDirectory())
+                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+                .Build();
+
+            // Parse command line arguments (no RiverSystem dependencies)
+            var result = Parser.Default.ParseArguments<Options>(args);
+            if (result?.Value == null)
+            {
+                return; // Display the default usage information
+            }
+
+            try
+            {
+                var options = result.Value;
+
+                // Update search paths if source directory specified
+                if (!string.IsNullOrWhiteSpace(options.SourcePath))
+                {
+                    UpdateSearchPathsFromOptions(options.SourcePath);
+                }
+                // Otherwise it will use the default path two directories up
+
+                // Have to manually load TIME on its own first in order to access the AssemblyManager
+                LoadRequiredAssembly("TIME");
+                LoadRequiredAssemblyWithAssemblyManager("TIME");
+
+                // Catch any assemblies that fail to load and try them in the Source directory itself
+                AppDomain.CurrentDomain.AssemblyResolve += CurrentDomain_AssemblyResolve;
+
+                // NOW call the method that has RiverSystem dependencies
+                // This is where assembly loading will happen, but now paths are set up
+                RunWithRiverSystemDependencies(options);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+                Console.WriteLine(e.StackTrace);
+                Console.WriteLine(@$"Unhandled exception: {e.Message}");
+            }
         }
 
+        /// <summary>
+        /// If we fail to load an assembly, try to load it into AssemblyManager from the Source directory
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="args"></param>
+        /// <returns></returns>
         private static Assembly CurrentDomain_AssemblyResolve(object sender, ResolveEventArgs args)
         {
             // Extract the assembly name without version info
@@ -65,7 +107,7 @@ namespace FlowMatters.Source.VeneerCmd
         /// <returns></returns>
         private static void LoadRequiredAssembly(string assemblyName)
         {
-            foreach (var searchPath in _searchPaths)
+            foreach (var searchPath in _dynamicSearchPaths)
             {
                 var assemblyPath = Path.Combine(searchPath, assemblyName + ".dll");
                 if (File.Exists(assemblyPath))
@@ -91,7 +133,7 @@ namespace FlowMatters.Source.VeneerCmd
         /// <returns></returns>
         private static Assembly LoadRequiredAssemblyWithAssemblyManager(string assemblyName)
         {
-            foreach (var searchPath in _searchPaths)
+            foreach (var searchPath in _dynamicSearchPaths)
             {
                 var assemblyPath = Path.Combine(searchPath, assemblyName + ".dll");
                 if (File.Exists(assemblyPath))
@@ -112,17 +154,23 @@ namespace FlowMatters.Source.VeneerCmd
             return null;
         }
 
-        static void Main(string[] args)
+        // Method to update search paths (no RiverSystem dependencies)
+        private static void UpdateSearchPathsFromOptions(string sourcePath)
         {
-            // Required for log4net used in RiverSystem.Persistence
-            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+            if (!Directory.Exists(sourcePath))
+                return;
 
-            // Set up configuration
-            _configuration = new ConfigurationBuilder()
-                .SetBasePath(Directory.GetCurrentDirectory())
-                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-                .Build();
+            // Replace the search paths with the newly passed in path
+            _dynamicSearchPaths.Clear();
+            _dynamicSearchPaths.Add(sourcePath);
+            _dynamicSearchPaths.Add(Path.Combine(sourcePath, "Plugins"));
+            _dynamicSearchPaths.Add(Path.Combine(sourcePath, "Plugins", "CommunityPlugins"));
+            Console.WriteLine(@$"Using Source directory: {sourcePath}");
+        }
 
+        // This method contains all the RiverSystem dependencies and must be called AFTER the search paths are set up
+        private static void RunWithRiverSystemDependencies(Options options)
+        {
             SynchronizationContext.SetSynchronizationContext(new SynchronizationContext());
             Constants.SetLargeDataOptions();
             try
@@ -134,25 +182,8 @@ namespace FlowMatters.Source.VeneerCmd
                 
             }
 
-            var options = new Options();
-            var result = CommandLine.Parser.Default.ParseArguments<Options>(args);
-            if (result != null)
-            {
-                try
-                {
-                    options = result.Value;
-                    RunWithOptions(options);
-                }
-                catch (Exception e)
-                {
-                    Console.WriteLine(e.Message);
-                    Console.WriteLine(e.StackTrace);
-                    Console.WriteLine("Unhandled exception: {0}", e.Message);
-                }
-                return;
-            }
-            // Display the default usage information
-            //Console.WriteLine(options.GetUsage());
+            // This is the original RunWithOptions logic, now safely deferred
+            RunWithOptions(options);
         }
 
         private static void RunWithOptions(Options options)
@@ -324,10 +355,8 @@ namespace FlowMatters.Source.VeneerCmd
             var manager = PluginManager.Instance;
 #endif
 
-            // TODO: RM-20834 RM-21455 Below needs testing
             var allDomainPluginsToLoad = new List<string>();
-
-            foreach (string plugin in additionalPlugins)
+            foreach (var plugin in additionalPlugins)
             {
                 Console.Write("Loading from command line {0}... ", plugin);
 
@@ -394,7 +423,7 @@ namespace FlowMatters.Source.VeneerCmd
         [Option('r', "remote-access",HelpText ="Allow access from other computers", Default = false)]
         public bool RemoteAccess { get; set; }
 
-        [Option('r', "enable-ssl", HelpText = "Enable SSL access", Default = false)]
+        [Option('e', "enable-ssl", HelpText = "Enable SSL access", Default = false)]
         public bool AllowSsl { get; set; }
 
         [Option('s',"allow-scripts",HelpText = "Allow submission of Iron Python scripts", Default = false)]
@@ -423,12 +452,7 @@ namespace FlowMatters.Source.VeneerCmd
         [Value(0, Max = 1)]
         public IList<string> ProjectFiles { get; set; }
 
-        //[Help]
-        //public string GetUsage()
-        //{
-        //    var usage = new StringBuilder();
-        //    usage.AppendLine("Veneer by Flow Matters");
-        //    return usage.ToString();
-        //}
+        [Option('d', "source-directory", HelpText = "Path to the Source directory", Default = null)]
+        public string SourcePath { get; set; }
     }
 }
