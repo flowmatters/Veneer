@@ -101,40 +101,28 @@ namespace FlowMatters.Source.Veneer
                     {
                         if (!_isEndpointRegistered)
                         {
+                            // Create the web binding
                             var binding = new WebHttpBinding
                             {
-                                MaxReceivedMessageSize = 1024 * 1024 * 1024, // 1 gigabyte
+                                MaxReceivedMessageSize = 1024 * 1024 * 1024 // 1 gigabyte
                             };
 
-                            // Create HTTPS binding
-                            var httpsBinding = new WebHttpBinding
+                            // Set https if applicable
+                            var protocol = "http";
+                            if (AllowSsl)
                             {
-                                MaxReceivedMessageSize = 1024 * 1024 * 1024, // 1 gigabyte
-                                Security = new WebHttpSecurity
-                                {
-                                    Mode = WebHttpSecurityMode.Transport
-                                }
-                            };
+                                protocol = "https";
+                                binding.Security = new WebHttpSecurity { Mode = WebHttpSecurityMode.Transport };
+                            }
+
+                            // Different urls for local and remote connections
+                            var host = AllowRemoteConnections ? "0.0.0.0" : "localhost";
 
                             // Register the service type
                             builder.AddService<SourceService>();
 
                             // In CoreWCF, we handle host restrictions through the endpoint address
-                            if (!AllowRemoteConnections)
-                            {
-                                if (AllowSsl)
-                                    builder.AddServiceWebEndpoint<SourceService, ISourceService>(httpsBinding, $"https://localhost:{_port}");
-                                else
-                                    builder.AddServiceWebEndpoint<SourceService, ISourceService>(binding, $"http://localhost:{_port}");
-                            }
-                            else
-                            {
-                                // Allow connections from any host
-                                if (AllowSsl)
-                                    builder.AddServiceWebEndpoint<SourceService, ISourceService>(httpsBinding, $"https://0.0.0.0:{_port}");
-                                else
-                                    builder.AddServiceWebEndpoint<SourceService, ISourceService>(binding, $"http://0.0.0.0:{_port}");
-                            }
+                            builder.AddServiceWebEndpoint<SourceService, ISourceService>(binding, $"{protocol}://{host}:{_port}");
 
                             builder.ConfigureServiceHostBase<SourceService>(serviceHost =>
                             {

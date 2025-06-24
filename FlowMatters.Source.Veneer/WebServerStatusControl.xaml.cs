@@ -10,6 +10,7 @@ using FlowMatters.Source.WebServer;
 using Newtonsoft.Json;
 using RiverSystem;
 using RiverSystem.TaskDefinitions;
+using TIME.Core.Metadata;
 using Application = System.Windows.Forms.Application;
 using Button = System.Windows.Controls.Button;
 using Path = System.IO.Path;
@@ -22,6 +23,7 @@ namespace FlowMatters.Source.Veneer
     /// <summary>
     /// Interaction logic for WebServerStatusControl.xaml
     /// </summary>
+    [IgnoreMenuItem] // We only want this in Tools > Veneer Server
     public partial class WebServerStatusControl : UserControl, IRiverSystemPlugin, IDisposable
     {
         public static int DefaultPort = SourceRESTfulService.DEFAULT_PORT;
@@ -177,7 +179,14 @@ namespace FlowMatters.Source.Veneer
             ToolStripItem veneer = reportMenu.DropDownItems.Add("");
             veneer.BackgroundImage = Veneer.Properties.Resources.Logo_RGB;
             veneer.BackgroundImageLayout = ImageLayout.Zoom;
-            veneer.Click += (eventSender, eventArgs) => Process.Start("http://www.flowmatters.com.au");
+            veneer.Click += (eventSender, eventArgs) =>
+            {
+                Process.Start(new ProcessStartInfo("https://www.flowmatters.com.au")
+                { 
+                    UseShellExecute = true,
+                    Verb = "open"
+                });
+            };
         }
 
         private void LaunchExeAddon(string addonPath)

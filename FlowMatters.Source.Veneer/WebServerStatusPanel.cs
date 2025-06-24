@@ -14,6 +14,7 @@ using TIME.UI.Core.Metadata;
 
 namespace FlowMatters.Source.WebServerPanel
 {
+    [IgnoreMenuItem] // We only want this in Tools > Veneer Server
     [Aka("Veneer Server"), InitialiseOnLoad(RiverSystemOptions.GENERAL_TOOL),MenuPlugin("Veneer.Properties.Resources.Logo_Only")]
     //    MenuPlugin("FlowMatters.Source.Veneer.Resources.Icon_Only_RGB_for_LI.png")]
     public partial class WebServerStatusPanel : UserControl, RiverSystemScenarioProxy.IRiverSystemScenarioHandler
