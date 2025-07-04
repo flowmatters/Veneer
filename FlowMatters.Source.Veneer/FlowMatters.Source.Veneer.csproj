@@ -15,6 +15,9 @@
     <Product>FlowMatters.Source.Veneer</Product>
     <Copyright>Copyright © Flow Matters 2013 </Copyright>
   </PropertyGroup>
+	<Import Project="$(RootPath)RiverSystem\Solutions\SDK.build.props" />
+	<Import Project="$(RootPath)RiverSystem\Solutions\SDK.build.targets" />
+	<Import Project="$(RootPath)RiverSystem\Solutions\NormalisePdbBuildRoot.targets" />
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <UseVSHostingProcess>false</UseVSHostingProcess>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>

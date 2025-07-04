@@ -19,6 +19,9 @@
     <Product>FlowMatters.Source.VeneerCmd</Product>
     <Copyright>FlowMatters @ 2013</Copyright>
   </PropertyGroup>
+	<Import Project="$(RootPath)RiverSystem\Solutions\SDK.build.props" />
+	<Import Project="$(RootPath)RiverSystem\Solutions\SDK.build.targets" />
+	<Import Project="$(RootPath)RiverSystem\Solutions\NormalisePdbBuildRoot.targets" />
   <ItemGroup>
     <PackageReference Include="CommandLineParser" Version="2.9.1" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
