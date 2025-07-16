@@ -7,7 +7,7 @@ using FlowMatters.Source.WebServer;
 using Microsoft.CSharp.RuntimeBinder;
 using RiverSystem;
 using RiverSystem.Catchments;
-using RiverSystem.Forms.SchematicBuilder;
+using RiverSystem.Forms.Core.SchematicBuilder;
 using TIME.DataTypes;
 using TIME.DataTypes.Polygons;
 using Network = RiverSystem.Network;
