@@ -24,7 +24,7 @@ using TIME.Core;
 using TimeSeries = TIME.DataTypes.TimeSeries;
 using TIME.Management;
 using TIME.Tools.Reflection;
-using RiverSystem.Forms.UI.SchematicBuilder;
+using RiverSystem.Forms.SchematicBuilder;
 
 namespace FlowMatters.Source.Veneer.RemoteScripting
 {
