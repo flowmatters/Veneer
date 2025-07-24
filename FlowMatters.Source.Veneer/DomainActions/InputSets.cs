@@ -38,6 +38,18 @@ namespace FlowMatters.Source.Veneer.DomainActions
                 var parentInputSet = Scenario.Network.InputSets.FirstOrDefault(s=>s.HierarchicalName== hierarchy);
                 set.ParentInputSet = parentInputSet;
             }
+
+            if (!String.IsNullOrEmpty(summary.Filename))
+            {
+                var parameterSet = GetOrCreateParameterSet(set);
+                parameterSet.Configuration = new FileParameterSetConfiguration
+                {
+                    Filename = summary.Filename,
+                    RelativePath = summary.RelativePath,
+                    ReloadOnRun = summary.ReloadOnRun
+                };
+            }
+
             UpdateInstructions(set, summary.Configuration);
         }
 
@@ -70,6 +82,12 @@ namespace FlowMatters.Source.Veneer.DomainActions
 
         public void UpdateInstructions(InputSet inputSet, string[] newInstructions)
         {
+            var parameterSet = GetOrCreateParameterSet(inputSet);
+            parameterSet.Configuration.Instructions = String.Join(Environment.NewLine, newInstructions);
+        }
+
+        private ParameterSet GetOrCreateParameterSet(InputSet inputSet)
+        {
             ParameterSet parameterSet = ParameterSet(inputSet);
             if (parameterSet == null)
             {
@@ -82,7 +100,8 @@ namespace FlowMatters.Source.Veneer.DomainActions
                 };
                 ParameterSetManager().ParameterSets.Add(inputSetParameterSet);
             }
-            parameterSet.Configuration.Instructions = String.Join(Environment.NewLine, newInstructions);
+
+            return parameterSet;
         }
 
         private ParameterSet ParameterSet(InputSet inputSet)
@@ -122,30 +141,28 @@ namespace FlowMatters.Source.Veneer.DomainActions
             Run(Find(urlSafeInputSetName));
         }
 
-        public string Filename(InputSet inputSet)
+        protected FileParameterSetConfiguration FileConfig(InputSet inputSet)
         {
             var p = ParameterSet(inputSet);
-            if (p == null)
-                return null;
+            return p?.Configuration as FileParameterSetConfiguration;
+        }
 
-            if (p.Configuration is FileParameterSetConfiguration)
-            {
-                return ((FileParameterSetConfiguration)p.Configuration).Filename;
-            }
-            return null;
+        public string Filename(InputSet inputSet)
+        {
+            var config = FileConfig(inputSet);
+            return config?.Filename;
         }
 
         public bool ReloadOnRun(InputSet inputSet)
         {
-            var p = ParameterSet(inputSet);
-            if (p == null)
-                return false;
+            var config = FileConfig(inputSet);
+            return config?.ReloadOnRun ?? false;
+        }
 
-            if (p.Configuration is FileParameterSetConfiguration)
-            {
-                return ((FileParameterSetConfiguration) p.Configuration).ReloadOnRun;
-            }
-            return false;
+        public bool RelativePath(InputSet inputSet)
+        {
+            var config = FileConfig(inputSet);
+            return config?.RelativePath ?? false;
         }
     }
 }

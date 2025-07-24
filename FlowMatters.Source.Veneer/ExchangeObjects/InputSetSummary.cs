@@ -10,6 +10,7 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects
         [DataMember] public string Name;
         [DataMember] public string[] Configuration;
         [DataMember] public bool ReloadOnRun;
+        [DataMember] public bool RelativePath;
         [DataMember] public string Filename;
     }
 }

@@ -599,6 +599,7 @@ namespace FlowMatters.Source.WebServer
                 {
                     result[i].Filename = fn;
                     result[i].ReloadOnRun = sets.ReloadOnRun(inputSet);
+                    result[i].RelativePath = sets.RelativePath(inputSet);
                 }
             }
             return result;
