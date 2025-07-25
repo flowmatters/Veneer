@@ -509,6 +509,7 @@ namespace FlowMatters.Source.WebServer
                 FunctionValue fv = new FunctionValue();
                 fv.Name = fn.Name;
                 fv.Expression = fn.Expression;
+                fv.FullName = fn.FullName;
                 result[i] = fv;
             }
             return result;
