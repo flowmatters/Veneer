@@ -19,6 +19,7 @@ using RiverSystem.ApplicationLayer.Persistence.ZipContainer;
 using RiverSystem.ManagedExtensions;
 using TIME.DataTypes;
 using System.Text;
+using Nito.AsyncEx;
 using TIME.Management;
 
 namespace FlowMatters.Source.VeneerCmd
@@ -236,7 +237,7 @@ namespace FlowMatters.Source.VeneerCmd
             _server.AllowRemoteConnections = options.RemoteAccess;
             _server.AllowSsl = options.AllowSsl;
 
-            _server.Start();
+            AsyncContext.Run(() => _server.Start());
             _server.Service.AllowScript = options.AllowScripts;
             _server.Service.RunningInGUI = false;
             _server.Service.ProjectHandler = projectHandler;
@@ -374,15 +375,16 @@ namespace FlowMatters.Source.VeneerCmd
             {
                 Console.Write("Loading from command line {0}... ", plugin);
 
-                var result = manager.InstallPlugin(plugin, out var domainPluginsToLoad, false, false);
-                allDomainPluginsToLoad.AddRange(domainPluginsToLoad);
+                var data = AsyncContext.Run(() => manager.InstallPluginAndGetDomainPluginsToLoadAsync(plugin, false, false));
+                var result = data.Plugin;
+                allDomainPluginsToLoad.AddRange(data.DomainPluginsToLoad);
                 Console.WriteLine(result.Status.IsLoaded?"Loaded":result.Status.ErrorMsg);
             }
 
             foreach (var plugin in allDomainPluginsToLoad)
             {
                 // Don't care about loading extra plugins here
-                manager.InstallPlugin(plugin, out _, false, false);
+                AsyncContext.Run(() => manager.InstallPlugin(plugin,  false, false));
             }
 
             foreach (var plugin in manager.ActivePlugins)
