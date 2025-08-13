@@ -7,7 +7,7 @@ using FlowMatters.Source.WebServer;
 using Microsoft.CSharp.RuntimeBinder;
 using RiverSystem;
 using RiverSystem.Catchments;
-using RiverSystem.Forms.SchematicBuilder;
+using RiverSystem.Forms.Core.SchematicBuilder;
 using TIME.DataTypes;
 using TIME.DataTypes.Polygons;
 using Network = RiverSystem.Network;
@@ -15,6 +15,8 @@ using Network = RiverSystem.Network;
 namespace FlowMatters.Source.Veneer.ExchangeObjects
 {
     [DataContract]
+    [KnownType(typeof(GeoJSONGeometry))]
+    [KnownType(typeof(GeoJSONProperties))]
     public class GeoJSONFeature
     {
         private const string FeatureTypeProperty = "feature_type";

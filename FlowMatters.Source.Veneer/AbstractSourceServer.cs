@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Threading.Tasks;
+using FlowMatters.Source.Veneer;
 using RiverSystem;
 
 namespace FlowMatters.Source.WebServer
@@ -6,7 +8,7 @@ namespace FlowMatters.Source.WebServer
     public abstract class AbstractSourceServer
     {
         protected int _port;
-        public int Port { get { return _port; } }
+        public int Port => _port;
         public abstract SourceService Service { get;  }
         protected AbstractSourceServer(int port)
         {
@@ -14,8 +16,8 @@ namespace FlowMatters.Source.WebServer
         }
 
         public event ServerLogListener LogGenerator;
-        public abstract void Start();
-        public abstract void Stop();
+        public abstract Task Start();
+        public abstract Task Stop();
         public abstract RiverSystemScenario Scenario { get; set; }
 
         public bool Running { get; protected set; }
