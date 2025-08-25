@@ -1,23 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Linq;
 using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
 using FlowMatters.Source.Veneer.ExchangeObjects.DataSources;
 using FlowMatters.Source.WebServer;
-using IronPython.Modules;
-using IronPython.Runtime.Operations;
 using RiverSystem;
-using RiverSystem.Api;
 using RiverSystem.Assurance;
 using RiverSystem.Catchments.Models.ContaminantFilteringModels;
 using RiverSystem.Catchments;
 using RiverSystem.Catchments.Constituents;
 using RiverSystem.Catchments.Models.ContaminantGenerationModels;
 using RiverSystem.Constituents;
-using RiverSystem.DataManagement;
 using RiverSystem.DataManagement.DataManager;
 using RiverSystem.DataManagement.DataManager.DataDetails;
 using RiverSystem.DataManagement.DataManager.DataSources;
@@ -26,14 +19,12 @@ using RiverSystem.Quality.SourceSinkModels;
 #if BEFORE_V4 || BEFORE_V5 || BEFORE_V5_13
 using RiverSystemGUI_II.SchematicBuilder;
 #else
-using RiverSystem.Forms.SchematicBuilder;
 #endif
 using TIME.Core;
 using TimeSeries = TIME.DataTypes.TimeSeries;
 using TIME.Management;
 using TIME.Tools.Reflection;
-using TIME.Core.Metadata;
-using Newtonsoft.Json.Linq;
+using RiverSystem.Forms.SchematicBuilder;
 
 namespace FlowMatters.Source.Veneer.RemoteScripting
 {
@@ -46,7 +37,7 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
                 var bits = accessor.Split('.');
                 var first = bits[0];
                 var next = target.GetMemberValue(first);
-                return Deref(next, String.Join(".", bits.TakeLast(bits.Length - 1)));
+                return Deref(next, string.Join(".", EnumerableExtensions.TakeLast(bits, bits.Length - 1)));
             }
             return target.GetMemberValue(accessor);
         }

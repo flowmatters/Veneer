@@ -14,6 +14,10 @@ using TIME.DataTypes.Polygons;
 namespace FlowMatters.Source.WebServer
 {
     [DataContract]
+    [KnownType(typeof(double[]))]
+    [KnownType(typeof(double[][]))]
+    [KnownType(typeof(double[][][]))]
+    [KnownType(typeof(double[][][][]))]
     public class GeoJSONGeometry
     {
         public static double RoundCoordinate(double v,int dp=-1)

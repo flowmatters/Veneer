@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ServiceModel;
-using System.ServiceModel.Channels;
-using System.ServiceModel.Dispatcher;
+using CoreWCF;
+using CoreWCF.Channels;
+using CoreWCF.Dispatcher;
 
 namespace FlowMatters.Source.Veneer.CORS
 {

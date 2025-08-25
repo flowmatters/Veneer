@@ -2,12 +2,10 @@
 using System.Data;
 using System.Linq;
 using System.Net;
-using System.ServiceModel.Channels;
-using System.ServiceModel.Dispatcher;
 using System.Text;
-using FlowMatters.Source.Veneer.ExchangeObjects;
-using FlowMatters.Source.WebServer.ExchangeObjects;
-using Microsoft.Scripting.Utils;
+using CoreWCF.Channels;
+using CoreWCF.Dispatcher;
+using HttpResponseMessageProperty = System.ServiceModel.Channels.HttpResponseMessageProperty;
 
 namespace FlowMatters.Source.Veneer.Formatting
 {
