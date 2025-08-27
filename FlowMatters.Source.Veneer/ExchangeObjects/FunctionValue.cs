@@ -8,5 +8,7 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects
         [DataMember] public string FullName;
         [DataMember] public string Name;
         [DataMember] public string Expression;
+        [DataMember] public string Units;
+        [DataMember] public double InitialValue;
     }
 }
