@@ -111,6 +111,8 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
         {
             if (actual == null)
                 return null;
+            if (actual is VeneerResponse)
+                return (VeneerResponse)actual;
             if (actual is TimeSeries)
                 return new SimpleTimeSeries((TimeSeries) actual);
             if(actual is LinearVariable)
