@@ -193,7 +193,16 @@ namespace FlowMatters.Source.Veneer
         {
             var fullPath = Path.Combine(Scenario.Project.FileDirectory, addonPath);
             var startInfo = new ProcessStartInfo();
-            startInfo.FileName = fullPath;
+            if (fullPath.EndsWith(".bat"))
+            {
+                startInfo.FileName = "cmd.exe";
+                startInfo.Arguments = "/C " + fullPath;
+            }
+            else
+            {
+                startInfo.FileName = fullPath;
+            }
+
             startInfo.Environment["VENEER_PORT"] = this.Port.ToString();
             startInfo.UseShellExecute = false;
             Process.Start(startInfo);
