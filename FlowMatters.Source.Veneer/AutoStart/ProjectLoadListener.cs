@@ -2,6 +2,7 @@
 using System.Reflection;
 using System.Windows.Forms;
 using FlowMatters.Source.WebServerPanel;
+using RiverSystem;
 using RiverSystem.ApplicationLayer.Consumer.Forms;
 using RiverSystem.Forms;
 using Timer = System.Timers.Timer;
@@ -70,7 +71,6 @@ namespace FlowMatters.Source.Veneer.AutoStart
 
         private Timer _timer;
 
-
         private void StartVeneer(int port,bool remote, bool scripts)
         {
             WebServerStatusControl.DefaultPort = port;
@@ -87,6 +87,14 @@ namespace FlowMatters.Source.Veneer.AutoStart
         {
 #if V4 && BEFORE_V4_3
 #else
+            if (MainForm.Instance.CurrentScenario == null)
+            {
+                _timer = new Timer(1000.0);
+                _timer.AutoReset = false;
+                _timer.Elapsed += _timer_Elapsed;
+                _timer.Start();
+                return;
+            }
             MainForm.Instance.Invoke(new Action(() =>
             {
                 var t = typeof(MenuPluginHelper);

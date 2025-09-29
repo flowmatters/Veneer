@@ -15,7 +15,7 @@ using NUnit.Framework;
 using RiverSystem;
 using RiverSystem.ApplicationLayer.Consumer.Forms;
 using RiverSystem.ApplicationLayer.Interfaces;
-using RiverSystem.Forms;
+using RiverSystem.Forms.Core;
 using RiverSystem.Functions.Variables;
 using TIME.DataTypes;
 using TIME.DataTypes.Polygons;
@@ -111,6 +111,8 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
         {
             if (actual == null)
                 return null;
+            if (actual is VeneerResponse)
+                return (VeneerResponse)actual;
             if (actual is TimeSeries)
                 return new SimpleTimeSeries((TimeSeries) actual);
             if(actual is LinearVariable)

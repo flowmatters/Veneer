@@ -1,28 +1,16 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Drawing;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Windows;
-using System.Windows.Data;
-using System.Windows.Documents;
 using System.Windows.Forms;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Media.TextFormatting;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
 using FlowMatters.Source.Veneer.Addons;
-using FlowMatters.Source.Veneer.RemoteScripting;
 using FlowMatters.Source.WebServer;
 using Newtonsoft.Json;
 using RiverSystem;
-using RiverSystem.Controls.ManagedExtensions;
 using RiverSystem.TaskDefinitions;
+using TIME.Core.Metadata;
 using Application = System.Windows.Forms.Application;
 using Button = System.Windows.Controls.Button;
 using Path = System.IO.Path;
@@ -30,16 +18,18 @@ using TextBox = System.Windows.Controls.TextBox;
 using Timer = System.Timers.Timer;
 using UserControl = System.Windows.Controls.UserControl;
 
-namespace FlowMatters.Source.WebServerPanel
+namespace FlowMatters.Source.Veneer
 {
     /// <summary>
     /// Interaction logic for WebServerStatusControl.xaml
     /// </summary>
+    [IgnoreMenuItem] // We only want this in Tools > Veneer Server
     public partial class WebServerStatusControl : UserControl, IRiverSystemPlugin, IDisposable
     {
         public static int DefaultPort = SourceRESTfulService.DEFAULT_PORT;
         public static bool DefaultAllowRemote = false;
         public static bool DefaultAllowScripts = false;
+        public static bool DefaultAllowSsl = false;
 
         private RiverSystemScenario _scenario;
         private SynchronizationContext _originalContext;
@@ -49,6 +39,7 @@ namespace FlowMatters.Source.WebServerPanel
         {
             Port = DefaultPort;
             AllowRemoteConnections = DefaultAllowRemote;
+            AllowSsl = DefaultAllowSsl;
             AllowScripts = DefaultAllowScripts;
             InitializeComponent();
             _originalContext = SynchronizationContext.Current;
@@ -188,14 +179,30 @@ namespace FlowMatters.Source.WebServerPanel
             ToolStripItem veneer = reportMenu.DropDownItems.Add("");
             veneer.BackgroundImage = Veneer.Properties.Resources.Logo_RGB;
             veneer.BackgroundImageLayout = ImageLayout.Zoom;
-            veneer.Click += (eventSender, eventArgs) => Process.Start("http://www.flowmatters.com.au");
+            veneer.Click += (eventSender, eventArgs) =>
+            {
+                Process.Start(new ProcessStartInfo("https://www.flowmatters.com.au")
+                { 
+                    UseShellExecute = true,
+                    Verb = "open"
+                });
+            };
         }
 
         private void LaunchExeAddon(string addonPath)
         {
             var fullPath = Path.Combine(Scenario.Project.FileDirectory, addonPath);
             var startInfo = new ProcessStartInfo();
-            startInfo.FileName = fullPath;
+            if (fullPath.EndsWith(".bat"))
+            {
+                startInfo.FileName = "cmd.exe";
+                startInfo.Arguments = "/C " + fullPath;
+            }
+            else
+            {
+                startInfo.FileName = fullPath;
+            }
+
             startInfo.Environment["VENEER_PORT"] = this.Port.ToString();
             startInfo.UseShellExecute = false;
             Process.Start(startInfo);
@@ -259,6 +266,20 @@ namespace FlowMatters.Source.WebServerPanel
                 RestartIfRunning();
             }
         }
+
+        private bool _allowSsl;
+        public bool AllowSsl
+        {
+            get { return _allowSsl; }
+            set
+            {
+                _allowSsl = value;
+                if (value)
+                    ServerLogEvent(this, "Note: Enabling SSL requires a valid SSL certificate.");
+                RestartIfRunning();
+            }
+        }
+
         private void RestartIfRunning()
         {
             if (Running)
@@ -269,7 +290,7 @@ namespace FlowMatters.Source.WebServerPanel
 
         private void StartServer()
         {
-            _server = new SourceRESTfulService(Port) {AllowRemoteConnections = AllowRemoteConnections};
+            _server = new SourceRESTfulService(Port) {AllowRemoteConnections = AllowRemoteConnections, AllowSsl = AllowSsl};
             _server.Scenario = Scenario;
             _server.LogGenerator += ServerLogEvent;
             _server.Start();

@@ -28,7 +28,28 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects
                 for (int col = 0; col < coverage.Length; col++)
                 {
                     var data = coverage[col];
-                    values[data.name] = data.cellObject(data.itemForGEORegion(geoRegion));
+
+                    double internalValue;
+                    try
+                    {
+                        internalValue = data.itemForGEORegion(geoRegion);
+                    }
+                    catch
+                    {
+                        internalValue = data[i];
+                    }
+
+                    object value;
+                    try
+                    {
+                        value = data.cellObject(internalValue);
+                    }
+                    catch
+                    {
+                        value = internalValue;
+                    }
+
+                    values[data.name] = value;
                 }
                 featureList.Add(new GeoJSONFeature(geoRegion, values));
 

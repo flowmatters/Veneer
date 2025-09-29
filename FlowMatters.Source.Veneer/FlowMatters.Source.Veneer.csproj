@@ -1,325 +1,126 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="15.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProductVersion>8.0.30703</ProductVersion>
-    <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>{3BD8FE40-11EA-4F0E-AB7C-9EA6E3FD1304}</ProjectGuid>
-    <OutputType>library</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>FlowMatters.Source.Veneer</RootNamespace>
-    <AssemblyName>FlowMatters.Source.Veneer</AssemblyName>
-    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
-    <TargetFrameworkProfile />
-    <FileAlignment>512</FileAlignment>
-    <ProjectTypeGuids>{60dc8134-eba5-43b8-bcc9-bb4bc16c2548};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
-    <WarningLevel>4</WarningLevel>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <OutputType>Library</OutputType>
     <NoWarn>1591,1587</NoWarn>
-    <LangVersion>7.3</LangVersion>
     <RootPath>$(MSBuildThisFileDirectory)..\..\</RootPath>
     <ReferencePath>$(RootPath)Output;$(RootPath)3rdParty</ReferencePath>
-    <OutputPath>$(RootPath)Output\Plugins\CommunityPlugins</OutputPath>
+    <OutputPath>$(RootPath)Output\Plugins\CommunityPlugins\Veneer</OutputPath>
     <ExcludeEWaterPdbPathMap>true</ExcludeEWaterPdbPathMap>
+    <UseWindowsForms>true</UseWindowsForms>
+    <UseWPF>true</UseWPF>
+    <ImportWindowsDesktopTargets>true</ImportWindowsDesktopTargets>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <Title>FlowMatters.Source.Veneer</Title>
+    <Product>FlowMatters.Source.Veneer</Product>
+    <Copyright>Copyright © Flow Matters 2013 </Copyright>
   </PropertyGroup>
+	<Import Project="$(RootPath)RiverSystem\Solutions\SDK.build.props" />
+	<Import Project="$(RootPath)RiverSystem\Solutions\SDK.build.targets" />
+	<Import Project="$(RootPath)RiverSystem\Solutions\NormalisePdbBuildRoot.targets" />
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>portable</DebugType>
-    <Optimize>false</Optimize>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
-    <Prefer32Bit>false</Prefer32Bit>
     <UseVSHostingProcess>false</UseVSHostingProcess>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <OutputPath>$(RootPath)Output\Plugins\CommunityPlugins</OutputPath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>portable</DebugType>
-    <Optimize>true</Optimize>
-    <DefineConstants>TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-    <Prefer32Bit>false</Prefer32Bit>
-    <DebugSymbols>false</DebugSymbols>
     <OutputPath>$(RootPath)Output\Plugins\CommunityPlugins</OutputPath>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="IronPython">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="IronPython.Modules">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="IronPython.SQLite">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="IronPython.Wpf">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Microsoft.Dynamic">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Microsoft.Scripting">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Microsoft.Scripting.AspNet">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Microsoft.Scripting.Metadata">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Newtonsoft.Json">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
-    </Reference>
     <Reference Include="RiverSystem.ApplicationLayer.Interfaces">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
+      <HintPath>..\..\Output\RiverSystem.ApplicationLayer.Interfaces.dll</HintPath>
     </Reference>
     <Reference Include="RiverSystem.Persistence">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
+      <HintPath>..\..\Output\RiverSystem.Persistence.dll</HintPath>
     </Reference>
     <Reference Include="RiverSystem.PreProcessing">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
+      <HintPath>..\..\Output\RiverSystem.PreProcessing.dll</HintPath>
     </Reference>
     <Reference Include="RiverSystem.ScenarioExplorer">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="nunit.framework">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>True</Private>
+      <HintPath>..\..\Output\RiverSystem.ScenarioExplorer.dll</HintPath>
     </Reference>
     <Reference Include="RiverSystem">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
+      <HintPath>..\..\Output\RiverSystem.dll</HintPath>
     </Reference>
     <Reference Include="RiverSystem.Api">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
+      <HintPath>..\..\Output\RiverSystem.Api.dll</HintPath>
     </Reference>
     <Reference Include="RiverSystem.ApplicationLayer.Consumer">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
+      <HintPath>..\..\Output\RiverSystem.ApplicationLayer.Consumer.dll</HintPath>
     </Reference>
     <Reference Include="RiverSystem.ApplicationLayer.Consumer.Forms">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
+      <HintPath>..\..\Output\RiverSystem.ApplicationLayer.Consumer.Forms.dll</HintPath>
     </Reference>
     <Reference Include="RiverSystem.Controls">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
+      <HintPath>..\..\Output\RiverSystem.Controls.dll</HintPath>
+    </Reference>
+    <Reference Include="RiverSystem.Controls.UI">
+      <HintPath>..\..\Output\RiverSystem.Controls.UI.dll</HintPath>
+    </Reference>
+    <Reference Include="RiverSystem.Forms.Core">
+      <HintPath>..\..\Output\RiverSystem.Forms.Core.dll</HintPath>
     </Reference>
     <Reference Include="RiverSystem.Forms">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
+      <HintPath>..\..\Output\RiverSystem.Forms.dll</HintPath>
     </Reference>
     <Reference Include="RiverSystem.Simulation">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="System">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="System.configuration">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="System.Data">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="System.Drawing">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="System.Runtime.Serialization">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="System.ServiceModel">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="System.ServiceModel.Web">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="System.Windows.Forms">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="System.Xml">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="Microsoft.CSharp">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="System.Core">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="System.Xml.Linq">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="System.Data.DataSetExtensions">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="System.Xaml">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
+      <HintPath>..\..\Output\RiverSystem.Simulation.dll</HintPath>
     </Reference>
     <Reference Include="TIME">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
+      <HintPath>..\..\Output\TIME.dll</HintPath>
+    </Reference>
+    <Reference Include="TIME.UI">
+      <HintPath>..\..\Output\TIME.UI.dll</HintPath>
     </Reference>
     <Reference Include="TIME.ScenarioManagement">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
+      <HintPath>..\..\Output\TIME.ScenarioManagement.dll</HintPath>
     </Reference>
     <Reference Include="TIME.Tools">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
+      <HintPath>..\..\Output\TIME.Tools.dll</HintPath>
     </Reference>
     <Reference Include="TIME.Winforms">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
+      <HintPath>..\..\Output\TIME.Winforms.dll</HintPath>
     </Reference>
-    <Reference Include="WindowsBase">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="PresentationCore">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="PresentationFramework">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="WindowsFormsIntegration">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
+    <Reference Include="TIME.Winforms.UI">
+      <HintPath>..\..\Output\TIME.Winforms.UI.dll</HintPath>
     </Reference>
     <Reference Include="NetronGraphLib">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
+      <HintPath>..\..\Output\NetronGraphLib.dll</HintPath>
     </Reference>
+    <PackageReference Include="CoreWCF.WebHttp" Version="1.5.2" />
+    <PackageReference Include="IronPython" Version="3.4.2" />
+    <PackageReference Include="IronPython.Interpreter" Version="2.7.4" />
+    <PackageReference Include="IronPython.StdLib" Version="2.7.5" />
+    <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="System.Data.DataSetExtensions" Version="4.5.0" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="9.0.5" />
+    <PackageReference Include="System.ServiceModel.Primitives" Version="8.1.2" />
+    <PackageReference Include="System.ServiceModel.Http" Version="8.1.2" />
+    <PackageReference Include="System.ServiceModel.Duplex" Version="6.0.0" />
+    <PackageReference Include="System.ServiceModel.NetTcp" Version="8.1.2" />
+    <PackageReference Include="System.ServiceModel.Security" Version="6.0.0" />
+    <PackageReference Include="System.ServiceModel.Federation" Version="8.1.2" />
+    <!-- Required to match RiverSystem.Controls.UI-->
+    <PackageReference Include="System.Drawing.Common" Version="9.0.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.10.0" />
+    <PackageReference Include="NUnit" Version="4.1.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="4.6.0" />
+    <PackageReference Include="NUnit.Analyzers" Version="4.3.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="coverlet.collector" Version="6.0.2">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="AbstractSourceServer.cs" />
-    <Compile Include="Addons\VeneerConfiguration.cs" />
-    <Compile Include="CORS\EnableCrossOriginResourceSharingBehavior.cs" />
-    <Compile Include="CORS\CORSMessageInspector.cs" />
-    <Compile Include="DomainActions\InputSets.cs" />
-    <Compile Include="DomainActions\ModelTabulator.cs" />
-    <Compile Include="DomainActions\ScenarioInvoker.cs" />
-    <Compile Include="DomainActions\TimeSeriesFunctions.cs" />
-    <Compile Include="DomainActions\TrimNetwork.cs" />
-    <Compile Include="ExchangeObjects\BooleanResponse.cs" />
-    <Compile Include="ExchangeObjects\DataSources\SimpleDataDetails.cs" />
-    <Compile Include="ExchangeObjects\DataSources\SimpleDataGroupItem.cs" />
-    <Compile Include="ExchangeObjects\DataSources\SimpleDataItem.cs" />
-    <Compile Include="ExchangeObjects\DictResponse.cs" />
-    <Compile Include="ExchangeObjects\GeoJSONCoverage.cs" />
-    <Compile Include="ExchangeObjects\GeoJSONFeature.cs" />
-    <Compile Include="ExchangeObjects\ListResponse.cs" />
-    <Compile Include="ExchangeObjects\ModelTableIndex.cs" />
-    <Compile Include="ExchangeObjects\MultipleTimeSeries.cs" />
-    <Compile Include="ExchangeObjects\NumericResponse.cs" />
-    <Compile Include="ExchangeObjects\ProjectionInfo.cs" />
-    <Compile Include="ExchangeObjects\RecordingInstructions.cs" />
-    <Compile Include="ExchangeObjects\RunLink.cs" />
-    <Compile Include="ExchangeObjects\RunParameters.cs" />
-    <Compile Include="ExchangeObjects\RunSummary.cs" />
-    <Compile Include="ExchangeObjects\SimpleException.cs" />
-    <Compile Include="ExchangeObjects\SimplePiecewise.cs" />
-    <Compile Include="ExchangeObjects\SimpleTimeSeries.cs" />
-    <Compile Include="ExchangeObjects\SimulationFault.cs" />
-    <Compile Include="ExchangeObjects\SlimTimeSeries.cs" />
-    <Compile Include="ExchangeObjects\StringResponse.cs" />
-    <Compile Include="ExchangeObjects\TimeSeriesEvent.cs" />
-    <Compile Include="ExchangeObjects\TimeSeriesLink.cs" />
-    <Compile Include="ExchangeObjects\TimeSeriesResponse.cs" />
-    <Compile Include="ExchangeObjects\VeneerResponse.cs" />
-    <Compile Include="ExchangeObjects\GeoJSONGeometry.cs" />
-    <Compile Include="ExchangeObjects\GeoJSONNetwork.cs" />
-    <Compile Include="ExchangeObjects\VeneerStatus.cs" />
-    <Compile Include="Formatting\NetworkToGeographic.cs" />
-    <Compile Include="Formatting\TableResponseFormatter.cs" />
-    <Compile Include="Formatting\TimeSeriesResponseFormatter.cs" />
-    <Compile Include="Formatting\ReplyFormatSwitchBehaviour.cs" />
-    <Compile Include="ExchangeObjects\FunctionValue.cs" />
-    <Compile Include="ExchangeObjects\InputSetSummary.cs" />
-    <Compile Include="AutoStart\InitialiseOnLoadAttribute.cs" />
-    <Compile Include="AutoStart\ProjectLoadListener.cs" />
-    <Compile Include="RemoteScripting\CustomEndPoint.cs" />
-    <Compile Include="RemoteScripting\IronPythonResponse.cs" />
-    <Compile Include="RemoteScripting\IronPythonScript.cs" />
-    <Compile Include="ISourceService.cs" />
-    <Compile Include="ProcessRequests\ParseDataRequests.cs" />
-    <Compile Include="RemoteScripting\ScriptHelpers.cs" />
-    <Compile Include="RemoteScripting\ScriptRunner.cs" />
-    <Compile Include="ResourceHelpers.cs" />
-    <Compile Include="SourceRESTfulService.cs" />
-    <Compile Include="SourceService.cs" />
-    <Compile Include="UriTemplates.cs" />
-    <Compile Include="VariableSummary.cs" />
-    <Compile Include="WebServerStatusPanel.cs">
+    <Compile Update="WebServerStatusPanel.cs">
       <SubType>UserControl</SubType>
     </Compile>
-    <Compile Include="WebServerStatusPanel.Designer.cs">
-      <DependentUpon>WebServerStatusPanel.cs</DependentUpon>
-    </Compile>
-    <Page Include="WebServerStatusControl.xaml">
-      <Generator>MSBuild:Compile</Generator>
-      <SubType>Designer</SubType>
-    </Page>
-    <Compile Include="WebServerStatusControl.xaml.cs">
-      <DependentUpon>WebServerStatusControl.xaml</DependentUpon>
-      <SubType>Code</SubType>
-    </Compile>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Properties\AssemblyInfo.cs">
-      <SubType>Code</SubType>
-    </Compile>
-    <Compile Include="Properties\Resources.Designer.cs">
-      <AutoGen>True</AutoGen>
-      <DesignTime>True</DesignTime>
-      <DependentUpon>Resources.resx</DependentUpon>
-    </Compile>
-    <Compile Include="Properties\Settings.Designer.cs">
-      <AutoGen>True</AutoGen>
-      <DependentUpon>Settings.settings</DependentUpon>
-      <DesignTimeSharedInput>True</DesignTimeSharedInput>
-    </Compile>
-    <EmbeddedResource Include="Properties\Resources.resx">
-      <Generator>ResXFileCodeGenerator</Generator>
-      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
-      <SubType>Designer</SubType>
-    </EmbeddedResource>
-    <EmbeddedResource Include="WebServerStatusPanel.resx">
-      <DependentUpon>WebServerStatusPanel.cs</DependentUpon>
-    </EmbeddedResource>
     <None Include="Lib\abc.py" />
     <None Include="Lib\aifc.py" />
     <None Include="Lib\antigravity.py" />
@@ -830,11 +631,6 @@
     <None Include="Lib\_weakrefset.py" />
     <None Include="Lib\__future__.py" />
     <None Include="Lib\__phello__.foo.py" />
-    <None Include="packages.config" />
-    <None Include="Properties\Settings.settings">
-      <Generator>SettingsSingleFileGenerator</Generator>
-      <LastGenOutput>Settings.Designer.cs</LastGenOutput>
-    </None>
     <AppDesigner Include="Properties\" />
   </ItemGroup>
   <ItemGroup>
@@ -846,15 +642,4 @@
   <ItemGroup>
     <Resource Include="Resources\Icon_Only_RGB_for_LI.png" />
   </ItemGroup>
-  <ItemGroup>
-    <None Include="Resources\FM.ico" />
-  </ItemGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
-       Other similar extension points exist, see Microsoft.Common.targets.
-  <Target Name="BeforeBuild">
-  </Target>
-  <Target Name="AfterBuild">
-  </Target>
-  -->
 </Project>

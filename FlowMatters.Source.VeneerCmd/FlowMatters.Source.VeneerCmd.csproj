@@ -1,165 +1,84 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="15.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">x86</Platform>
-    <ProductVersion>8.0.30703</ProductVersion>
-    <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>{2D61D0F4-DCF5-4F41-9994-94F97C7AD1B9}</ProjectGuid>
+    <TargetFramework>net8.0-windows</TargetFramework>
     <OutputType>Exe</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>FlowMatters.Source.VeneerCmd</RootNamespace>
     <AssemblyName>FlowMatters.Source.VeneerCmd</AssemblyName>
-    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
-    <TargetFrameworkProfile />
-    <FileAlignment>512</FileAlignment>
+    <LangVersion>9.0</LangVersion>
+    <RootPath>$(MSBuildThisFileDirectory)..\..\</RootPath>
+    <OutputPath>$(RootPath)Output\Plugins\CommunityPlugins\Veneer</OutputPath>
     <NoWarn>1591,1587</NoWarn>
     <WarningLevel>4</WarningLevel>
-    <Prefer32Bit>false</Prefer32Bit>
-    <LangVersion>7.3</LangVersion>
-    <RootPath>$(MSBuildThisFileDirectory)..\..\</RootPath>
-    <ReferencePath>$(RootPath)Output;$(RootPath)3rdParty;..\References;..\References\Plugins</ReferencePath>
-    <OutputPath>$(RootPath)Output\Plugins\CommunityPlugins</OutputPath>
-    <ExcludeEWaterPdbPathMap>true</ExcludeEWaterPdbPathMap>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x86' ">
     <PlatformTarget>x64</PlatformTarget>
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>portable</DebugType>
-    <Optimize>false</Optimize>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-    <Prefer32Bit>false</Prefer32Bit>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <UseWindowsForms>true</UseWindowsForms>
+    <UseWPF>true</UseWPF>
+    <ImportWindowsDesktopTargets>true</ImportWindowsDesktopTargets>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <Title>FlowMatters.Source.VeneerCmd</Title>
+    <Product>FlowMatters.Source.VeneerCmd</Product>
+    <Copyright>FlowMatters @ 2013</Copyright>
   </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x86' ">
-    <PlatformTarget>x86</PlatformTarget>
-    <DebugType>portable</DebugType>
-    <Optimize>true</Optimize>
-    <DefineConstants>TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-    <Prefer32Bit>false</Prefer32Bit>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
-    <DebugSymbols>true</DebugSymbols>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <DebugType>portable</DebugType>
-    <PlatformTarget>AnyCPU</PlatformTarget>
-    <ErrorReport>prompt</ErrorReport>
-    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
-    <Optimize>false</Optimize>
-    <OutputPath>$(RootPath)Output\Plugins\CommunityPlugins</OutputPath>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|AnyCPU'">
-    <DefineConstants>TRACE</DefineConstants>
-    <Optimize>true</Optimize>
-    <DebugType>portable</DebugType>
-    <PlatformTarget>AnyCPU</PlatformTarget>
-    <ErrorReport>prompt</ErrorReport>
-    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
-    <DebugSymbols>false</DebugSymbols>
-    <OutputPath>$(RootPath)Output\Plugins\CommunityPlugins</OutputPath>
-  </PropertyGroup>
+	<Import Project="$(RootPath)RiverSystem\Solutions\SDK.build.props" />
+	<Import Project="$(RootPath)RiverSystem\Solutions\SDK.build.targets" />
+	<Import Project="$(RootPath)RiverSystem\Solutions\NormalisePdbBuildRoot.targets" />
   <ItemGroup>
-    <Reference Include="CommandLine">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="FirebirdSql.Data.FirebirdClient">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="Newtonsoft.Json, Version=11.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL" />
+    <PackageReference Include="CommandLineParser" Version="2.9.1" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
+    <PackageReference Include="System.Text.Encoding.CodePages" Version="4.0.1" />
+    <PackageReference Include="FirebirdSql.Data.FirebirdClient" Version="10.3.1" />
+    <PackageReference Include="Nito.AsyncEx" Version="5.1.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj" />
+  </ItemGroup>
+  <ItemGroup>
     <Reference Include="RiverSystem">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
+      <HintPath>..\..\Output\RiverSystem.dll</HintPath>
     </Reference>
     <Reference Include="RiverSystem.ApplicationLayer">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
+      <HintPath>..\..\Output\RiverSystem.ApplicationLayer.dll</HintPath>
     </Reference>
     <Reference Include="RiverSystem.ApplicationLayer.Interfaces">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
+      <HintPath>..\..\Output\RiverSystem.ApplicationLayer.Interfaces.dll</HintPath>
     </Reference>
     <Reference Include="RiverSystem.Persistence">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
+      <HintPath>..\..\Output\RiverSystem.Persistence.dll</HintPath>
     </Reference>
     <Reference Include="RiverSystem.PluginManager">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
+      <HintPath>..\..\Output\RiverSystem.PluginManager.dll</HintPath>
     </Reference>
     <Reference Include="TIME">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
+      <HintPath>..\..\Output\TIME.dll</HintPath>
     </Reference>
     <Reference Include="TIME.ScenarioManagement">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
+      <HintPath>..\..\Output\TIME.ScenarioManagement.dll</HintPath>
     </Reference>
     <Reference Include="TIME.Tools">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="System">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="System.Core">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="System.Xml.Linq">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="System.Data.DataSetExtensions">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="Microsoft.CSharp">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="System.Data">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="System.Xml">
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
+      <HintPath>..\..\Output\TIME.Tools.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Program.cs" />
-    <Compile Include="Properties\AssemblyInfo.cs" />
+    <None Update="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj">
-      <Project>{3bd8fe40-11ea-4f0e-ab7c-9ea6e3fd1304}</Project>
-      <Name>FlowMatters.Source.Veneer</Name>
-      <Private>False</Private>
-    </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="app.config" />
-    <None Include="packages.config" />
-  </ItemGroup>
-  <ItemGroup />
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <PropertyGroup>
-    <PreBuildEvent />
-  </PropertyGroup>
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
-       Other similar extension points exist, see Microsoft.Common.targets.
-  <Target Name="BeforeBuild">
+  <!-- To run this from CommunityPlugins we need to make sure everything required is copied across -->
+  <Target Name="CopyToPlugins" AfterTargets="Build">
+    <!--<Copy SourceFiles="$(OutputPath)$(AssemblyName).dll" DestinationFolder="$(RootPath)Output\Plugins\CommunityPlugins" />
+    <Copy SourceFiles="$(OutputPath)$(AssemblyName).exe" DestinationFolder="$(RootPath)Output\Plugins\CommunityPlugins" />
+    <Copy SourceFiles="$(OutputPath)$(AssemblyName).deps.json" DestinationFolder="$(RootPath)Output\Plugins\CommunityPlugins" />
+    <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll.config" DestinationFolder="$(RootPath)Output\Plugins\CommunityPlugins" />
+    <Copy SourceFiles="$(OutputPath)$(AssemblyName).runtimeconfig.json" DestinationFolder="$(RootPath)Output\Plugins\CommunityPlugins" />-->
+
+    <!--Firebird dependencies-->
+    <Copy SourceFiles="$(RootPath)Output\fbclient.dll" DestinationFolder="$(OutputPath)" />
+    <Copy SourceFiles="$(RootPath)Output\fbembed.dll" DestinationFolder="$(OutputPath)" />
+    <Copy SourceFiles="$(RootPath)Output\icudt63.dll" DestinationFolder="$(OutputPath)" />
+    <Copy SourceFiles="$(RootPath)Output\icuin63.dll" DestinationFolder="$(OutputPath)" />
+    <Copy SourceFiles="$(RootPath)Output\icuuc63.dll" DestinationFolder="$(OutputPath)" />
+    <Copy SourceFiles="$(RootPath)Output\Plugins\engine13.dll" DestinationFolder="$(OutputPath)\Plugins" />
   </Target>
-  <Target Name="AfterBuild">
-  </Target>
-  -->
 </Project>
