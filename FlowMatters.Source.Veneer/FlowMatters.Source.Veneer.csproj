@@ -87,7 +87,7 @@
     <Reference Include="NetronGraphLib">
       <HintPath>..\..\Output\NetronGraphLib.dll</HintPath>
     </Reference>
-    <PackageReference Include="CoreWCF.WebHttp" Version="1.7.0" />
+    <PackageReference Include="CoreWCF.WebHttp" Version="1.5.2" />
     <PackageReference Include="IronPython" Version="3.4.2" />
     <PackageReference Include="IronPython.Interpreter" Version="2.7.4" />
     <PackageReference Include="IronPython.StdLib" Version="2.7.5" />

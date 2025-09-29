@@ -384,7 +384,7 @@ namespace FlowMatters.Source.VeneerCmd
             foreach (var plugin in allDomainPluginsToLoad)
             {
                 // Don't care about loading extra plugins here
-                AsyncContext.Run(() => manager.InstallPlugin(plugin,  false, false));
+                AsyncContext.Run(() => manager.InstallPluginAsync(plugin,  false, false));
             }
 
             foreach (var plugin in manager.ActivePlugins)

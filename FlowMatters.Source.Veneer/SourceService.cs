@@ -491,6 +491,8 @@ namespace FlowMatters.Source.Veneer
                 fv.Name = fn.Name;
                 fv.Expression = fn.Expression;
                 fv.FullName = fn.FullName;
+                fv.Units = fn.ResultUnit.SIUnits;
+                fv.InitialValue = fn.InitialValue;
                 result[i] = fv;
             }
             return result;

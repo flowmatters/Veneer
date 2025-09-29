@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.IO;
 using System.Runtime.Serialization;
 using System.Text;
 using System.Threading.Tasks;
@@ -19,7 +20,7 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects
             Version = PROTOCOL_VERSION;
             SourceVersion = new Constants.ProductVersion().GetFullVersionString();
             ProjectFile = s.Project.FileName;
-            ProjectFullFilename = s.Project.FullFilename;
+            ProjectFullFilename = Path.GetFullPath(s.Project.FullFilename);
             Scenario = s.Name;
             Projection = new ProjectionInfo(s.GeographicData?.Projection as AbstractProjectionInfo);
             var process = Process.GetCurrentProcess();
