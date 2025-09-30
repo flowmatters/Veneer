@@ -20,6 +20,7 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects.DataSources
 
         public SimpleDataDetails(DataDetailsItem item,bool summary=true,bool slim=false)
         {
+
             TimeSeries = summary
                 ? new TimeSeriesReponseMeta(item.Data.TimeSeries)
                 : new SimpleTimeSeries(item.Data.TimeSeries);
