@@ -20,7 +20,9 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects
             Version = PROTOCOL_VERSION;
             SourceVersion = new Constants.ProductVersion().GetFullVersionString();
             ProjectFile = s.Project.FileName;
-            ProjectFullFilename = Path.GetFullPath(s.Project.FullFilename);
+            ProjectFullFilename = (s.Project.FullFilename==null) ?
+                null:
+                Path.GetFullPath(s.Project.FullFilename);
             Scenario = s.Name;
             Projection = new ProjectionInfo(s.GeographicData?.Projection as AbstractProjectionInfo);
             var process = Process.GetCurrentProcess();
