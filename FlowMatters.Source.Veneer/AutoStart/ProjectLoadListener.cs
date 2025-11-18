@@ -50,38 +50,13 @@ namespace FlowMatters.Source.Veneer.AutoStart
                 return;
             }
 
-            var startOnLoad = Environment.GetEnvironmentVariable("VENEER_START_ON_LOAD");
-            if (String.IsNullOrEmpty(startOnLoad))
-            {
-                return;
-            }
-
-            var veneerPort = 9876;
-            var veneerPortVar = Environment.GetEnvironmentVariable("VENEER_PORT");
-            if (!String.IsNullOrEmpty(veneerPortVar))
-            {
-                veneerPort = Int32.Parse(veneerPortVar);
-            }
-
-            var remoteConnections = !String.IsNullOrEmpty(Environment.GetEnvironmentVariable("VENEER_ALLOW_REMOTE"));
-            var allowScripts = !String.IsNullOrEmpty(Environment.GetEnvironmentVariable("VENEER_ALLOW_SCRIPTS"));
-
-            StartVeneer(veneerPort,remoteConnections,allowScripts);
-        }
-
-        private Timer _timer;
-
-        private void StartVeneer(int port,bool remote, bool scripts)
-        {
-            WebServerStatusControl.DefaultPort = port;
-            WebServerStatusControl.DefaultAllowRemote = remote;
-            WebServerStatusControl.DefaultAllowScripts = scripts;
-
             _timer = new Timer(1000.0);
             _timer.AutoReset = false;
             _timer.Elapsed += _timer_Elapsed;
             _timer.Start();
         }
+
+        private Timer _timer;
 
         private void _timer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
@@ -95,17 +70,47 @@ namespace FlowMatters.Source.Veneer.AutoStart
                 _timer.Start();
                 return;
             }
-            MainForm.Instance.Invoke(new Action(() =>
-            {
-                var t = typeof(MenuPluginHelper);
-                var invoker = t.GetMethod("ShowAnalysisWindow", BindingFlags.NonPublic | BindingFlags.Instance);
-                invoker.Invoke(MainForm.Instance.MenuPluginHelper, new[]
-                {
-                    typeof(WebServerStatusPanel)
-                    //null
-                });
-            }));
+
+            ScenarioLoaded();
 #endif
+        }
+
+        private void ScenarioLoaded()
+        {
+            var startOnLoad = !String.IsNullOrEmpty(Environment.GetEnvironmentVariable("VENEER_START_ON_LOAD"));
+            if (startOnLoad)
+            {
+                StartVeneer();
+            }
+            else
+            {
+                PopulateReportingMenu();
+            }
+        }
+
+        private void PopulateReportingMenu()
+        {
+            ReportingMenu.Instance.FindOrCreateReportMenu(MainForm.Instance, MainForm.Instance.CurrentScenario);
+        }
+
+        private void StartVeneer()
+        {
+            var veneerPort = 9876;
+            var veneerPortVar = Environment.GetEnvironmentVariable("VENEER_PORT");
+            if (!String.IsNullOrEmpty(veneerPortVar))
+            {
+                veneerPort = Int32.Parse(veneerPortVar);
+            }
+
+            var remoteConnections = !String.IsNullOrEmpty(Environment.GetEnvironmentVariable("VENEER_ALLOW_REMOTE"));
+            var allowScripts = !String.IsNullOrEmpty(Environment.GetEnvironmentVariable("VENEER_ALLOW_SCRIPTS"));
+
+            //StartVeneer(veneerPort, remoteConnections, allowScripts);
+            WebServerStatusControl.DefaultPort = veneerPort;
+            WebServerStatusControl.DefaultAllowRemote = remoteConnections;
+            WebServerStatusControl.DefaultAllowScripts = allowScripts;
+
+            WebServerStatusControl.Launch();
         }
 
         private void Project_ScenarioAdded(object sender, TIME.ScenarioManagement.ScenarioArgs e)

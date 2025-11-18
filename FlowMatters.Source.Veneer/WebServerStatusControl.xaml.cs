@@ -2,13 +2,16 @@
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Windows;
 using System.Windows.Forms;
 using FlowMatters.Source.Veneer.Addons;
 using FlowMatters.Source.WebServer;
+using FlowMatters.Source.WebServerPanel;
 using Newtonsoft.Json;
 using RiverSystem;
+using RiverSystem.Forms;
 using RiverSystem.TaskDefinitions;
 using TIME.Core.Metadata;
 using Application = System.Windows.Forms.Application;
@@ -65,7 +68,7 @@ namespace FlowMatters.Source.Veneer
                 if (_scenario != null)
                 {
                     StopServer();
-                    ClearMenu();
+                    ReportingMenu.ClearMenu();
                 }
                 _scenario = value;
               
@@ -77,158 +80,11 @@ namespace FlowMatters.Source.Veneer
             }
         }
 
-        private string ConfigurationFilename
-        {
-            get
-            {
-                if (Scenario == null)
-                {
-                    return null;
-                }
-
-                if (Scenario.Project.FullFilename == null)
-                {
-                    return null;
-                }
-
-                var result = Scenario.Project.FullFilename.Replace(".rsproj", ".rsproj.veneer");
-                if (File.Exists(result))
-                {
-                    return result;
-                }
-
-                return null;
-            }
-        }
-
-        private VeneerConfiguration Configuration
-        {
-            get
-            {
-                var fn = ConfigurationFilename;
-                if (fn == null)
-                {
-                    return null;
-                }
-                return JsonConvert.DeserializeObject<VeneerConfiguration>(File.ReadAllText(fn));
-            }
-        }
-
         private void PopulateMenu()
         {
-            Form parent = FindParent();
-            ToolStripMenuItem reportMenu = FindReportMenu(parent);
-        }
-
-        private Form FindParent()
-        {
-            return Application.OpenForms.Cast<Form>().FirstOrDefault(f => f.MainMenuStrip != null);
-        }
-
-        private ToolStripMenuItem FindReportMenu(Form parent)
-        {
-            ToolStripMenuItem result =
-                parent.MainMenuStrip.Items.Cast<ToolStripItem>().
-                        Where(item => item.Text == "Reporting").Cast<ToolStripMenuItem>().FirstOrDefault();
-
-            if (result == null)
-            {
-                result = new ToolStripMenuItem("Reporting");
-                result.DropDownOpening += PopulateReportMenu;
-                parent.MainMenuStrip.Items.Add(result);
-            }
-
-            return result;
-        }
-
-        private void PopulateReportMenu(object sender, EventArgs e)
-        {
-            Form parent = FindParent();
-            ToolStripMenuItem reportMenu = FindReportMenu(parent);
-            reportMenu.DropDownItems.Clear();
-
-            if (_scenario != null)
-            {
-                string projectFolder = _scenario.Project.FileDirectory;
-                if (projectFolder != null)
-                {
-                    foreach (string reportFn in Directory.EnumerateFiles(projectFolder, "*.htm*", SearchOption.TopDirectoryOnly))
-                    {
-                        string fn = reportFn.Replace(projectFolder + "\\", "");
-                        ToolStripItem item = reportMenu.DropDownItems.Add(NiceName(fn));
-                        item.Click += (eventSender, eventArgs) => Launch(fn);
-                    }
-                }
-
-                var config = Configuration;
-                if (config?.addons != null)
-                {
-                    foreach (var addon in config.addons)
-                    {
-                        ToolStripItem item = reportMenu.DropDownItems.Add(addon.name);
-                        switch (addon.type)
-                        {
-                            case "exe":
-                                item.Click += (o, args) => LaunchExeAddon(addon.path);
-                                break;
-
-                        }
-                    }
-                }
-            }
-            ToolStripItem veneer = reportMenu.DropDownItems.Add("");
-            veneer.BackgroundImage = Veneer.Properties.Resources.Logo_RGB;
-            veneer.BackgroundImageLayout = ImageLayout.Zoom;
-            veneer.Click += (eventSender, eventArgs) =>
-            {
-                Process.Start(new ProcessStartInfo("https://www.flowmatters.com.au")
-                { 
-                    UseShellExecute = true,
-                    Verb = "open"
-                });
-            };
-        }
-
-        private void LaunchExeAddon(string addonPath)
-        {
-            var fullPath = Path.Combine(Scenario.Project.FileDirectory, addonPath);
-            var startInfo = new ProcessStartInfo();
-            if (fullPath.EndsWith(".bat"))
-            {
-                startInfo.FileName = "cmd.exe";
-                startInfo.Arguments = "/C " + fullPath;
-            }
-            else
-            {
-                startInfo.FileName = fullPath;
-            }
-
-            startInfo.Environment["VENEER_PORT"] = this.Port.ToString();
-            startInfo.UseShellExecute = false;
-            Process.Start(startInfo);
-        }
-
-        private string NiceName(string reportFn)
-        {
-            return reportFn.Replace('_', ' ').Replace(".html", "").Replace(".htm", "");
-        }
-
-        private void Launch(string p)
-        {
-            int port = SourceRESTfulService.DEFAULT_PORT;
-            string url = string.Format("http://localhost:{0}/doc/{1}", port, p);
-            Process.Start(url);
-        }
-
-        private void ClearMenu()
-        {
-            Form parent = FindParent();
-            ToolStripMenuItem reportMenu =
-                parent.MainMenuStrip.Items.Cast<ToolStripItem>().
-                        Where(item => item.Text == "Reporting").Cast<ToolStripMenuItem>().FirstOrDefault();
-
-            if (reportMenu != null)
-                parent.MainMenuStrip.Items.Remove(reportMenu);
+            Form parent = ReportingMenu.FindMainForm();
+            ReportingMenu.Instance.Control = this;
+            ToolStripMenuItem reportMenu = ReportingMenu.Instance.FindOrCreateReportMenu(parent,_scenario);
         }
 
         private AbstractSourceServer _server;
@@ -359,6 +215,24 @@ namespace FlowMatters.Source.Veneer
             StartBtn.GetBindingExpression(Button.IsEnabledProperty).UpdateTarget();
             StopBtn.GetBindingExpression(Button.IsEnabledProperty).UpdateTarget();
             RestartBtn.GetBindingExpression(Button.IsEnabledProperty).UpdateTarget();
+        }
+
+        public static void Launch()
+        {
+#if V4 && BEFORE_V4_3
+#else
+
+            MainForm.Instance.Invoke(new Action(() =>
+            {
+                var t = typeof(MenuPluginHelper);
+                var invoker = t.GetMethod("ShowAnalysisWindow", BindingFlags.NonPublic | BindingFlags.Instance);
+                invoker.Invoke(MainForm.Instance.MenuPluginHelper, new[]
+                {
+                    typeof(WebServerStatusPanel)
+                    //null
+                });
+            }));
+#endif
         }
     }
 }
