@@ -286,6 +286,7 @@
     <Compile Include="ProcessRequests\ParseDataRequests.cs" />
     <Compile Include="RemoteScripting\ScriptHelpers.cs" />
     <Compile Include="RemoteScripting\ScriptRunner.cs" />
+    <Compile Include="ReportingMenu.cs" />
     <Compile Include="ResourceHelpers.cs" />
     <Compile Include="SourceRESTfulService.cs" />
     <Compile Include="SourceService.cs" />
