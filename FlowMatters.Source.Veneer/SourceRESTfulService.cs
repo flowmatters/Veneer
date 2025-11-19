@@ -39,80 +39,88 @@ namespace FlowMatters.Source.WebServer
 
         public override void Start()
         {
-            LeaveDotsAndSlashesEscaped();
-            WebHttpBinding binding = new WebHttpBinding();
-
-            binding.MaxReceivedMessageSize = 1024*1024*1024; // 1 gigabyte
-            _singletonInstance = new SourceService();
-            _singletonInstance.LogGenerator += _singletonInstance_LogGenerator;
-            _singletonInstance.Scenario = Scenario;
-            _host = new WebServiceHost(_singletonInstance);
-            _host.UnknownMessageReceived += _host_UnknownMessageReceived;
-            binding.CrossDomainScriptAccessEnabled = true;
-            if(!AllowRemoteConnections)
-                binding.HostNameComparisonMode = HostNameComparisonMode.Exact;
-
-            //AppendHeader("Access-Control-Allow-Origin", "*");
-            ServiceEndpoint endpoint = _host.AddServiceEndpoint(typeof(SourceService), binding, string.Format("http://localhost:{0}/", _port));
-            endpoint.Behaviors.Add(new ReplyFormatSwitchBehaviour());
-            endpoint.Behaviors.Add(new EnableCrossOriginResourceSharingBehavior());
-
-//            int sslPort = _port + 1000;
-//            endpoint = _host.AddServiceEndpoint(typeof(SourceService), binding, string.Format("https://localhost:{0}/", sslPort));
-//            endpoint.Behaviors.Add(new ReplyFormatSwitchBehaviour());
-
-            try
+            bool failedAddressInUse;
+            do
             {
-                Running = false;
-                _host.Open();
-                Log("Veneer, by Flow Matters: https://www.flowmatters.com.au");
+                failedAddressInUse = false;
+                LeaveDotsAndSlashesEscaped();
+                WebHttpBinding binding = new WebHttpBinding();
+
+                binding.MaxReceivedMessageSize = 1024 * 1024 * 1024; // 1 gigabyte
+                _singletonInstance = new SourceService();
+                _singletonInstance.LogGenerator += _singletonInstance_LogGenerator;
+                _singletonInstance.Scenario = Scenario;
+                _host = new WebServiceHost(_singletonInstance);
+                _host.UnknownMessageReceived += _host_UnknownMessageReceived;
+                binding.CrossDomainScriptAccessEnabled = true;
+                if (!AllowRemoteConnections)
+                    binding.HostNameComparisonMode = HostNameComparisonMode.Exact;
+
+                //AppendHeader("Access-Control-Allow-Origin", "*");
+                ServiceEndpoint endpoint = _host.AddServiceEndpoint(typeof(SourceService), binding, string.Format("http://localhost:{0}/", _port));
+                endpoint.Behaviors.Add(new ReplyFormatSwitchBehaviour());
+                endpoint.Behaviors.Add(new EnableCrossOriginResourceSharingBehavior());
+
                 try
                 {
-                    RetrieveVeneerStatus();
+                    Running = false;
+                    _host.Open();
+                    Log("Veneer, by Flow Matters: https://www.flowmatters.com.au");
+                    try
+                    {
+                        RetrieveVeneerStatus();
+                    }
+                    catch
+                    {
+                        // Pass
+                    }
+                    Log(string.Format("Started Source RESTful Service on port:{0}", _port));
+                    Running = true;
+                    _host.Faulted += _host_Faulted;
                 }
-                catch
+                catch (AddressAlreadyInUseException)
                 {
-                    // Pass
-                }
-                Log(string.Format("Started Source RESTful Service on port:{0}", _port));
-                Running = true;
-            }
-            catch (AddressAlreadyInUseException)
-            {
-                _port++; // Keep retrying until we run out of allocated ports
-                Start();
-            }
-            catch (AddressAccessDeniedException)
-            {
-                Log(String.Format("For details, see: https://github.com/flowmatters/veneer"));
+                    failedAddressInUse = true;
+                    binding = null;
+                    _singletonInstance.LogGenerator -= _singletonInstance_LogGenerator;
+                    _singletonInstance = null;
+                    _host = null;
+                    endpoint = null;
+                    GC.Collect();
 
-                if (AllowRemoteConnections)
-                {
-                    Log("If you require external connections, you must select a port where Veneer has permissions to accept external connections.");
-                    Log(
-                        String.Format(
-                            "Veneer does not have permission to accept external (ie non-local) connections on port {0}",
-                            _port));
+                    _port++; // Keep retrying until we run out of allocated ports
                 }
-                else
+                catch (AddressAccessDeniedException)
                 {
-                    Log("Alternatively, enable 'Allow Remote Connections' and restart Veneer.");
-                    Log("To establish a local-only connection, select a port where Veneer is NOT registered for external connections.");
-                    Log(String.Format(
-                            "This is most likely because Veneer is registered to accept external/non-local connections on port {0}.", _port));
-                    Log(String.Format(
-                            "Veneer does not have permission to accept local-only connections on port {0}",
-                            _port));
+                    Log(String.Format("For details, see: https://github.com/flowmatters/veneer"));
+
+                    if (AllowRemoteConnections)
+                    {
+                        Log("If you require external connections, you must select a port where Veneer has permissions to accept external connections.");
+                        Log(
+                            String.Format(
+                                "Veneer does not have permission to accept external (ie non-local) connections on port {0}",
+                                _port));
+                    }
+                    else
+                    {
+                        Log("Alternatively, enable 'Allow Remote Connections' and restart Veneer.");
+                        Log("To establish a local-only connection, select a port where Veneer is NOT registered for external connections.");
+                        Log(String.Format(
+                                "This is most likely because Veneer is registered to accept external/non-local connections on port {0}.", _port));
+                        Log(String.Format(
+                                "Veneer does not have permission to accept local-only connections on port {0}",
+                                _port));
+                    }
+                    Log(String.Format("COULD NOT START VENEER ON PORT {0}", _port));
                 }
-                Log(String.Format("COULD NOT START VENEER ON PORT {0}",_port));
-            }
-            catch (Exception e)
-            {
-                Log("COULD NOT START VENEER");
-                Log(e.Message);
-                Log(e.StackTrace);
-            }
-            _host.Faulted += _host_Faulted;
+                catch (Exception e)
+                {
+                    Log("COULD NOT START VENEER");
+                    Log(e.Message);
+                    Log(e.StackTrace);
+                }
+            } while (failedAddressInUse);
         }
 
         private void RetrieveVeneerStatus()
