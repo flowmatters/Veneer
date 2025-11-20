@@ -27,6 +27,7 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects
             Projection = new ProjectionInfo(s.GeographicData?.Projection as AbstractProjectionInfo);
             var process = Process.GetCurrentProcess();
             PID = process.Id;
+            HostExe = Process.GetCurrentProcess().MainModule.FileName;
         }
 
         [DataMember]
@@ -49,5 +50,9 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects
 
         [DataMember]
         public int PID { get; set; }
+
+        [DataMember]
+        public string HostExe { get; set; }
+
     }
 }
