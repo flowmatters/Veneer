@@ -25,6 +25,9 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects.DataSources
             Path = ExpandPath(dgi);
             FullName = MakeFullName(dgi);
             id = MakeID(dgi);
+#if !BEFORE_V5
+            ReloadMatchesOnName = dgi.DataDetailsMatchMethod == DataDetailsMatchMethod.ByName;
+#endif
             Items = dgi.InputSetItems.Select(isi => new SimpleDataItem(isi,summary)).ToArray();
         }
 
@@ -46,6 +49,9 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects.DataSources
                     ds.Filename = Name;
                 });
             }
+#if !BEFORE_V5
+            dataGroup.DataDetailsMatchMethod = ReloadMatchesOnName ? DataDetailsMatchMethod.ByName : DataDetailsMatchMethod.ByPosition;
+#endif
 
             dm.DataGroups.Add(dataGroup);
 
@@ -71,6 +77,10 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects.DataSources
 
         [DataMember]
         public string FullName;
+
+#if !BEFORE_V5
+        [DataMember] public bool ReloadMatchesOnName;
+#endif
 
         [DataMember]
         public SimpleDataItem[] Items;
