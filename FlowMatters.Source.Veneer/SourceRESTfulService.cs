@@ -119,6 +119,12 @@ namespace FlowMatters.Source.WebServer
                     Log("COULD NOT START VENEER");
                     Log(e.Message);
                     Log(e.StackTrace);
+                    if(e.InnerException != null)
+                    {
+                        Log("INNER EXCEPTION:");
+                        Log(e.InnerException.Message);
+                        Log(e.InnerException.StackTrace);
+                    }
                 }
             } while (failedAddressInUse);
         }
