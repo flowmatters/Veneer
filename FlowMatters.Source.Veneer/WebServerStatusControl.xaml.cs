@@ -5,6 +5,7 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.ServiceModel.Channels;
 using System.Text;
 using System.Threading;
 using System.Windows;
@@ -26,6 +27,7 @@ using RiverSystem;
 using RiverSystem.Controls.ManagedExtensions;
 using RiverSystem.Forms;
 using RiverSystem.TaskDefinitions;
+using TIME.ManagedExtensions;
 using Application = System.Windows.Forms.Application;
 using Button = System.Windows.Controls.Button;
 using Path = System.IO.Path;
@@ -77,7 +79,7 @@ namespace FlowMatters.Source.WebServerPanel
                 if (_scenario != null)
                 {
                     StopServer();
-                    ReportingMenu.ClearMenu();
+                    ReportingMenu.Instance.ClearMenu();
                 }
                 _scenario = value;
               
@@ -93,10 +95,8 @@ namespace FlowMatters.Source.WebServerPanel
         {
             Form parent = ReportingMenu.FindMainForm();
             ReportingMenu.Instance.Control = this;
-            ToolStripMenuItem reportMenu = ReportingMenu.Instance.FindOrCreateReportMenu(parent,_scenario);
+            ReportingMenu.Instance.InitialiseRequiredMenus(parent,_scenario);
         }
-
-
 
         private AbstractSourceServer _server;
 

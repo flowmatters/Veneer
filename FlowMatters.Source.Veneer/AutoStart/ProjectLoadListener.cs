@@ -97,7 +97,7 @@ namespace FlowMatters.Source.Veneer.AutoStart
 
         private void PopulateReportingMenu()
         {
-            ReportingMenu.Instance.FindOrCreateReportMenu(MainForm.Instance, MainForm.Instance.CurrentScenario);
+            ReportingMenu.Instance.InitialiseRequiredMenus(MainForm.Instance, MainForm.Instance.CurrentScenario);
         }
 
         private void StartVeneer()

@@ -28,6 +28,7 @@ namespace FlowMatters.Source.WebServerPanel
             InitializeComponent();
             _webServerStatusControl = new WebServerStatusControl();
             Controls.Add(new ElementHost {Child = _webServerStatusControl,Dock=DockStyle.Fill});
+
         }
 
         public RiverSystemScenario Scenario
