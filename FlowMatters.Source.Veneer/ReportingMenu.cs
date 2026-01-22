@@ -165,6 +165,7 @@ namespace FlowMatters.Source.Veneer
 
         public void InitialiseRequiredMenus(Form parent, RiverSystemScenario scenario)
         {
+            Scenario = scenario;
             foreach (var mnu in RequiredMenus())
             {
                 FindOrCreateReportMenu(parent, mnu);
