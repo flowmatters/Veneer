@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Configuration;
 using System.Data.Common;
 using System.IO;
 using System.Linq;
@@ -105,11 +106,17 @@ namespace FlowMatters.Source.VeneerCmd
             _server.AllowRemoteConnections = options.RemoteAccess;
 
             _server.Start();
-            _server.Service.AllowScript = options.AllowScripts;
-            _server.Service.RunningInGUI = false;
-            _server.Service.ProjectHandler = projectHandler;
+            SourceService.InitializeSharedState(
+                scenario,
+                projectHandler,
+                options.AllowScripts,
+                false,
+                customEndpoints);
+            //_server.Service.AllowScript = options.AllowScripts;
+            //_server.Service.RunningInGUI = false;
+            //_server.Service.ProjectHandler = projectHandler;
 
-            customEndpoints.ForEachItem(ep=> _server.Service.RegisterEndPoint(ep));
+            //customEndpoints.ForEachItem(ep=> _server.Service.RegisterEndPoint(ep));
             if (customEndpoints.Length>0)
             {
                 Console.WriteLine($"Registered {customEndpoints.Length} custom endpoints");
@@ -314,7 +321,6 @@ namespace FlowMatters.Source.VeneerCmd
 
         [Option('c', "custom-endpoints", HelpText = "Custom endpoints to enable, specified as command separated list of filenames", DefaultValue = null)]
         public string CustomEndPointFiles{ get; set; }
-
 
         [ValueList(typeof(List<string>), MaximumElements = 1)]
         public IList<string> ProjectFiles { get; set; }

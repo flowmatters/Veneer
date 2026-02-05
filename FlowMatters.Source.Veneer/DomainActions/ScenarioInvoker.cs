@@ -34,6 +34,9 @@ namespace FlowMatters.Source.Veneer
 
         //private ScenarioRunWindow runControl;
         private object lockObj = new object();
+        private CancellationTokenSource _cancellationTokenSource;
+        private Task _runningTask;
+
         //private bool running;
         public RiverSystemScenario Scenario { set; get; }
 
@@ -49,15 +52,38 @@ namespace FlowMatters.Source.Veneer
             }
         }
 
+        public bool IsRunning => _runningTask != null && !_runningTask.IsCompleted;
+
+        public void CancelRun()
+        {
+            lock (lockObj)
+            {
+                if (_cancellationTokenSource != null && !_cancellationTokenSource.IsCancellationRequested)
+                {
+                    _cancellationTokenSource.Cancel();
+                }
+            }
+        }
+
         public void RunScenario(RunParameters parameters, bool showWindow, ServerLogListener logger)
         {
+            lock (lockObj)
+            {
+                if (IsRunning)
+                {
+                    throw new InvalidOperationException("A simulation is already running. Cancel the current run before starting a new one.");
+                }
+
+                _cancellationTokenSource = new CancellationTokenSource();
+            }
+
             if (Scenario == null)
             {
                 MsgTools.ShowInfo(RiverSystemOptions.NEED_PROJECT_OPEN_MESSAGE);
                 return;
             }
 
-            if(parameters!=null)
+            if (parameters != null)
                 ApplyRunParameters(parameters);
 
             if (!IsRunnable()) throw new Exception("Scenario not runnable");
@@ -74,22 +100,57 @@ namespace FlowMatters.Source.Veneer
                 ProjectManager.Instance.SaveAuditLogMessage("Run started at " + DateTime.Now);
             }
 
-
-            Task x = Task.Factory.StartNew(() => Scenario.RunManager.Execute());
-            while (!x.IsCompleted)
+            try
             {
-                Thread.Sleep(50);
-                Application.DoEvents();
+                _runningTask = Task.Factory.StartNew(() => Scenario.RunManager.Execute(), _cancellationTokenSource.Token);
+
+                while (!_runningTask.IsCompleted)
+                {
+                    if (_cancellationTokenSource.Token.IsCancellationRequested)
+                    {
+                        // Attempt to stop the run manager if it supports cancellation
+                        TryStopRunManager();
+                        break;
+                    }
+
+                    Thread.Sleep(50);
+                    Application.DoEvents();
+                }
+
+                // Wait a short time for the task to complete after cancellation
+                if (_cancellationTokenSource.Token.IsCancellationRequested)
+                {
+                    if (!_runningTask.Wait(5000)) // Wait up to 5 seconds
+                    {
+                        logger?.Invoke(this, "Warning: Simulation task did not respond to cancellation within timeout period.");
+                    }
+
+                    throw new OperationCanceledException("Simulation run was cancelled.");
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                logger?.Invoke(this, "Simulation run was cancelled.");
+                throw;
+            }
+            finally
+            {
+                lock (lockObj)
+                {
+                    _cancellationTokenSource?.Dispose();
+                    _cancellationTokenSource = null;
+                    _runningTask = null;
+                }
+
+                if (showWindow && runWindow != null)
+                {
+                    ProjectManager.Instance.SaveAuditLogMessage("Run finished at " + DateTime.Now + " and took " + TimeTools.TimeSpanString(DateTime.Now - startOfRun));
+                    runWindow.Close();
+                    runWindow.Dispose();
+                }
             }
 
-            if (showWindow)
-            {
-                ProjectManager.Instance.SaveAuditLogMessage("Run finished at " + DateTime.Now + " and took " + TimeTools.TimeSpanString(DateTime.Now - startOfRun));
-                runWindow.Close();
-                runWindow.Dispose();
-            }
-
-            if((parameters!=null)&&parameters.Params.ContainsKey(RUN_NAME_KEY))
+            if ((parameters != null) && parameters.Params.ContainsKey(RUN_NAME_KEY))
             {
                 try
                 {
@@ -107,6 +168,27 @@ namespace FlowMatters.Source.Veneer
             }
         }
 
+        private void TryStopRunManager()
+        {
+            try
+            {
+                // Try to find a Stop/Cancel method on the RunManager using reflection
+                var runManager = JobRunner;
+                var stopMethod = runManager.GetType().GetMethod("Stop") ??
+                               runManager.GetType().GetMethod("Cancel") ??
+                               runManager.GetType().GetMethod("Abort");
+
+                if (stopMethod != null)
+                {
+                    stopMethod.Invoke(runManager, null);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Log but don't throw - cancellation might still work through task cancellation
+                TIME.Management.Log.WriteError(this, $"Failed to stop run manager: {ex.Message}");
+            }
+        }
         private static void SetPrivateRunProperty(object run, string field, object value)
         {
             var mi = run.GetType().GetMember(field, BindingFlags.NonPublic | BindingFlags.Instance)[0];
@@ -155,6 +237,23 @@ namespace FlowMatters.Source.Veneer
         {
             if (e.State==JobRunningState.Finished)
                 JobRunner_AfterRun(sender,e);
+            CurrentSimulationDate = e.CurrentSimulationDate;
+        }
+
+        public DateTime CurrentSimulationDate { get; set; }
+
+        public double GetPercentComplete()
+        {
+            if (JobRunner?.Scenario?.CurrentConfiguration == null)
+                return 0;
+
+            var currentConfig = JobRunner.Scenario.CurrentConfiguration;
+            var totalDuration = currentConfig.EndDate - currentConfig.StartDate;
+            if (totalDuration.TotalSeconds <= 0)
+                return 100;
+
+            var elapsedDuration = CurrentSimulationDate - currentConfig.StartDate;
+            return Math.Max(0, 100.0 * Math.Min(1, elapsedDuration.TotalSeconds / totalDuration.TotalSeconds));
         }
 
         //void JobRunner_BeforeRun(object sender, TemporalRunArgs args)

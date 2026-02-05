@@ -21,20 +21,15 @@ namespace FlowMatters.Source.WebServer
         public const int DEFAULT_PORT = 9876;
         public const string STATUS_URL = "https://www.flowmatters.com.au/veneer/status.json";
         private WebServiceHost _host;
-        private SourceService _singletonInstance;
         private RiverSystemScenario _scenario;
         private List<int> _registeredOnPorts = new List<int>();
-         
-        public bool AllowRemoteConnections { get; set; }
+        private bool _allowScript;
 
-        public override SourceService Service
-        {
-            get { return _singletonInstance; }
-        }
+        public bool AllowRemoteConnections { get; set; }
 
         public SourceRESTfulService(int port) : base(port)
         {
-            
+
         }
 
         public override void Start()
@@ -47,17 +42,20 @@ namespace FlowMatters.Source.WebServer
                 WebHttpBinding binding = new WebHttpBinding();
 
                 binding.MaxReceivedMessageSize = 1024 * 1024 * 1024; // 1 gigabyte
-                _singletonInstance = new SourceService();
-                _singletonInstance.LogGenerator += _singletonInstance_LogGenerator;
-                _singletonInstance.Scenario = Scenario;
-                _host = new WebServiceHost(_singletonInstance);
+
+                // Initialize static state before starting the service
+                InitializeStaticServiceState();
+
+                // With PerCall mode, we pass the service
+                _host = new WebServiceHost(typeof(SourceService));
                 _host.UnknownMessageReceived += _host_UnknownMessageReceived;
                 binding.CrossDomainScriptAccessEnabled = true;
                 if (!AllowRemoteConnections)
                     binding.HostNameComparisonMode = HostNameComparisonMode.Exact;
 
                 //AppendHeader("Access-Control-Allow-Origin", "*");
-                ServiceEndpoint endpoint = _host.AddServiceEndpoint(typeof(SourceService), binding, string.Format("http://localhost:{0}/", _port));
+                ServiceEndpoint endpoint = _host.AddServiceEndpoint(typeof(SourceService), binding,
+                    string.Format("http://localhost:{0}/", _port));
                 endpoint.Behaviors.Add(new ReplyFormatSwitchBehaviour());
                 endpoint.Behaviors.Add(new EnableCrossOriginResourceSharingBehavior());
 
@@ -74,6 +72,7 @@ namespace FlowMatters.Source.WebServer
                     {
                         // Pass
                     }
+
                     Log(string.Format("Started Source RESTful Service on port:{0}", _port));
                     Running = true;
                     _host.Faulted += _host_Faulted;
@@ -82,8 +81,6 @@ namespace FlowMatters.Source.WebServer
                 {
                     failedAddressInUse = true;
                     binding = null;
-                    _singletonInstance.LogGenerator -= _singletonInstance_LogGenerator;
-                    _singletonInstance = null;
                     _host = null;
                     endpoint = null;
                     GC.Collect();
@@ -96,7 +93,8 @@ namespace FlowMatters.Source.WebServer
 
                     if (AllowRemoteConnections)
                     {
-                        Log("If you require external connections, you must select a port where Veneer has permissions to accept external connections.");
+                        Log(
+                            "If you require external connections, you must select a port where Veneer has permissions to accept external connections.");
                         Log(
                             String.Format(
                                 "Veneer does not have permission to accept external (ie non-local) connections on port {0}",
@@ -105,13 +103,16 @@ namespace FlowMatters.Source.WebServer
                     else
                     {
                         Log("Alternatively, enable 'Allow Remote Connections' and restart Veneer.");
-                        Log("To establish a local-only connection, select a port where Veneer is NOT registered for external connections.");
+                        Log(
+                            "To establish a local-only connection, select a port where Veneer is NOT registered for external connections.");
                         Log(String.Format(
-                                "This is most likely because Veneer is registered to accept external/non-local connections on port {0}.", _port));
+                            "This is most likely because Veneer is registered to accept external/non-local connections on port {0}.",
+                            _port));
                         Log(String.Format(
-                                "Veneer does not have permission to accept local-only connections on port {0}",
-                                _port));
+                            "Veneer does not have permission to accept local-only connections on port {0}",
+                            _port));
                     }
+
                     Log(String.Format("COULD NOT START VENEER ON PORT {0}", _port));
                 }
                 catch (Exception e)
@@ -119,7 +120,7 @@ namespace FlowMatters.Source.WebServer
                     Log("COULD NOT START VENEER");
                     Log(e.Message);
                     Log(e.StackTrace);
-                    if(e.InnerException != null)
+                    if (e.InnerException != null)
                     {
                         Log("INNER EXCEPTION:");
                         Log(e.InnerException.Message);
@@ -129,14 +130,39 @@ namespace FlowMatters.Source.WebServer
             } while (failedAddressInUse);
         }
 
+        private void InitializeStaticServiceState()
+        {
+            // Initialize the static state of SourceService
+            // This replaces the need for a singleton instance
+            SourceService.InitializeSharedState(
+                scenario: _scenario,
+                projectHandler: null, // You may need to pass this from elsewhere
+                allowScript: AllowScript, // Default values, can be configured
+                runningInGUI: true
+            );
+
+            // Set up logging to route through this service's Log method
+            SourceService.SetLogHandler((sender, message) => Log(message));
+        }
+
+        public override bool AllowScript
+        {
+            get => _allowScript;
+            set
+            {
+                _allowScript = value;
+                InitializeStaticServiceState();
+            }
+        }
+
         private void RetrieveVeneerStatus()
         {
-            using( WebClient wc = new WebClient())
+            using (WebClient wc = new WebClient())
             {
                 var notifications = wc.DownloadString(STATUS_URL);
                 dynamic status = JsonConvert.DeserializeObject(notifications);
                 JArray messages = status.message;
-                messages.Reverse().Select(e=>e.ToString()).ForEachItem(Log);
+                messages.Reverse().Select(e => e.ToString()).ForEachItem(Log);
             }
         }
 
@@ -160,9 +186,10 @@ namespace FlowMatters.Source.WebServer
 
             setUpdatableFlagsMethod.Invoke(uriParser, new object[] { 0 });
         }
+
         void _host_UnknownMessageReceived(object sender, UnknownMessageReceivedEventArgs e)
         {
-            Log(string.Format("Unknown message received: {0}",e.Message));
+            Log(string.Format("Unknown message received: {0}", e.Message));
         }
 
         void _host_Faulted(object sender, EventArgs e)
@@ -170,11 +197,6 @@ namespace FlowMatters.Source.WebServer
             Log("Service faulted");
             Stop();
             Start();
-        }
-
-        void _singletonInstance_LogGenerator(object sender, string msg)
-        {
-            Log(msg);
         }
 
         public override void Stop()
@@ -185,6 +207,7 @@ namespace FlowMatters.Source.WebServer
                 _host.Close();
                 _host = null;
             }
+
             Running = false;
         }
 
@@ -194,10 +217,13 @@ namespace FlowMatters.Source.WebServer
             set
             {
                 _scenario = value;
-                if (_singletonInstance != null)
-                    _singletonInstance.Scenario = _scenario;
+
+                // Update the static scenario state if the service is already running
+                if (Running)
+                {
+                    SourceService.UpdateSharedScenario(_scenario);
+                }
             }
         }
     }
-
 }

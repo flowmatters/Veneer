@@ -288,6 +288,7 @@
     <Compile Include="RemoteScripting\ScriptRunner.cs" />
     <Compile Include="ReportingMenu.cs" />
     <Compile Include="ResourceHelpers.cs" />
+    <Compile Include="ExchangeObjects\RunStatus.cs" />
     <Compile Include="SourceRESTfulService.cs" />
     <Compile Include="SourceService.cs" />
     <Compile Include="UriTemplates.cs" />

@@ -18,6 +18,8 @@ using System.ServiceModel.Channels;
 using System.ServiceModel.Web;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Xml;
 using FlowMatters.Source.Veneer;
@@ -28,6 +30,7 @@ using FlowMatters.Source.Veneer.Formatting;
 using FlowMatters.Source.Veneer.RemoteScripting;
 using FlowMatters.Source.WebServer.ExchangeObjects;
 using RiverSystem;
+using RiverSystem.ApplicationLayer.Consumer.Forms;
 using RiverSystem.ApplicationLayer.Interfaces;
 using RiverSystem.Controls.Icons;
 using RiverSystem.DataManagement.DataManager;
@@ -44,30 +47,80 @@ using TIME.ScenarioManagement;
 
 namespace FlowMatters.Source.WebServer
 {
-    [ServiceContract,ServiceBehavior(InstanceContextMode = InstanceContextMode.Single)]
+    [ServiceContract,ServiceBehavior(InstanceContextMode = InstanceContextMode.PerCall, ConcurrencyMode = ConcurrencyMode.Multiple)]
     [ServiceKnownType(typeof(double[]))]
     [ServiceKnownType(typeof(double[][]))]
     [ServiceKnownType(typeof(double[][][]))]
     [ServiceKnownType(typeof(double[][][][]))]
     public class SourceService //: ISourceService
     {
-        public Dictionary<int,string[]> RunLogs = new Dictionary<int,string[]>();
+        // Make these static to maintain state across instances
+        private static Dictionary<int,string[]> _runLogs = new Dictionary<int,string[]>();
+        private static ScenarioInvoker _currentScenarioInvoker; // Track current running scenario invoker
+        private static readonly object _runLock = new object(); // Thread safety for run operations
+
+        private static RiverSystemScenario _sharedScenario;
+        private static ServerLogListener _sharedLogGenerator; // Shared log generator
+        private static IProjectHandler<RiverSystemProject> _sharedProjectHandler;
+        private static bool _allowScript = false;
+        private static bool _runningInGUI = true;
+        private static CustomEndPoint[] _customEndpoints = null;
+
+        public Dictionary<int,string[]> RunLogs
+        {
+            get { return _runLogs; }
+            set { _runLogs = value; }
+        }
 
         public RiverSystemScenario Scenario { get; set; }
         private ScriptRunner scriptRunner = new ScriptRunner();
 
         public bool AllowScript { get; set; }
-
         public bool RunningInGUI { get; set; }
-
-        public event ServerLogListener LogGenerator;
-
+        public event ServerLogListener LogGenerator
+        {
+            add { _sharedLogGenerator += value; }
+            remove { _sharedLogGenerator -= value; }
+        }
         public IProjectHandler<RiverSystemProject> ProjectHandler { get; set; }
 
         public SourceService()
         {
-            AllowScript = false;
-            RunningInGUI = true;
+            AllowScript = _allowScript;
+            RunningInGUI = _runningInGUI;
+            _customEndpoints?.ForEachItem(RegisterEndPoint);
+            // Get the shared scenario from a static location
+            // You'll need to ensure the scenario is accessible statically
+            Scenario = _sharedScenario;
+        }
+
+        private static RiverSystemScenario GetCurrentScenario()
+        {
+            // Implementation depends on how you manage the current scenario
+            // This might need to be passed through a static property or service locator
+            return ProjectManager.Instance?.CurrentRiverSystemScenarioProxy?.riverSystemScenario;
+        }
+
+        public static void InitializeSharedState(
+            RiverSystemScenario scenario, IProjectHandler<RiverSystemProject> projectHandler,
+            bool allowScript = false, bool runningInGUI = true,
+            CustomEndPoint[] customEndpoints = null)
+        {
+            _sharedScenario = scenario;
+            _sharedProjectHandler = projectHandler;
+            _allowScript = allowScript;
+            _runningInGUI = runningInGUI;
+            _customEndpoints = customEndpoints;
+        }
+
+        public static void UpdateSharedScenario(RiverSystemScenario scenario)
+        {
+            _sharedScenario = scenario;
+        }
+
+        public static void SetLogHandler(ServerLogListener logHandler)
+        {
+            _sharedLogGenerator = logHandler;
         }
 
         [OperationContract]
@@ -93,8 +146,8 @@ namespace FlowMatters.Source.WebServer
         }
 
         [OperationContract]
-        [WebInvoke(Method = "POST", UriTemplate = "/shutdown")]
-        public void ShutdownServer()
+                        [WebInvoke(Method = "POST", UriTemplate = "/shutdown")]
+                        public void ShutdownServer()
         {
             Log("Shutdown Requested");
             if (!RunningInGUI)
@@ -132,6 +185,7 @@ namespace FlowMatters.Source.WebServer
                 newScenario = scenarios.First(sc=>sc.ScenarioName==scenario).riverSystemScenario;
             }
             Scenario = newScenario;
+            _sharedScenario = newScenario;
         }
 
         [OperationContract]
@@ -196,7 +250,7 @@ namespace FlowMatters.Source.WebServer
         public GeoJSONFeature GetNode(string nodeId)
         {
             Log(string.Format("Requested node {0} (NOT IMPLEMENTED)", nodeId));
-            return null;                
+            return null;
         }
 
         [OperationContract]
@@ -239,7 +293,18 @@ namespace FlowMatters.Source.WebServer
         public void TriggerRun(RunParameters parameters)
         {
             Log("Triggering a run.");
-            ScenarioInvoker si = new ScenarioInvoker { Scenario = Scenario };
+
+            lock (_runLock)
+            {
+                if (_currentScenarioInvoker?.IsRunning == true)
+                {
+                    throw new WebFaultException<SimulationFault>(
+                        new SimulationFault(new InvalidOperationException("A simulation is already running. Cancel the current run before starting a new one.")),
+                        HttpStatusCode.Conflict);
+                }
+
+                _currentScenarioInvoker = new ScenarioInvoker { Scenario = Scenario };
+            }
 
             ConcurrentQueue<string> messages = new ConcurrentQueue<string>();
             LogAction runLogger = (sender, args) =>
@@ -250,7 +315,7 @@ namespace FlowMatters.Source.WebServer
 
             try
             {
-                si.RunScenario(parameters, RunningInGUI, LogGenerator);
+                _currentScenarioInvoker.RunScenario(parameters, RunningInGUI, _sharedLogGenerator);
             }
             catch (Exception e)
             {
@@ -262,6 +327,10 @@ namespace FlowMatters.Source.WebServer
             finally
             {
                 TIME.Management.Log.MessageRecieved -= runLogger;
+                lock (_runLock)
+                {
+                    _currentScenarioInvoker = null; // Clear reference when done
+                }
             }
 
             var allRuns = Scenario.Project.ResultManager.AllRuns();
@@ -275,6 +344,95 @@ namespace FlowMatters.Source.WebServer
                                                                      WebOperationContext.Current.IncomingRequest.Headers
                                                                          ["Location"] +
                                                                      String.Format("runs/{0}", r.RunNumber));
+        }
+
+        [OperationContract]
+        [WebInvoke(Method = "POST", UriTemplate = "/runs/cancel")]
+        public void CancelRun()
+        {
+            Log("Cancel run requested.");
+
+            ScenarioInvoker currentInvoker;
+            lock (_runLock)
+            {
+                currentInvoker = _currentScenarioInvoker;
+            }
+
+            if (currentInvoker == null)
+            {
+                Log("No active run to cancel.");
+                WebOperationContext.Current.OutgoingResponse.StatusCode = HttpStatusCode.NotFound;
+                WebOperationContext.Current.OutgoingResponse.StatusDescription = "No active run to cancel";
+                return;
+            }
+
+            if (!currentInvoker.IsRunning)
+            {
+                Log("No running simulation to cancel.");
+                WebOperationContext.Current.OutgoingResponse.StatusCode = HttpStatusCode.BadRequest;
+                WebOperationContext.Current.OutgoingResponse.StatusDescription = "No running simulation to cancel";
+                return;
+            }
+
+            try
+            {
+                currentInvoker.CancelRun();
+                Log("Cancellation request sent to running simulation.");
+                WebOperationContext.Current.OutgoingResponse.StatusCode = HttpStatusCode.OK;
+            }
+            catch (Exception e)
+            {
+                Log($"Error cancelling run: {e.Message}");
+                throw new WebFaultException<SimulationFault>(new SimulationFault(e), HttpStatusCode.InternalServerError);
+            }
+        }
+
+        [OperationContract]
+        [WebInvoke(Method = "GET", UriTemplate = "/runs/status", ResponseFormat = WebMessageFormat.Json)]
+        public RunStatus GetRunStatus()
+        {
+            ScenarioInvoker currentInvoker;
+            lock (_runLock)
+            {
+                currentInvoker = _currentScenarioInvoker;
+            }
+
+            bool isRunning = currentInvoker?.IsRunning ?? false;
+
+            var result = new RunStatus
+            {
+                IsRunning = isRunning,
+                CanCancel = isRunning
+            };
+
+            if (!isRunning) return result;
+            // Populate scenario information
+
+            result.Scenario = Scenario.Name ?? "Unknown Scenario";
+            result.CurrentDate = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+
+            // Get start and end dates from the current configuration
+            var config = Scenario.CurrentConfiguration;
+            if (config != null)
+            {
+                result.StartDate = config.StartDate.ToString("yyyy-MM-dd");
+                result.EndDate = config.EndDate.ToString("yyyy-MM-dd");
+
+                result.PercentComplete = currentInvoker.GetPercentComplete();
+            }
+            else
+            {
+                result.StartDate = "Not configured";
+                result.EndDate = "Not configured";
+            }
+
+            // Get recent log messages
+            //lock (_logLock)
+            //{
+            //    result.Logs = _recentLogMessages.ToArray();
+            //}
+
+            return result;
         }
 
         [OperationContract]
@@ -460,9 +618,9 @@ namespace FlowMatters.Source.WebServer
                 theFunctions = TimeSeriesFunctions.Functions.Keys.ToArray();
             }
 
-            return TimeSeriesFunctions.TabulateResults(theFunctions, results, 
-                runId == UriTemplates.MatchAll, 
-                networkElement == UriTemplates.MatchAll, 
+            return TimeSeriesFunctions.TabulateResults(theFunctions, results,
+                runId == UriTemplates.MatchAll,
+                networkElement == UriTemplates.MatchAll,
                 recordingElement == UriTemplates.MatchAll,
                 variable == UriTemplates.MatchAll);
         }
@@ -804,7 +962,7 @@ namespace FlowMatters.Source.WebServer
         }
 
         [OperationContract]
-        [WebInvoke(Method = "POST", UriTemplate = "/ironpython", 
+        [WebInvoke(Method = "POST", UriTemplate = "/ironpython",
             RequestFormat = WebMessageFormat.Json, ResponseFormat = WebMessageFormat.Json)]
         public IronPythonResponse RunIronPython(IronPythonScript script)
         {
@@ -816,6 +974,13 @@ namespace FlowMatters.Source.WebServer
             }
             Log(String.Format("Running IronyPython script:\n{0}",(script.Script.Length>80)?(script.Script.Substring(0,75)+"..."):script.Script));
             return runIronPythonWithScenario(script);
+        }
+
+        [OperationContract]
+        [WebInvoke(Method = "GET", UriTemplate = "/fail", ResponseFormat = WebMessageFormat.Json)]
+        public int Fail()
+        {
+            throw new ApplicationException("This endpoint triggers a failure");
         }
 
         private IronPythonResponse runIronPythonWithScenario(IronPythonScript script)
@@ -939,7 +1104,6 @@ namespace FlowMatters.Source.WebServer
                     {
                         row.ElementRecorder.SetRecordingState(recordable.Key, recordable.KeyObject, state);
                     }
-
                 }
 #endif
             }
@@ -973,7 +1137,7 @@ namespace FlowMatters.Source.WebServer
 
             //if (aggregation == "monthly")
             //    result = result.toMonthly();
-            
+
             //if (aggregation == "annual")
             //    result = result.toAnnual();
             result.name = name;
@@ -999,7 +1163,7 @@ namespace FlowMatters.Source.WebServer
             //WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Origin", "*");
             return (result == null) ? TimeSeriesNotFound() : new SimpleTimeSeries(result);
         }
-        
+
         private Tuple<TimeSeriesLink,TimeSeries>[] MatchTimeSeries(string runId, string networkElement, string recordingElement, string variable)
         {
             List<Tuple<TimeSeriesLink, TimeSeries>> result = new List<Tuple<TimeSeriesLink, TimeSeries>>();
@@ -1026,9 +1190,9 @@ namespace FlowMatters.Source.WebServer
                     }));
             }
             return result.ToArray();
-            //return row.ElementRecorder.GetResultList().FirstOrDefault(er => 
+            //return row.ElementRecorder.GetResultList().FirstOrDefault(er =>
             //    (URLSafeString(er.Key.KeyString) == URLSafeString(variable))||
-            //    ((er.Key.KeyString=="")&&(row.ElementName==variable))).Value;            
+            //    ((er.Key.KeyString=="")&&(row.ElementName==variable))).Value;
         }
 
 #if BEFORE_RECORDING_ATTRIBUTES_REFACTOR
@@ -1082,8 +1246,8 @@ namespace FlowMatters.Source.WebServer
 
         protected void Log(string query)
         {
-            if (LogGenerator != null)
-                LogGenerator(this, query);
+            if (_sharedLogGenerator != null)
+                _sharedLogGenerator(this, query);
         }
     }
 }

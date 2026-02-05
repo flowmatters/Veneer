@@ -109,7 +109,7 @@ namespace FlowMatters.Source.WebServerPanel
             set
             {
                 _allowScripts = value;
-                if (_server != null) _server.Service.AllowScript = value;
+                if (_server != null) _server.AllowScript = value;
             }
         }
         public int Port
@@ -149,7 +149,7 @@ namespace FlowMatters.Source.WebServerPanel
             _server.Start();
             _port = _server.Port;
             PortTxt.GetBindingExpression(TextBox.TextProperty).UpdateTarget();
-            _server.Service.AllowScript = AllowScripts;
+            _server.AllowScript = AllowScripts;
             UpdateButtons();
         }
 
