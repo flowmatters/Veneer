@@ -61,6 +61,41 @@ namespace FlowMatters.Source.Veneer
             return result;
         }
 
+        private string[] SplitMenuPath(string menuPath)
+        {
+            if (string.IsNullOrEmpty(menuPath))
+                return new[] { DEFAULT_MENU };
+
+            return menuPath.Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(s => s.Trim())
+                .ToArray();
+        }
+
+        private string GetTopLevelMenu(string menuPath)
+        {
+            var parts = SplitMenuPath(menuPath);
+            return parts.Length > 0 ? parts[0] : DEFAULT_MENU;
+        }
+
+        private ToolStripMenuItem FindOrCreateNestedMenu(ToolStripMenuItem parentMenu, string[] menuPath, int startIndex = 1)
+        {
+            if (startIndex >= menuPath.Length)
+                return parentMenu;
+
+            string menuName = menuPath[startIndex];
+            ToolStripMenuItem subMenu = parentMenu.DropDownItems.Cast<ToolStripItem>()
+                .OfType<ToolStripMenuItem>()
+                .FirstOrDefault(item => item.Text == menuName);
+
+            if (subMenu == null)
+            {
+                subMenu = new ToolStripMenuItem(menuName);
+                parentMenu.DropDownItems.Add(subMenu);
+            }
+
+            return FindOrCreateNestedMenu(subMenu, menuPath, startIndex + 1);
+        }
+
         private void PopulateReportMenu(string mnu)
         {
             Form parent = ReportingMenu.FindMainForm();
@@ -84,10 +119,18 @@ namespace FlowMatters.Source.Veneer
                 var config = VeneerConfiguration.Load(Scenario);
                 if (config?.addons != null)
                 {
-                    var addonsForMenu = config.addons.Where(a => (a.menu ?? DEFAULT_MENU) == mnu);
+                    var addonsForMenu = config.addons.Where(a => GetTopLevelMenu(a.menu) == mnu);
                     foreach (var addon in addonsForMenu)
                     {
-                        ToolStripItem item = reportMenu.DropDownItems.Add(addon.name);
+                        var menuPath = SplitMenuPath(addon.menu);
+                        ToolStripMenuItem targetMenu = reportMenu;
+
+                        if (menuPath.Length > 1)
+                        {
+                            targetMenu = FindOrCreateNestedMenu(reportMenu, menuPath);
+                        }
+
+                        ToolStripItem item = targetMenu.DropDownItems.Add(addon.name);
                         switch (addon.type)
                         {
                             case "exe":
@@ -177,9 +220,9 @@ namespace FlowMatters.Source.Veneer
             var config = VeneerConfiguration.Load(Scenario);
             if (config?.addons != null)
             {
-                foreach (var se in config.addons.Select(a => a.menu ?? DEFAULT_MENU))
+                foreach (var menuPath in config.addons.Select(a => a.menu ?? DEFAULT_MENU))
                 {
-                    result.Add(se);
+                    result.Add(GetTopLevelMenu(menuPath));
                 }
             }
             return result;
