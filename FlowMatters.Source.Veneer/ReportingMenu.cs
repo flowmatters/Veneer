@@ -87,7 +87,15 @@ namespace FlowMatters.Source.Veneer
                     var addonsForMenu = config.addons.Where(a => GetTopLevelMenu(a.menu) == mnu);
                     foreach (var addon in addonsForMenu)
                     {
-                        ToolStripItem item = reportMenu.DropDownItems.Add(addon.name);
+                        var menuPath = SplitMenuPath(addon.menu);
+                        ToolStripMenuItem targetMenu = reportMenu;
+
+                        if (menuPath.Length > 1)
+                        {
+                            targetMenu = FindOrCreateNestedMenu(reportMenu, menuPath);
+                        }
+
+                        ToolStripItem item = targetMenu.DropDownItems.Add(addon.name);
                         switch (addon.type)
                         {
                             case "exe":
@@ -107,17 +115,50 @@ namespace FlowMatters.Source.Veneer
                 }
             }
 
-            ToolStripItem veneer = reportMenu.DropDownItems.Add("");
-            veneer.BackgroundImage = Veneer.Properties.Resources.Logo_RGB;
-            veneer.BackgroundImageLayout = ImageLayout.Zoom;
-            veneer.Click += (eventSender, eventArgs) => Process.Start("http://www.flowmatters.com.au");
+            // Only add Veneer logo to the first menu
+            var requiredMenus = RequiredMenus();
+            if (requiredMenus.Count > 0 && requiredMenus[0] == mnu)
+            {
+                ToolStripItem veneer = reportMenu.DropDownItems.Add("");
+                veneer.BackgroundImage = Veneer.Properties.Resources.Logo_RGB;
+                veneer.BackgroundImageLayout = ImageLayout.Zoom;
+                veneer.Click += (eventSender, eventArgs) => Process.Start("http://www.flowmatters.com.au");
+            }
+        }
+
+        private string[] SplitMenuPath(string menuPath)
+        {
+            if (string.IsNullOrEmpty(menuPath))
+                return new[] { DEFAULT_MENU };
+
+            return menuPath.Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(s => s.Trim())
+                .ToArray();
         }
 
         private string GetTopLevelMenu(string menuPath)
         {
-            if (string.IsNullOrEmpty(menuPath))
-                return DEFAULT_MENU;
-            return menuPath;
+            var parts = SplitMenuPath(menuPath);
+            return parts.Length > 0 ? parts[0] : DEFAULT_MENU;
+        }
+
+        private ToolStripMenuItem FindOrCreateNestedMenu(ToolStripMenuItem parentMenu, string[] menuPath, int startIndex = 1)
+        {
+            if (startIndex >= menuPath.Length)
+                return parentMenu;
+
+            string menuName = menuPath[startIndex];
+            ToolStripMenuItem subMenu = parentMenu.DropDownItems.Cast<ToolStripItem>()
+                .OfType<ToolStripMenuItem>()
+                .FirstOrDefault(item => item.Text == menuName);
+
+            if (subMenu == null)
+            {
+                subMenu = new ToolStripMenuItem(menuName);
+                parentMenu.DropDownItems.Add(subMenu);
+            }
+
+            return FindOrCreateNestedMenu(subMenu, menuPath, startIndex + 1);
         }
 
         private void LaunchExeAddon(string addonPath)
@@ -173,24 +214,72 @@ namespace FlowMatters.Source.Veneer
         public void InitialiseRequiredMenus(Form parent, RiverSystemScenario scenario)
         {
             Scenario = scenario;
-            foreach (var mnu in RequiredMenus())
+            var menus = RequiredMenus();
+            foreach (var mnu in menus)
             {
                 FindOrCreateReportMenu(parent, mnu);
             }
         }
 
-        private HashSet<string> RequiredMenus()
+        private List<string> RequiredMenus()
         {
-            var result = new HashSet<string> { DEFAULT_MENU };
+            var result = new List<string>();
             var config = VeneerConfiguration.Load(Scenario);
+
+            // Get all addon menus
+            var addonMenus = new HashSet<string>();
             if (config?.addons != null)
             {
                 foreach (var menuPath in config.addons.Select(a => a.menu ?? DEFAULT_MENU))
                 {
-                    result.Add(GetTopLevelMenu(menuPath));
+                    addonMenus.Add(GetTopLevelMenu(menuPath));
                 }
             }
+
+            // Determine if we have menus other than the default
+            var hasOtherMenus = addonMenus.Any(m => m != DEFAULT_MENU);
+
+            // Include default menu if it has content OR if there are no other menus
+            if (HasMenuContent(DEFAULT_MENU) || !hasOtherMenus)
+            {
+                result.Add(DEFAULT_MENU);
+            }
+
+            // Add other addon menus in a consistent order
+            foreach (var menu in addonMenus.OrderBy(m => m))
+            {
+                if (menu != DEFAULT_MENU)
+                {
+                    result.Add(menu);
+                }
+            }
+
             return result;
+        }
+
+        private bool HasMenuContent(string menuName)
+        {
+            if (Scenario == null)
+                return false;
+
+            // Check for HTML reports
+            string projectFolder = Scenario.Project.FileDirectory;
+            if (projectFolder != null)
+            {
+                var htmlFiles = Directory.EnumerateFiles(projectFolder, "*.htm*", SearchOption.TopDirectoryOnly);
+                if (htmlFiles.Any())
+                    return true;
+            }
+
+            // Check for addons in this menu
+            var config = VeneerConfiguration.Load(Scenario);
+            if (config?.addons != null)
+            {
+                if (config.addons.Any(a => GetTopLevelMenu(a.menu) == menuName))
+                    return true;
+            }
+
+            return false;
         }
 
     }
