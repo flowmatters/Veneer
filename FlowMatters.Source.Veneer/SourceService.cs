@@ -464,6 +464,10 @@ namespace FlowMatters.Source.Veneer
             Log(String.Format("Updating function {0}", functionName));
             functionName = "$" + functionName;
             var function = Enumerable.FirstOrDefault(Scenario.Network.FunctionManager.Functions, f => f.Name == functionName);
+            if (function == null)
+            {
+                function = Enumerable.FirstOrDefault(Scenario.Network.FunctionManager.Functions, f => f.FullName == functionName);
+            }
             if (function != null)
             {
                 Log(String.Format("Setting ${0}={1}", functionName, value.Expression));
