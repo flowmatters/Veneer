@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Reflection;
 using System.Windows.Forms;
 using FlowMatters.Source.WebServerPanel;
@@ -39,6 +40,12 @@ namespace FlowMatters.Source.Veneer.AutoStart
         private void _pm_ProjectLoaded(object sender,
             TIME.ScenarioManagement.EditorState.ProjectActionWithPathEventArgs<RiverSystem.RiverSystemProject> e)
         {
+            var combined = Path.Combine(Directory.GetCurrentDirectory(), e.Project.FullFilename);
+            if (File.Exists(combined))
+            {
+                e.Project.SetFullFilename(combined);
+            }
+
             var scenarios = e.Project.GetRSScenarios();
             if (scenarios.Length == 0)
             {
