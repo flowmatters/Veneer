@@ -171,6 +171,8 @@ namespace FlowMatters.Source.WebServer
                 throw new InvalidOperationException("Cannot set scenario when running Veneer in Source user interface");
             }
 
+            // TODO Prevent changing during a simulation!
+
             Log($"Setting scenario: {scenario}");
             var scenarios = Scenario.RiverSystemProject.GetRSScenarios();
             RiverSystemScenario newScenario;
@@ -391,6 +393,7 @@ namespace FlowMatters.Source.WebServer
         [WebInvoke(Method = "GET", UriTemplate = "/runs/status", ResponseFormat = WebMessageFormat.Json)]
         public RunStatus GetRunStatus()
         {
+            Log("Requested run status.");
             ScenarioInvoker currentInvoker;
             lock (_runLock)
             {
@@ -409,7 +412,6 @@ namespace FlowMatters.Source.WebServer
             // Populate scenario information
 
             result.Scenario = Scenario.Name ?? "Unknown Scenario";
-            result.CurrentDate = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
 
             // Get start and end dates from the current configuration
             var config = Scenario.CurrentConfiguration;
@@ -419,6 +421,7 @@ namespace FlowMatters.Source.WebServer
                 result.EndDate = config.EndDate.ToString("yyyy-MM-dd");
 
                 result.PercentComplete = currentInvoker.GetPercentComplete();
+                result.CurrentDate = currentInvoker.CurrentSimulationDate.ToString("yyyy-MM-dd HH:mm:ss");
             }
             else
             {
@@ -1021,7 +1024,7 @@ namespace FlowMatters.Source.WebServer
             element = element.ToLower();
             if (element == "networkelement")
             {
-                
+
                 return Enumerable.ToHashSet(table.Select(row => row.NetworkElementName)).ToArray();
             }
 
