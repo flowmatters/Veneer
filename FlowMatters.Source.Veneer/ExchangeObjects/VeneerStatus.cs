@@ -8,13 +8,14 @@ using System.Text;
 using System.Threading.Tasks;
 using RiverSystem;
 using RiverSystem.PreProcessing.ProjectionInfo;
+using RiverSystem.PluginManager;
 
 namespace FlowMatters.Source.Veneer.ExchangeObjects
 {
     [DataContract]
     public class VeneerStatus
     {
-        public const int PROTOCOL_VERSION = 20220601;
+        public const int PROTOCOL_VERSION = 20260201;
         public VeneerStatus(RiverSystemScenario s)
         {
             Version = PROTOCOL_VERSION;
@@ -29,6 +30,28 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects
             PID = process.Id;
             HostExe = process.MainModule.FileName;
             User = Environment.UserName;
+            PluginsLoaded = GetLoadedPlugins();
+        }
+
+        private static string[] GetLoadedPlugins()
+        {
+            try
+            {
+#if V3 || V4_0 || V4_1 || V4_2 || V4_3_0
+                var manager = PluginRegisterUtility.LoadPlugins();
+#else
+                var manager = PluginManager.Instance;
+#endif
+                if (manager?.ActivePlugins != null && manager.ActivePlugins.Count() > 0)
+                {
+                    return manager.ActivePlugins.Select(p => p.Path).ToArray();
+                }
+            }
+            catch
+            {
+                // If plugin loading fails for any reason, gracefully return empty array
+            }
+            return Array.Empty<string>();
         }
 
         [DataMember]
@@ -58,5 +81,7 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects
         [DataMember]
         public string User { get; set; }
 
+        [DataMember]
+        public string[] PluginsLoaded {get;set;}
     }
 }

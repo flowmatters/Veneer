@@ -42,6 +42,9 @@
     <Reference Include="RiverSystem">
       <HintPath>..\..\Output\RiverSystem.dll</HintPath>
     </Reference>
+    <Reference Include="RiverSystem.PluginManager">
+      <HintPath>..\..\Output\RiverSystem.PluginManager.dll</HintPath>
+    </Reference>
     <Reference Include="RiverSystem.Api">
       <HintPath>..\..\Output\RiverSystem.Api.dll</HintPath>
     </Reference>
