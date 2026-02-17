@@ -68,7 +68,7 @@ namespace FlowMatters.Source.Veneer
                 if (_scenario != null)
                 {
                     StopServer();
-                    ReportingMenu.ClearMenu();
+                    ReportingMenu.Instance.ClearMenu();
                 }
                 _scenario = value;
               
@@ -84,7 +84,7 @@ namespace FlowMatters.Source.Veneer
         {
             Form parent = ReportingMenu.FindMainForm();
             ReportingMenu.Instance.Control = this;
-            ToolStripMenuItem reportMenu = ReportingMenu.Instance.FindOrCreateReportMenu(parent,_scenario);
+            ReportingMenu.Instance.InitialiseRequiredMenus(parent, _scenario);
         }
 
         private AbstractSourceServer _server;
