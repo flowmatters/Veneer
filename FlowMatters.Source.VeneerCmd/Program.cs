@@ -325,6 +325,9 @@ namespace FlowMatters.Source.VeneerCmd
             loader.LoadProject(false);
             Show("Project Loaded");
             var project = loader.ProjectMetaStructure.Project;
+#if V3 || BEFORE_V4_3
+            project.SetFullFilename(fn);
+#endif
             projectHandler = loader;
             return project;
         }

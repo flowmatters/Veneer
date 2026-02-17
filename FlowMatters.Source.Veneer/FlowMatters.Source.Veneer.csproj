@@ -4,7 +4,7 @@
     <OutputType>Library</OutputType>
     <NoWarn>1591,1587</NoWarn>
     <RootPath>$(MSBuildThisFileDirectory)..\..\</RootPath>
-    <ReferencePath>$(RootPath)Output;$(RootPath)3rdParty</ReferencePath>
+    <ReferencePath>$(RootPath)Output;$(RootPath)3rdParty;$(RootPath)\Veneer\References;$(RootPath)\Veneer\References\Plugins</ReferencePath>
     <OutputPath>$(RootPath)Output\Plugins\CommunityPlugins\Veneer</OutputPath>
     <ExcludeEWaterPdbPathMap>true</ExcludeEWaterPdbPathMap>
     <UseWindowsForms>true</UseWindowsForms>
