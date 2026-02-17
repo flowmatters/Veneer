@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -25,46 +25,50 @@ namespace FlowMatters.Source.Veneer
         public const int DEFAULT_PORT = 9876;
         public const string STATUS_URL = "https://www.flowmatters.com.au/veneer/status.json";
         private IWebHost _host;
-        private SourceService _singletonInstance;
         private RiverSystemScenario _scenario;
         private List<int> _registeredOnPorts = new List<int>();
         private bool _isEndpointRegistered = false;
-         
+        private bool _allowScript;
+
         public bool AllowRemoteConnections { get; set; }
 
         public bool AllowSsl { get; set; }
 
-        public override SourceService Service
+        public override bool AllowScript
         {
-            get { return _singletonInstance; }
+            get => _allowScript;
+            set
+            {
+                _allowScript = value;
+                InitializeStaticServiceState();
+            }
         }
 
         public SourceRESTfulService(int port) : base(port)
         {
-            
+
         }
 
         public override async Task Start()
         {
             // TODO: RM-20834 RM-21455 This doesn't look to be necessary anymore with CoreWCF, but leaving commented out in case it needs to be revisited
             //LeaveDotsAndSlashesEscaped();
-            
-            _singletonInstance = new SourceService();
-            _singletonInstance.LogGenerator += _singletonInstance_LogGenerator;
-            _singletonInstance.Scenario = Scenario;
+
+            // Initialize static state before starting the service
+            InitializeStaticServiceState();
 
             var builder = Microsoft.AspNetCore.WebHost.CreateDefaultBuilder()
                 .ConfigureServices(services =>
                 {
                     // Add base service model services
                     services.AddServiceModelServices();
-                    
+
                     // Add web services
                     services.AddServiceModelWebServices();
 
-                    // Register the service instance as singleton
-                    services.AddSingleton(_singletonInstance);
-                    
+                    // Register as transient for PerCall behavior
+                    services.AddTransient<SourceService>();
+
                     // Add any custom behaviors as singletons
                     services.AddSingleton<IServiceBehavior, UseRequestHeadersForMetadataAddressBehavior>();
                 })
@@ -93,7 +97,7 @@ namespace FlowMatters.Source.Veneer
                         else
                             options.ListenLocalhost(_port);
                     }
-                    
+
                 })
                 .Configure(app =>
                 {
@@ -141,7 +145,7 @@ namespace FlowMatters.Source.Veneer
                                     }
                                 }
                             });
-                            
+
                             _isEndpointRegistered = true;
                         }
                     });
@@ -210,6 +214,18 @@ namespace FlowMatters.Source.Veneer
             }
         }
 
+        private void InitializeStaticServiceState()
+        {
+            SourceService.InitializeSharedState(
+                scenario: _scenario,
+                projectHandler: null,
+                allowScript: _allowScript,
+                runningInGUI: true
+            );
+
+            SourceService.SetLogHandler((sender, message) => Log(message));
+        }
+
         private void LogVeneerPermissionsIssue()
         {
             Log("For details, see: https://github.com/flowmatters/veneer");
@@ -266,11 +282,6 @@ namespace FlowMatters.Source.Veneer
         //    setUpdatableFlagsMethod.Invoke(uriParser, new object[] { 0 });
         //}
 
-        void _singletonInstance_LogGenerator(object sender, string msg)
-        {
-            Log(msg);
-        }
-
         public override async Task Stop()
         {
             if (_host != null)
@@ -289,8 +300,10 @@ namespace FlowMatters.Source.Veneer
             set
             {
                 _scenario = value;
-                if (_singletonInstance != null)
-                    _singletonInstance.Scenario = _scenario;
+                if (Running)
+                {
+                    SourceService.UpdateSharedScenario(_scenario);
+                }
             }
         }
     }

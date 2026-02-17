@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -19,7 +19,7 @@ using TIME.Winforms.UI.Utils;
 using FlowMatters.Source.Veneer.ExchangeObjects;
 using TIME.Management;
 using TIME.Tools.Reflection;
-#if V3 || V4_0 || V4_1 || V4_2_0 || V4_2_1 || V4_2_2 || V4_2_3 || V4_2_4 || V4_2_5 
+#if V3 || V4_0 || V4_1 || V4_2_0 || V4_2_1 || V4_2_2 || V4_2_3 || V4_2_4 || V4_2_5
 
 #else
 using RiverSystem.Options;
@@ -33,6 +33,9 @@ namespace FlowMatters.Source.Veneer
 
         //private ScenarioRunWindow runControl;
         private object lockObj = new object();
+        private CancellationTokenSource _cancellationTokenSource;
+        private Task _runningTask;
+
         //private bool running;
         public RiverSystemScenario Scenario { set; get; }
 
@@ -48,8 +51,31 @@ namespace FlowMatters.Source.Veneer
             }
         }
 
+        public bool IsRunning => _runningTask != null && !_runningTask.IsCompleted;
+
+        public void CancelRun()
+        {
+            lock (lockObj)
+            {
+                if (_cancellationTokenSource != null && !_cancellationTokenSource.IsCancellationRequested)
+                {
+                    _cancellationTokenSource.Cancel();
+                }
+            }
+        }
+
         public void RunScenario(RunParameters parameters, bool showWindow, ServerLogListener logger)
         {
+            lock (lockObj)
+            {
+                if (IsRunning)
+                {
+                    throw new InvalidOperationException("A simulation is already running. Cancel the current run before starting a new one.");
+                }
+
+                _cancellationTokenSource = new CancellationTokenSource();
+            }
+
             if (Scenario == null)
             {
                 MsgTools.ShowInfo(RiverSystemOptions.NEED_PROJECT_OPEN_MESSAGE);
@@ -73,19 +99,52 @@ namespace FlowMatters.Source.Veneer
                 ProjectManager.Instance.SaveAuditLogMessage("Run started at " + DateTime.Now);
             }
 
-
-            Task x = Task.Factory.StartNew(() => Scenario.RunManager.Execute());
-            while (!x.IsCompleted)
+            try
             {
-                Thread.Sleep(50);
-                Application.DoEvents();
+                _runningTask = Task.Factory.StartNew(() => Scenario.RunManager.Execute(), _cancellationTokenSource.Token);
+
+                while (!_runningTask.IsCompleted)
+                {
+                    if (_cancellationTokenSource.Token.IsCancellationRequested)
+                    {
+                        TryStopRunManager();
+                        break;
+                    }
+
+                    Thread.Sleep(50);
+                    Application.DoEvents();
+                }
+
+                if (_cancellationTokenSource.Token.IsCancellationRequested)
+                {
+                    if (!_runningTask.Wait(5000))
+                    {
+                        logger?.Invoke(this, "Warning: Simulation task did not respond to cancellation within timeout period.");
+                    }
+
+                    throw new OperationCanceledException("Simulation run was cancelled.");
+                }
             }
-
-            if (showWindow)
+            catch (OperationCanceledException)
             {
-                ProjectManager.Instance.SaveAuditLogMessage("Run finished at " + DateTime.Now + " and took " + TimeTools.TimeSpanString(DateTime.Now - startOfRun));
-                runWindow.Close();
-                runWindow.Dispose();
+                logger?.Invoke(this, "Simulation run was cancelled.");
+                throw;
+            }
+            finally
+            {
+                lock (lockObj)
+                {
+                    _cancellationTokenSource?.Dispose();
+                    _cancellationTokenSource = null;
+                    _runningTask = null;
+                }
+
+                if (showWindow && runWindow != null)
+                {
+                    ProjectManager.Instance.SaveAuditLogMessage("Run finished at " + DateTime.Now + " and took " + TimeTools.TimeSpanString(DateTime.Now - startOfRun));
+                    runWindow.Close();
+                    runWindow.Dispose();
+                }
             }
 
             if((parameters!=null)&&parameters.Params.ContainsKey(RUN_NAME_KEY))
@@ -106,27 +165,32 @@ namespace FlowMatters.Source.Veneer
             }
         }
 
+        private void TryStopRunManager()
+        {
+            try
+            {
+                var runManager = JobRunner;
+                var stopMethod = runManager.GetType().GetMethod("Stop") ??
+                               runManager.GetType().GetMethod("Cancel") ??
+                               runManager.GetType().GetMethod("Abort");
+
+                if (stopMethod != null)
+                {
+                    stopMethod.Invoke(runManager, null);
+                }
+            }
+            catch (Exception ex)
+            {
+                TIME.Management.Log.WriteError(this, $"Failed to stop run manager: {ex.Message}");
+            }
+        }
+
         private static void SetPrivateRunProperty(object run, string field, object value)
         {
             var mi = run.GetType().GetMember(field, BindingFlags.NonPublic | BindingFlags.Instance)[0];
             var ri = ReflectedItem.NewItem(mi, run);
             ri.itemValue = value;
         }
-
-        //private void LogRunEnd(DateTime startOfRun)
-        //{
-        //    Type t = typeof (RunTracker);
-        //    MethodInfo method = t.GetMethod("RunCompleted", BindingFlags.Public | BindingFlags.Static);
-
-        //    try
-        //    {
-        //        method.Invoke(null, new object[] {Scenario.Project, Scenario, startOfRun});
-        //    }
-        //    catch(Exception)
-        //    {
-        //        method.Invoke(null, new object[] { Scenario.Project, startOfRun });
-        //    }
-        //}
 
         private void ApplyRunParameters(RunParameters parameters)
         {
@@ -154,83 +218,34 @@ namespace FlowMatters.Source.Veneer
         {
             if (e.State==JobRunningState.Finished)
                 JobRunner_AfterRun(sender,e);
+            CurrentSimulationDate = e.CurrentSimulationDate;
         }
 
-        //void JobRunner_BeforeRun(object sender, TemporalRunArgs args)
-        //{
-        //    Monitor.Enter(lockObj);
-        //}
+        public DateTime CurrentSimulationDate { get; set; }
+
+        public double GetPercentComplete()
+        {
+            if (JobRunner?.Scenario?.CurrentConfiguration == null)
+                return 0;
+
+            var currentConfig = JobRunner.Scenario.CurrentConfiguration;
+            var totalDuration = currentConfig.EndDate - currentConfig.StartDate;
+            if (totalDuration.TotalSeconds <= 0)
+                return 100;
+
+            var elapsedDuration = CurrentSimulationDate - currentConfig.StartDate;
+            return Math.Max(0, 100.0 * Math.Min(1, elapsedDuration.TotalSeconds / totalDuration.TotalSeconds));
+        }
 
         void JobRunner_AfterRun(object sender, EventArgs e)
         {
-//            running = false;
-//            Monitor.PulseAll(lockObj);
-//            Monitor.Exit(lockObj);
         }
 
         private bool IsRunnable()
         {
-//            if(JobRunner==null)
-//                ConfigureScenario();
-
-            //Todo Need to do the cleanup tasks with applicationLayer
-//            ProjectManager.Instance.RefreshScenario((RiverSystemScenario)JobRunner.Scenario);
-
             string message;
             bool runnable = JobRunner.IsRunnable(Scenario.Network,out message);
-
-            // Update the Scenario Start and End for consistency, when saved this is used as a consistencey
-            // check for running in the commandline as well (the extents of the scenaro are not well defined when there are no timeseries)
-            //if (runnable)
-            //{
-            //    if (Scenario.Start > Scenario.CurrentConfiguration.StartDate)
-            //        Scenario.Start = Scenario.CurrentConfiguration.StartDate;
-            //    if (Scenario.End < Scenario.CurrentConfiguration.EndDate)
-            //        Scenario.End = Scenario.CurrentConfiguration.EndDate;
-
-            //    runnable = Scenario.CurrentConfiguration.IsRunnable(out message, JobRunner);
-            //}
-
             return runnable;
         }
-
-        //private void ConfigureScenario()
-        //{
-        //    try
-        //    {
-        //        if (Scenario.CurrentConfiguration == null )
-        //            return;
-
-        //        RunningConfiguration currentConfigPair = Scenario.CurrentConfiguration;//ConfigPair();
-        //        ProjectManager.Instance.CurrentScenarioJobRunner = currentConfigPair.JobRunner;
-        //        if (ProjectManager.Instance.CurrentScenarioJobRunner == null)
-        //        {
-        //            var srtc =
-        //                new ScenarioRunTemporalCharacteristics(Scenario.TemporalSystemRunner,
-        //                                                       SqlDateTime.MinValue.Value,
-        //                                                       SqlDateTime.MaxValue.Value);
-        //            //                                                                  DateTimePicker.MinDateTime.AddYears(1),
-        //            //                                                                  DateTimePicker.MaxDateTime.AddYears(-1), true);
-        //            ProjectManager.Instance.CurrentScenarioJobRunner = new ScenarioJobRunner(Scenario, srtc);
-        //            currentConfigPair.JobRunner = ProjectManager.Instance.CurrentScenarioJobRunner;
-        //        }
-
-        //        ProjectManager.Instance.RefreshScenario(Scenario);
-        //        ProjectManager.Instance.RefreshJobRunner(true);
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        Log.WriteError(this, "Error occured while trying to configure the scenario for running \n" + ex);
-        //        throw;
-        //    }
-        //}
-
-        //private static ConfigurationRunningPair ConfigPair()
-        //{
-        //    Type mf = MainForm.Instance.GetType();
-        //    FieldInfo toolStripField = mf.GetField("toolStripAnalysisList", BindingFlags.NonPublic | BindingFlags.Instance);
-        //    ToolStripComboBox list = (ToolStripComboBox) toolStripField.GetValue(MainForm.Instance );
-        //    return (ConfigurationRunningPair)list.SelectedItem;
-        //}
     }
 }
