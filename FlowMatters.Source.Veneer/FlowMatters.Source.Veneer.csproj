@@ -19,7 +19,7 @@
     <NoWarn>1591,1587</NoWarn>
     <LangVersion>7.3</LangVersion>
     <RootPath>$(MSBuildThisFileDirectory)..\..\</RootPath>
-    <ReferencePath>$(RootPath)Output;$(RootPath)3rdParty</ReferencePath>
+    <ReferencePath>$(RootPath)Output;$(RootPath)3rdParty;;$(RootPath)\Veneer\References;$(RootPath)\Veneer\References\Plugins</ReferencePath>
     <OutputPath>$(RootPath)Output\Plugins\CommunityPlugins</OutputPath>
     <ExcludeEWaterPdbPathMap>true</ExcludeEWaterPdbPathMap>
   </PropertyGroup>

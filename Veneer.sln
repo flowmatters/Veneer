@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 14
-VisualStudioVersion = 14.0.24720.0
+# Visual Studio Version 17
+VisualStudioVersion = 17.8.34330.188
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FlowMatters.Source.Veneer", "FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj", "{3BD8FE40-11EA-4F0E-AB7C-9EA6E3FD1304}"
 EndProject
@@ -40,5 +40,8 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {248FBE4A-4F62-47C0-BC81-AC400AD70391}
 	EndGlobalSection
 EndGlobal

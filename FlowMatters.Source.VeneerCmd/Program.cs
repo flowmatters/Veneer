@@ -198,10 +198,14 @@ namespace FlowMatters.Source.VeneerCmd
             callback.OutputFileName = fn;
             Show(String.Format("Opening project file: {0}", fn));
             loader.OpenProject();
+
             Show("Loading project");
             loader.LoadProject(false);
             Show("Project Loaded");
             var project = loader.ProjectMetaStructure.Project;
+#if V3 || BEFORE_V4_3
+            project.SetFullFilename(fn);
+#endif
             projectHandler = loader;
             return project;
         }
