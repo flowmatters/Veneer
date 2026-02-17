@@ -158,6 +158,8 @@ namespace FlowMatters.Source.Veneer
                 throw new InvalidOperationException("Cannot set scenario when running Veneer in Source user interface");
             }
 
+            // TODO Prevent changing during a simulation!
+
             Log($"Setting scenario: {scenario}");
             var scenarios = Scenario.RiverSystemProject.GetRSScenarios();
             RiverSystemScenario newScenario;
