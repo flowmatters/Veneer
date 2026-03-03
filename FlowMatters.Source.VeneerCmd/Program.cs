@@ -237,12 +237,9 @@ namespace FlowMatters.Source.VeneerCmd
             _server.AllowRemoteConnections = options.RemoteAccess;
             _server.AllowSsl = options.AllowSsl;
 
-            AsyncContext.Run(() => _server.Start());
-            _server.Service.AllowScript = options.AllowScripts;
-            _server.Service.RunningInGUI = false;
-            _server.Service.ProjectHandler = projectHandler;
+            SourceService.InitializeSharedState(scenario, projectHandler, options.AllowScripts, false, customEndpoints);
 
-            customEndpoints.ForEachItem(ep=> _server.Service.RegisterEndPoint(ep));
+            AsyncContext.Run(() => _server.Start());
             if (customEndpoints.Length>0)
             {
                 Console.WriteLine($"Registered {customEndpoints.Length} custom endpoints");
@@ -328,6 +325,9 @@ namespace FlowMatters.Source.VeneerCmd
             loader.LoadProject(false);
             Show("Project Loaded");
             var project = loader.ProjectMetaStructure.Project;
+#if V3 || BEFORE_V4_3
+            project.SetFullFilename(fn);
+#endif
             projectHandler = loader;
             return project;
         }
