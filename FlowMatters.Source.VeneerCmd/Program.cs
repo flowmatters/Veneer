@@ -46,7 +46,7 @@ namespace FlowMatters.Source.VeneerCmd
 
             // Set up configuration (no RiverSystem dependencies here)
             _configuration = new ConfigurationBuilder()
-                .SetBasePath(Directory.GetCurrentDirectory())
+                .SetBasePath(AppDomain.CurrentDomain.BaseDirectory)
                 .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
                 .Build();
 
