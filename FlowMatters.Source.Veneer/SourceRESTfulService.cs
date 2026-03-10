@@ -138,10 +138,7 @@ namespace FlowMatters.Source.Veneer
                                     if (endpoint.Binding is WebHttpBinding b)
                                     {
                                         endpoint.EndpointBehaviors.Add(reply);
-
-                                        // Only add CORS if not ssl
-                                        if (b.Security.Mode != WebHttpSecurityMode.Transport && AllowSsl)
-                                            endpoint.EndpointBehaviors.Add(cors);
+                                        endpoint.EndpointBehaviors.Add(cors);
                                     }
                                 }
                             });
