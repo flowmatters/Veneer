@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using FlowMatters.Source.Veneer;
 using RiverSystem;
@@ -9,7 +9,7 @@ namespace FlowMatters.Source.WebServer
     {
         protected int _port;
         public int Port => _port;
-        public abstract SourceService Service { get;  }
+        public abstract bool AllowScript { get; set; }
         protected AbstractSourceServer(int port)
         {
             _port = port;

@@ -68,7 +68,7 @@ namespace FlowMatters.Source.Veneer
                 if (_scenario != null)
                 {
                     StopServer();
-                    ReportingMenu.ClearMenu();
+                    ReportingMenu.Instance.ClearMenu();
                 }
                 _scenario = value;
               
@@ -84,7 +84,7 @@ namespace FlowMatters.Source.Veneer
         {
             Form parent = ReportingMenu.FindMainForm();
             ReportingMenu.Instance.Control = this;
-            ToolStripMenuItem reportMenu = ReportingMenu.Instance.FindOrCreateReportMenu(parent,_scenario);
+            ReportingMenu.Instance.InitialiseRequiredMenus(parent, _scenario);
         }
 
         private AbstractSourceServer _server;
@@ -98,7 +98,7 @@ namespace FlowMatters.Source.Veneer
             set
             {
                 _allowScripts = value;
-                if (_server != null) _server.Service.AllowScript = value;
+                if (_server != null) _server.AllowScript = value;
             }
         }
         public int Port
@@ -152,7 +152,7 @@ namespace FlowMatters.Source.Veneer
             _server.Start();
             _port = _server.Port;
             PortTxt.GetBindingExpression(TextBox.TextProperty).UpdateTarget();
-            _server.Service.AllowScript = AllowScripts;
+            _server.AllowScript = AllowScripts;
             UpdateButtons();
         }
 

@@ -60,6 +60,8 @@ namespace FlowMatters.Source.Veneer.Addons
 
         public string path { get; set; }
 
+        public string menu { get; set; }
+
     }
 
     public class VeneerOptions
