@@ -1,6 +1,7 @@
 ﻿using System.Data;
 using System.IO;
-using System.ServiceModel;
+//using System.ServiceModel;
+using CoreWCF;
 using CoreWCF.Web;
 using FlowMatters.Source.Veneer.ExchangeObjects;
 using FlowMatters.Source.Veneer.ExchangeObjects.DataSources;

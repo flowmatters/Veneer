@@ -57,7 +57,7 @@ namespace FlowMatters.Source.Veneer
             // Initialize static state before starting the service
             InitializeStaticServiceState();
 
-            var builder = Microsoft.AspNetCore.WebHost.CreateDefaultBuilder()
+            var builder = new WebHostBuilder()
                 .ConfigureServices(services =>
                 {
                     // Add base service model services
@@ -126,6 +126,7 @@ namespace FlowMatters.Source.Veneer
                             builder.AddService<SourceService>();
 
                             // In CoreWCF, we handle host restrictions through the endpoint address
+                            //builder.AddServiceWebEndpoint<SourceService, ISourceService>(binding, "");
                             builder.AddServiceWebEndpoint<SourceService, ISourceService>(binding, $"{protocol}://{host}:{_port}");
 
                             builder.ConfigureServiceHostBase<SourceService>(serviceHost =>
@@ -172,7 +173,7 @@ namespace FlowMatters.Source.Veneer
 
                 await task;
             }
-            catch (AddressAlreadyInUseException)
+            catch (Exception ex) when (IsAddressInUse(ex))
             {
                 _port++; // Keep retrying until we run out of allocated ports
                 await Start();
@@ -209,6 +210,19 @@ namespace FlowMatters.Source.Veneer
                     Log(e.InnerException.StackTrace);
                 }
             }
+        }
+
+        private static bool IsAddressInUse(Exception ex)
+        {
+            // Walk the exception chain looking for socket address-in-use indicators
+            for (var current = ex; current != null; current = current.InnerException)
+            {
+                if (current is System.Net.Sockets.SocketException)
+                    return true;
+                if (current.Message.Contains("Only one usage of each socket address"))
+                    return true;
+            }
+            return false;
         }
 
         private void InitializeStaticServiceState()

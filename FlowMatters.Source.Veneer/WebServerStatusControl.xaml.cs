@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Forms;
 using FlowMatters.Source.Veneer.Addons;
@@ -144,16 +145,38 @@ namespace FlowMatters.Source.Veneer
             }
         }
 
-        private void StartServer()
+        private async void StartServer()
         {
-            _server = new SourceRESTfulService(Port) {AllowRemoteConnections = AllowRemoteConnections, AllowSsl = AllowSsl};
-            _server.Scenario = Scenario;
-            _server.LogGenerator += ServerLogEvent;
-            _server.Start();
-            _port = _server.Port;
-            PortTxt.GetBindingExpression(TextBox.TextProperty).UpdateTarget();
-            _server.AllowScript = AllowScripts;
-            UpdateButtons();
+            try
+            {
+                _server = new SourceRESTfulService(Port) {AllowRemoteConnections = AllowRemoteConnections, AllowSsl = AllowSsl};
+                _server.Scenario = Scenario;
+                _server.LogGenerator += ServerLogEvent;
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await _server.Start();
+                    }
+                    catch (Exception ex)
+                    {
+                        ServerLogEvent(this, $"Server error: {ex.Message}");
+                    }
+                });
+
+                // Wait for the server to start on the thread pool thread
+                while (!_server.Running)
+                    await Task.Delay(100);
+
+                _port = _server.Port;
+                PortTxt.GetBindingExpression(TextBox.TextProperty).UpdateTarget();
+                _server.AllowScript = AllowScripts;
+                UpdateButtons();
+            }
+            catch (Exception ex)
+            {
+                ServerLogEvent(this, $"Failed to start server: {ex.Message}");
+            }
         }
 
         public bool NotRunning { get { return !Running; } }
@@ -170,12 +193,19 @@ namespace FlowMatters.Source.Veneer
                 },null);
         }
 
-        private void StopServer()
+        private async void StopServer()
         {
-            if(Running)
-                _server.Stop();
-            _server = null;
-            UpdateButtons();
+            try
+            {
+                if(Running)
+                    await Task.Run(() => _server.Stop());
+                _server = null;
+                UpdateButtons();
+            }
+            catch (Exception ex)
+            {
+                ServerLogEvent(this, $"Failed to stop server: {ex.Message}");
+            }
         }
 
         public void Dispose()
