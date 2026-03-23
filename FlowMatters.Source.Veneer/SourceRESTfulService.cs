@@ -9,7 +9,9 @@ using CoreWCF.Configuration;
 using CoreWCF.Description;
 using FlowMatters.Source.Veneer.CORS;
 using FlowMatters.Source.Veneer.Formatting;
+using FlowMatters.Source.Veneer.RemoteScripting;
 using FlowMatters.Source.WebServer;
+using RiverSystem.ApplicationLayer.Interfaces;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
@@ -33,6 +35,12 @@ namespace FlowMatters.Source.Veneer
         public bool AllowRemoteConnections { get; set; }
 
         public bool AllowSsl { get; set; }
+
+        public bool RunningInGUI { get; set; } = true;
+
+        public IProjectHandler<RiverSystemProject> ProjectHandler { get; set; }
+
+        public CustomEndPoint[] CustomEndpoints { get; set; }
 
         public override bool AllowScript
         {
@@ -229,9 +237,10 @@ namespace FlowMatters.Source.Veneer
         {
             SourceService.InitializeSharedState(
                 scenario: _scenario,
-                projectHandler: null,
+                projectHandler: ProjectHandler,
                 allowScript: _allowScript,
-                runningInGUI: true
+                runningInGUI: RunningInGUI,
+                customEndpoints: CustomEndpoints
             );
 
             SourceService.SetLogHandler((sender, message, level) => Log(message, level));
