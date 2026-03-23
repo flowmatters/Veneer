@@ -9,7 +9,9 @@ using System.Text;
 using System.Reflection;
 using FlowMatters.Source.Veneer.CORS;
 using FlowMatters.Source.Veneer.Formatting;
+using FlowMatters.Source.Veneer.RemoteScripting;
 using Newtonsoft.Json;
+using RiverSystem.ApplicationLayer.Interfaces;
 using Newtonsoft.Json.Linq;
 using RiverSystem;
 using RiverSystem.ManagedExtensions;
@@ -26,6 +28,12 @@ namespace FlowMatters.Source.WebServer
         private bool _allowScript;
 
         public bool AllowRemoteConnections { get; set; }
+
+        public bool RunningInGUI { get; set; } = true;
+
+        public IProjectHandler<RiverSystemProject> ProjectHandler { get; set; }
+
+        public CustomEndPoint[] CustomEndpoints { get; set; }
 
         public SourceRESTfulService(int port) : base(port)
         {
@@ -132,16 +140,14 @@ namespace FlowMatters.Source.WebServer
 
         private void InitializeStaticServiceState()
         {
-            // Initialize the static state of SourceService
-            // This replaces the need for a singleton instance
             SourceService.InitializeSharedState(
                 scenario: _scenario,
-                projectHandler: null, // You may need to pass this from elsewhere
-                allowScript: AllowScript, // Default values, can be configured
-                runningInGUI: true
+                projectHandler: ProjectHandler,
+                allowScript: AllowScript,
+                runningInGUI: RunningInGUI,
+                customEndpoints: CustomEndpoints
             );
 
-            // Set up logging to route through this service's Log method
             SourceService.SetLogHandler((sender, message, level) => Log(message, level));
         }
 

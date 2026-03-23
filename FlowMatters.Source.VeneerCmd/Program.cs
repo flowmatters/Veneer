@@ -110,25 +110,19 @@ namespace FlowMatters.Source.VeneerCmd
             _server.Scenario = scenario;
             _server.LogGenerator += ServerLogEvent;
             _server.AllowRemoteConnections = options.RemoteAccess;
+            _server.AllowScript = options.AllowScripts;
+            _server.RunningInGUI = false;
+            _server.ProjectHandler = projectHandler;
+            _server.CustomEndpoints = customEndpoints;
 
-            _server.Start();
-            SourceService.InitializeSharedState(
-                scenario,
-                projectHandler,
-                options.AllowScripts,
-                false,
-                customEndpoints);
-            //_server.Service.AllowScript = options.AllowScripts;
-            //_server.Service.RunningInGUI = false;
-            //_server.Service.ProjectHandler = projectHandler;
-
-            //customEndpoints.ForEachItem(ep=> _server.Service.RegisterEndPoint(ep));
-            if (customEndpoints.Length>0)
+            if (customEndpoints.Length > 0)
             {
                 Console.WriteLine($"Registered {customEndpoints.Length} custom endpoints");
             }
 
             Show("Server started. Ctrl-C to exit, or POST /shutdown command");
+
+            _server.Start();
             while (true)
             {
                 Console.ReadLine();
