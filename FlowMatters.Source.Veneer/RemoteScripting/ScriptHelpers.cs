@@ -6,6 +6,7 @@ using FlowMatters.Source.Veneer.ExchangeObjects.DataSources;
 using FlowMatters.Source.WebServer;
 using RiverSystem;
 using RiverSystem.Assurance;
+using AssuranceLogLevel = RiverSystem.Assurance.LogLevel;
 using RiverSystem.Catchments.Models.ContaminantFilteringModels;
 using RiverSystem.Catchments;
 using RiverSystem.Catchments.Constituents;
@@ -302,8 +303,8 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
         public static void ConfigureAssuranceRule(RiverSystemScenario scenario, string level = "Off", string name=null, string category = null)
         {
             var config = scenario.GetScenarioConfiguration<AssuranceConfiguration>();
-            LogLevel logLevel;
-            if (!Enum.TryParse<LogLevel>(level, true, out logLevel))
+            AssuranceLogLevel logLevel;
+            if (!Enum.TryParse<AssuranceLogLevel>(level, true, out logLevel))
             {
                 throw new Exception("Unknown log level");
             }

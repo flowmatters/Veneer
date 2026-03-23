@@ -191,23 +191,23 @@ namespace FlowMatters.Source.Veneer
                                                         ioe.Message.Contains("No server certificate was specified") &&
                                                         ioe.Message.Contains("Unable to configure HTTPS endpoint"))
             {
-                Log("Enabling SSL requires a server certificate.");
-                Log("To generate a developer certificate, run 'dotnet dev-certs https' in a Powershell/Command Prompt window.");
-                Log("To trust the certificate (Windows and macOS only) run 'dotnet dev-certs https --trust'.");
-                Log("Falling back to HTTP only.");
+                Log("Enabling SSL requires a server certificate.", LogLevel.Warning);
+                Log("To generate a developer certificate, run 'dotnet dev-certs https' in a Powershell/Command Prompt window.", LogLevel.Warning);
+                Log("To trust the certificate (Windows and macOS only) run 'dotnet dev-certs https --trust'.", LogLevel.Warning);
+                Log("Falling back to HTTP only.", LogLevel.Warning);
                 AllowSsl = false;
                 await Start();
             }
             catch (Exception e)
             {
-                Log("COULD NOT START VENEER");
-                Log(e.Message);
-                Log(e.StackTrace);
+                Log("COULD NOT START VENEER", LogLevel.Error);
+                Log(e.Message, LogLevel.Error);
+                Log(e.StackTrace, LogLevel.Error);
                 if (e.InnerException != null)
                 {
-                    Log("INNER EXCEPTION:");
-                    Log(e.InnerException.Message);
-                    Log(e.InnerException.StackTrace);
+                    Log("INNER EXCEPTION:", LogLevel.Error);
+                    Log(e.InnerException.Message, LogLevel.Error);
+                    Log(e.InnerException.StackTrace, LogLevel.Error);
                 }
             }
         }
@@ -234,26 +234,26 @@ namespace FlowMatters.Source.Veneer
                 runningInGUI: true
             );
 
-            SourceService.SetLogHandler((sender, message) => Log(message));
+            SourceService.SetLogHandler((sender, message, level) => Log(message, level));
         }
 
         private void LogVeneerPermissionsIssue()
         {
-            Log("For details, see: https://github.com/flowmatters/veneer");
+            Log("For details, see: https://github.com/flowmatters/veneer", LogLevel.Error);
 
             if (AllowRemoteConnections)
             {
-                Log("If you require external connections, you must select a port where Veneer has permissions to accept external connections.");
-                Log($"Veneer does not have permission to accept external (ie non-local) connections on port {_port}");
+                Log("If you require external connections, you must select a port where Veneer has permissions to accept external connections.", LogLevel.Error);
+                Log($"Veneer does not have permission to accept external (ie non-local) connections on port {_port}", LogLevel.Error);
             }
             else
             {
-                Log("Alternatively, enable 'Allow Remote Connections' and restart Veneer.");
-                Log("To establish a local-only connection, select a port where Veneer is NOT registered for external connections.");
-                Log($"This is most likely because Veneer is registered to accept external/non-local connections on port {_port}.");
-                Log($"Veneer does not have permission to accept local-only connections on port {_port}");
+                Log("Alternatively, enable 'Allow Remote Connections' and restart Veneer.", LogLevel.Error);
+                Log("To establish a local-only connection, select a port where Veneer is NOT registered for external connections.", LogLevel.Error);
+                Log($"This is most likely because Veneer is registered to accept external/non-local connections on port {_port}.", LogLevel.Error);
+                Log($"Veneer does not have permission to accept local-only connections on port {_port}", LogLevel.Error);
             }
-            Log($"COULD NOT START VENEER ON PORT {_port}");
+            Log($"COULD NOT START VENEER ON PORT {_port}", LogLevel.Error);
         }
 
         private void RetrieveVeneerStatus()
@@ -263,11 +263,11 @@ namespace FlowMatters.Source.Veneer
                 var response = _httpClient.GetStringAsync(STATUS_URL).GetAwaiter().GetResult();
                 dynamic status = JsonConvert.DeserializeObject(response);
                 JArray messages = status.message;
-                messages.Reverse().Select(e=>e.ToString()).ForEachItem(Log);
+                messages.Reverse().Select(e=>e.ToString()).ForEachItem(m => Log(m));
             }
             catch (Exception ex)
             {
-                Log($"Failed to retrieve Veneer status: {ex.Message}");
+                Log($"Failed to retrieve Veneer status: {ex.Message}", LogLevel.Warning);
             }
         }
 
