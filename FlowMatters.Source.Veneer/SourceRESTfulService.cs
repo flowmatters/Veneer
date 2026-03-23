@@ -89,42 +89,42 @@ namespace FlowMatters.Source.WebServer
                 }
                 catch (AddressAccessDeniedException)
                 {
-                    Log(String.Format("For details, see: https://github.com/flowmatters/veneer"));
+                    Log(String.Format("For details, see: https://github.com/flowmatters/veneer"), LogLevel.Error);
 
                     if (AllowRemoteConnections)
                     {
                         Log(
-                            "If you require external connections, you must select a port where Veneer has permissions to accept external connections.");
+                            "If you require external connections, you must select a port where Veneer has permissions to accept external connections.", LogLevel.Error);
                         Log(
                             String.Format(
                                 "Veneer does not have permission to accept external (ie non-local) connections on port {0}",
-                                _port));
+                                _port), LogLevel.Error);
                     }
                     else
                     {
-                        Log("Alternatively, enable 'Allow Remote Connections' and restart Veneer.");
+                        Log("Alternatively, enable 'Allow Remote Connections' and restart Veneer.", LogLevel.Error);
                         Log(
-                            "To establish a local-only connection, select a port where Veneer is NOT registered for external connections.");
+                            "To establish a local-only connection, select a port where Veneer is NOT registered for external connections.", LogLevel.Error);
                         Log(String.Format(
                             "This is most likely because Veneer is registered to accept external/non-local connections on port {0}.",
-                            _port));
+                            _port), LogLevel.Error);
                         Log(String.Format(
                             "Veneer does not have permission to accept local-only connections on port {0}",
-                            _port));
+                            _port), LogLevel.Error);
                     }
 
-                    Log(String.Format("COULD NOT START VENEER ON PORT {0}", _port));
+                    Log(String.Format("COULD NOT START VENEER ON PORT {0}", _port), LogLevel.Error);
                 }
                 catch (Exception e)
                 {
-                    Log("COULD NOT START VENEER");
-                    Log(e.Message);
-                    Log(e.StackTrace);
+                    Log("COULD NOT START VENEER", LogLevel.Error);
+                    Log(e.Message, LogLevel.Error);
+                    Log(e.StackTrace, LogLevel.Error);
                     if (e.InnerException != null)
                     {
-                        Log("INNER EXCEPTION:");
-                        Log(e.InnerException.Message);
-                        Log(e.InnerException.StackTrace);
+                        Log("INNER EXCEPTION:", LogLevel.Error);
+                        Log(e.InnerException.Message, LogLevel.Error);
+                        Log(e.InnerException.StackTrace, LogLevel.Error);
                     }
                 }
             } while (failedAddressInUse);
@@ -142,7 +142,7 @@ namespace FlowMatters.Source.WebServer
             );
 
             // Set up logging to route through this service's Log method
-            SourceService.SetLogHandler((sender, message) => Log(message));
+            SourceService.SetLogHandler((sender, message, level) => Log(message, level));
         }
 
         public override bool AllowScript
@@ -162,7 +162,7 @@ namespace FlowMatters.Source.WebServer
                 var notifications = wc.DownloadString(STATUS_URL);
                 dynamic status = JsonConvert.DeserializeObject(notifications);
                 JArray messages = status.message;
-                messages.Reverse().Select(e => e.ToString()).ForEachItem(Log);
+                messages.Reverse().Select(e => e.ToString()).ForEachItem(m => Log(m));
             }
         }
 
@@ -189,12 +189,12 @@ namespace FlowMatters.Source.WebServer
 
         void _host_UnknownMessageReceived(object sender, UnknownMessageReceivedEventArgs e)
         {
-            Log(string.Format("Unknown message received: {0}", e.Message));
+            Log(string.Format("Unknown message received: {0}", e.Message), LogLevel.Warning);
         }
 
         void _host_Faulted(object sender, EventArgs e)
         {
-            Log("Service faulted");
+            Log("Service faulted", LogLevel.Error);
             Stop();
             Start();
         }

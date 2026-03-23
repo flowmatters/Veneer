@@ -122,7 +122,7 @@ namespace FlowMatters.Source.Veneer
                 {
                     if (!_runningTask.Wait(5000)) // Wait up to 5 seconds
                     {
-                        logger?.Invoke(this, "Warning: Simulation task did not respond to cancellation within timeout period.");
+                        logger?.Invoke(this, "Warning: Simulation task did not respond to cancellation within timeout period.", LogLevel.Warning);
                     }
 
                     throw new OperationCanceledException("Simulation run was cancelled.");
@@ -130,7 +130,7 @@ namespace FlowMatters.Source.Veneer
             }
             catch (OperationCanceledException)
             {
-                logger?.Invoke(this, "Simulation run was cancelled.");
+                logger?.Invoke(this, "Simulation run was cancelled.", LogLevel.Warning);
                 throw;
             }
             finally
@@ -163,7 +163,7 @@ namespace FlowMatters.Source.Veneer
                 {
                     // Ignore. Not supported in all versions of Source
                     if (logger != null)
-                        logger(this, "Cannot set custom run name. Not supported by this version of Source");
+                        logger(this, "Cannot set custom run name. Not supported by this version of Source", LogLevel.Warning);
                 }
             }
         }

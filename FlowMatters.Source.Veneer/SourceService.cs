@@ -141,7 +141,7 @@ namespace FlowMatters.Source.WebServer
         public VeneerStatus GetRoot()
         {
 //            WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Origin", "*");
-            Log("Requested /");
+            Log("Requested /", LogLevel.Debug);
             return new VeneerStatus(Scenario);
         }
 
@@ -156,7 +156,7 @@ namespace FlowMatters.Source.WebServer
             }
             else
             {
-                Log("Shutdown not supported");
+                Log("Shutdown not supported", LogLevel.Warning);
             }
 
             throw new Exception("Shutdown not supported");
@@ -321,9 +321,9 @@ namespace FlowMatters.Source.WebServer
             }
             catch (Exception e)
             {
-                Log("Run Failed");
-                Log(e.Message);
-                Log(e.StackTrace);
+                Log("Run Failed", LogLevel.Error);
+                Log(e.Message, LogLevel.Error);
+                Log(e.StackTrace, LogLevel.Error);
                 throw new WebFaultException<SimulationFault>(new SimulationFault(e), HttpStatusCode.InternalServerError);
             }
             finally
@@ -362,7 +362,7 @@ namespace FlowMatters.Source.WebServer
 
             if (currentInvoker == null)
             {
-                Log("No active run to cancel.");
+                Log("No active run to cancel.", LogLevel.Warning);
                 WebOperationContext.Current.OutgoingResponse.StatusCode = HttpStatusCode.NotFound;
                 WebOperationContext.Current.OutgoingResponse.StatusDescription = "No active run to cancel";
                 return;
@@ -370,7 +370,7 @@ namespace FlowMatters.Source.WebServer
 
             if (!currentInvoker.IsRunning)
             {
-                Log("No running simulation to cancel.");
+                Log("No running simulation to cancel.", LogLevel.Warning);
                 WebOperationContext.Current.OutgoingResponse.StatusCode = HttpStatusCode.BadRequest;
                 WebOperationContext.Current.OutgoingResponse.StatusDescription = "No running simulation to cancel";
                 return;
@@ -379,12 +379,12 @@ namespace FlowMatters.Source.WebServer
             try
             {
                 currentInvoker.CancelRun();
-                Log("Cancellation request sent to running simulation.");
+                Log("Cancellation request sent to running simulation.", LogLevel.Warning);
                 WebOperationContext.Current.OutgoingResponse.StatusCode = HttpStatusCode.OK;
             }
             catch (Exception e)
             {
-                Log($"Error cancelling run: {e.Message}");
+                Log($"Error cancelling run: {e.Message}", LogLevel.Error);
                 throw new WebFaultException<SimulationFault>(new SimulationFault(e), HttpStatusCode.InternalServerError);
             }
         }
@@ -393,7 +393,7 @@ namespace FlowMatters.Source.WebServer
         [WebInvoke(Method = "GET", UriTemplate = "/runs/status", ResponseFormat = WebMessageFormat.Json)]
         public RunStatus GetRunStatus()
         {
-            Log("Requested run status.");
+            Log("Requested run status.", LogLevel.Debug);
             ScenarioInvoker currentInvoker;
             lock (_runLock)
             {
@@ -1247,10 +1247,10 @@ namespace FlowMatters.Source.WebServer
             return src.Replace("#","").Replace("/","%2F").Replace(":","");
         }
 
-        protected void Log(string query)
+        protected void Log(string query, LogLevel level = LogLevel.Info)
         {
             if (_sharedLogGenerator != null)
-                _sharedLogGenerator(this, query);
+                _sharedLogGenerator(this, query, level);
         }
     }
 }

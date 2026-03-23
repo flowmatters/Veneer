@@ -26,6 +26,7 @@ namespace FlowMatters.Source.VeneerCmd
     class Program
     {
         private static PluginManager _pluginManager;
+        private static LogLevel _minimumLogLevel = LogLevel.Info;
 
         static void Main(string[] args)
         {
@@ -72,6 +73,11 @@ namespace FlowMatters.Source.VeneerCmd
 
         private static void RunWithOptions(Options options)
         {
+            if (Enum.TryParse<LogLevel>(options.LogLevelString, true, out var parsedLevel))
+                _minimumLogLevel = parsedLevel;
+            else
+                Console.WriteLine("Unknown log level '{0}', defaulting to Info.", options.LogLevelString);
+
 // consume Options instance properties
             var fn = (options.ProjectFiles.Count>0)?options.ProjectFiles[0]:null;
             LoadPlugins(options.PluginsToLoad,!options.SkipRegisteredPlugins);
@@ -184,9 +190,10 @@ namespace FlowMatters.Source.VeneerCmd
             return scenario.riverSystemScenario;
         }
 
-        private static void ServerLogEvent(object sender, string msg)
+        private static void ServerLogEvent(object sender, string msg, LogLevel level)
         {
-            Show(msg);
+            if (level >= _minimumLogLevel)
+                Show(msg);
         }
 
         private static IProjectHandler<RiverSystemProject> projectHandler;
@@ -325,6 +332,9 @@ namespace FlowMatters.Source.VeneerCmd
 
         [Option('c', "custom-endpoints", HelpText = "Custom endpoints to enable, specified as command separated list of filenames", DefaultValue = null)]
         public string CustomEndPointFiles{ get; set; }
+
+        [Option('v', "log-level", HelpText = "Minimum log level: Debug, Info, Warning, Error", DefaultValue = "Info")]
+        public string LogLevelString { get; set; }
 
         [ValueList(typeof(List<string>), MaximumElements = 1)]
         public IList<string> ProjectFiles { get; set; }

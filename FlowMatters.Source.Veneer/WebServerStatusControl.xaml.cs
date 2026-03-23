@@ -49,6 +49,7 @@ namespace FlowMatters.Source.WebServerPanel
         private RiverSystemScenario _scenario;
         private SynchronizationContext _originalContext;
         private Timer _timer;
+        private LogLevel _minimumLogLevel = LogLevel.Info;
 
         public WebServerStatusControl()
         {
@@ -59,6 +60,9 @@ namespace FlowMatters.Source.WebServerPanel
             _originalContext = SynchronizationContext.Current;
             this.DataContext = this;
 
+            LogLevelCombo.ItemsSource = Enum.GetValues(typeof(LogLevel));
+            LogLevelCombo.SelectedItem = _minimumLogLevel;
+
             _timer = new Timer(1000.0);
             _timer.AutoReset = false;
             _timer.Elapsed += _timer_Elapsed;
@@ -68,7 +72,7 @@ namespace FlowMatters.Source.WebServerPanel
         private void _timer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
             if (Scenario == null)
-                ServerLogEvent(this, "No active scenario. Load a project file before opening Web Server Monitoring");
+                ServerLogEvent(this, "No active scenario. Load a project file before opening Web Server Monitoring", LogLevel.Warning);
         }
 
         public RiverSystemScenario Scenario
@@ -159,12 +163,40 @@ namespace FlowMatters.Source.WebServerPanel
             get { return (_server != null) && _server.Running; }
         }
 
-        void ServerLogEvent(object sender, string msg)
+        void ServerLogEvent(object sender, string msg, LogLevel level = LogLevel.Info)
         {
-            _originalContext.Post( delegate
-                {
-                    LogBox.Text = msg + "\n" + LogBox.Text;                    
-                },null);
+            _originalContext.Post(delegate
+            {
+                if (level < _minimumLogLevel)
+                    return;
+
+                var scrollViewer = GetScrollViewer(LogBox);
+                bool wasAtBottom = scrollViewer == null ||
+                    scrollViewer.VerticalOffset >= scrollViewer.ScrollableHeight - 10;
+
+                LogBox.AppendText(msg + "\n");
+
+                if (wasAtBottom)
+                    LogBox.ScrollToEnd();
+            }, null);
+        }
+
+        private static System.Windows.Controls.ScrollViewer GetScrollViewer(System.Windows.DependencyObject depObj)
+        {
+            if (depObj is System.Windows.Controls.ScrollViewer sv) return sv;
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(depObj); i++)
+            {
+                var child = VisualTreeHelper.GetChild(depObj, i);
+                var result = GetScrollViewer(child);
+                if (result != null) return result;
+            }
+            return null;
+        }
+
+        private void LogLevelCombo_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        {
+            if (LogLevelCombo.SelectedItem is LogLevel selected)
+                _minimumLogLevel = selected;
         }
 
         private void StopServer()
