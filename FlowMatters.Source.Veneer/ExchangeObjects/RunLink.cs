@@ -7,5 +7,8 @@
         public string DateRun;
         public string Scenario;
         public string Status;
+        public string StartDate;
+        public string EndDate;
+        public string TimeStep;
     }
 }

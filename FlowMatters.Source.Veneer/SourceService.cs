@@ -274,13 +274,17 @@ namespace FlowMatters.Source.WebServer
             for(int i = 0; i < runs.Length; i++)
             {
                 var run = runs[i];
+                var meta = run.MetaData;
                 links[i] = new RunLink
                     {
                         RunName = run.Name,
                         RunUrl = "/runs/" + run.RunNumber,
                         DateRun = run.DateRun.ToString(CultureInfo.InvariantCulture),
                         Scenario = run.Scenario.Name,
-                        Status = run.RunResultIndicator.ToString()
+                        Status = run.RunResultIndicator.ToString(),
+                        StartDate = meta.ContainsKey("ConfigurationStartDate") ? meta["ConfigurationStartDate"]?.ToString() : null,
+                        EndDate = meta.ContainsKey("ConfigurationEndDate") ? meta["ConfigurationEndDate"]?.ToString() : null,
+                        TimeStep = meta.ContainsKey("ConfigurationTimeStep") ? meta["ConfigurationTimeStep"]?.ToString() : null
                     };
             }
 
