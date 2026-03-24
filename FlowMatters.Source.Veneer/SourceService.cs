@@ -1,4 +1,4 @@
-#if V3 || V4_0 || V4_1 || V4_2 || V4_3 || V4_4 || V4_5
+﻿#if V3 || V4_0 || V4_1 || V4_2 || V4_3 || V4_4 || V4_5
 #define BEFORE_RECORDING_ATTRIBUTES_REFACTOR
 #endif
 
@@ -44,6 +44,7 @@ namespace FlowMatters.Source.Veneer
     [System.ServiceModel.ServiceKnownType(typeof(double[][]))]
     [System.ServiceModel.ServiceKnownType(typeof(double[][][]))]
     [System.ServiceModel.ServiceKnownType(typeof(double[][][][]))]
+    [ServiceBehavior(InstanceContextMode = InstanceContextMode.PerCall, ConcurrencyMode = ConcurrencyMode.Multiple, UseSynchronizationContext = false)]
     public class SourceService : ISourceService
     {
         // Static state shared across PerCall instances
@@ -270,13 +271,17 @@ namespace FlowMatters.Source.Veneer
             for(int i = 0; i < runs.Length; i++)
             {
                 var run = runs[i];
+                var meta = run.MetaData;
                 links[i] = new RunLink
                     {
                         RunName = run.Name,
                         RunUrl = "/runs/" + run.RunNumber,
                         DateRun = run.DateRun.ToString(CultureInfo.InvariantCulture),
                         Scenario = run.Scenario.Name,
-                        Status = run.RunResultIndicator.ToString()
+                        Status = run.RunResultIndicator.ToString(),
+                        StartDate = meta.ContainsKey("ConfigurationStartDate") ? meta["ConfigurationStartDate"]?.ToString() : null,
+                        EndDate = meta.ContainsKey("ConfigurationEndDate") ? meta["ConfigurationEndDate"]?.ToString() : null,
+                        TimeStep = meta.ContainsKey("ConfigurationTimeStep") ? meta["ConfigurationTimeStep"]?.ToString() : null
                     };
             }
 

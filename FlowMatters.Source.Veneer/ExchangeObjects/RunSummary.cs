@@ -25,6 +25,14 @@ namespace FlowMatters.Source.WebServer.ExchangeObjects
             Results = BuildResultsArray(r.RunParameters.GetRowsForScenario(r.Scenario.id).ToArray());
             Status = r.RunResultIndicator.ToString();
             RunLog = new string[0];
+
+            var meta = r.MetaData;
+            if (meta != null)
+            {
+                StartDate = meta.ContainsKey("ConfigurationStartDate") ? meta["ConfigurationStartDate"]?.ToString() : null;
+                EndDate = meta.ContainsKey("ConfigurationEndDate") ? meta["ConfigurationEndDate"]?.ToString() : null;
+                TimeStep = meta.ContainsKey("ConfigurationTimeStep") ? meta["ConfigurationTimeStep"]?.ToString() : null;
+            }
         }
 
         private TimeSeriesLink[] BuildResultsArray(ProjectViewRow[] rows)
@@ -125,5 +133,14 @@ namespace FlowMatters.Source.WebServer.ExchangeObjects
         public string Status;
 
         [DataMember] public string[] RunLog;
+
+        [DataMember]
+        public string StartDate;
+
+        [DataMember]
+        public string EndDate;
+
+        [DataMember]
+        public string TimeStep;
     }
 }
