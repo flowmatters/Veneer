@@ -46,6 +46,9 @@ namespace FlowMatters.Source.WebServerPanel
         public static bool DefaultAllowRemote = false;
         public static bool DefaultAllowScripts = false;
 
+        private static WebServerStatusControl _activeInstance;
+        public static WebServerStatusControl ActiveInstance => _activeInstance;
+
         private RiverSystemScenario _scenario;
         private SynchronizationContext _originalContext;
         private Timer _timer;
@@ -53,6 +56,7 @@ namespace FlowMatters.Source.WebServerPanel
 
         public WebServerStatusControl()
         {
+            _activeInstance = this;
             Port = DefaultPort;
             AllowRemoteConnections = DefaultAllowRemote;
             AllowScripts = DefaultAllowScripts;
@@ -211,6 +215,8 @@ namespace FlowMatters.Source.WebServerPanel
         {
             StopServer();
             UpdateButtons();
+            if (_activeInstance == this)
+                _activeInstance = null;
         }
 
         private void ClearBtn_OnClick(object sender, RoutedEventArgs e)
@@ -253,12 +259,19 @@ namespace FlowMatters.Source.WebServerPanel
 
             MainForm.Instance.Invoke(new Action(() =>
             {
+                // If a Veneer panel already exists, bring it to front instead of creating a duplicate
+                var existingPanel = WebServerStatusPanel.ActivePanel;
+                if (existingPanel != null)
+                {
+                    existingPanel.ActivateWindow();
+                    return;
+                }
+
                 var t = typeof(MenuPluginHelper);
                 var invoker = t.GetMethod("ShowAnalysisWindow", BindingFlags.NonPublic | BindingFlags.Instance);
                 invoker.Invoke(MainForm.Instance.MenuPluginHelper, new[]
                 {
                     typeof(WebServerStatusPanel)
-                    //null
                 });
             }));
 #endif
