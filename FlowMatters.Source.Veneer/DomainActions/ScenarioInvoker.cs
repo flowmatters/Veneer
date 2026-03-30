@@ -11,12 +11,14 @@ using RiverSystem;
 using RiverSystem.ApplicationLayer.Consumer.Forms;
 using RiverSystem.Controls.UI.ModelRun;
 using RiverSystem.DataManagement.DataManager;
+using RiverSystem.Forms;
 //using RiverSystem.Tracking;
 using TIME.DataTypes;
 using TIME.ScenarioManagement.Execution;
 using TIME.ScenarioManagement.RunManagement;
 using TIME.Winforms.UI.Utils;
 using FlowMatters.Source.Veneer.ExchangeObjects;
+using RiverSystem.Controls.UI;
 using TIME.Management;
 using TIME.Tools.Reflection;
 #if V3 || V4_0 || V4_1 || V4_2_0 || V4_2_1 || V4_2_2 || V4_2_3 || V4_2_4 || V4_2_5
@@ -94,8 +96,11 @@ namespace FlowMatters.Source.Veneer
 
             if (showWindow)
             {
-                runWindow = new ScenarioRunWindow(Scenario);
-                runWindow.Show();
+                MainForm.Instance.Invoke(new Action(() =>
+                {
+                    runWindow = new ScenarioRunWindow(Scenario);
+                    runWindow.Show();
+                }));
                 ProjectManager.Instance.SaveAuditLogMessage("Run started at " + DateTime.Now);
             }
 
@@ -142,8 +147,11 @@ namespace FlowMatters.Source.Veneer
                 if (showWindow && runWindow != null)
                 {
                     ProjectManager.Instance.SaveAuditLogMessage("Run finished at " + DateTime.Now + " and took " + TimeTools.TimeSpanString(DateTime.Now - startOfRun));
-                    runWindow.Close();
-                    runWindow.Dispose();
+                    MainForm.Instance.Invoke(new Action(() =>
+                    {
+                        runWindow.Close();
+                        runWindow.Dispose();
+                    }));
                 }
             }
 
