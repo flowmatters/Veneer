@@ -95,8 +95,11 @@ namespace FlowMatters.Source.Veneer
 
             if (showWindow)
             {
-                runWindow = new ScenarioRunWindow(Scenario);
-                runWindow.Show();
+                MainForm.Instance.Invoke(new Action(() =>
+                {
+                    runWindow = new ScenarioRunWindow(Scenario);
+                    runWindow.Show();
+                }));
                 ProjectManager.Instance.SaveAuditLogMessage("Run started at " + DateTime.Now);
             }
 
@@ -145,8 +148,11 @@ namespace FlowMatters.Source.Veneer
                 if (showWindow && runWindow != null)
                 {
                     ProjectManager.Instance.SaveAuditLogMessage("Run finished at " + DateTime.Now + " and took " + TimeTools.TimeSpanString(DateTime.Now - startOfRun));
-                    runWindow.Close();
-                    runWindow.Dispose();
+                    MainForm.Instance.Invoke(new Action(() =>
+                    {
+                        runWindow.Close();
+                        runWindow.Dispose();
+                    }));
                 }
             }
 
