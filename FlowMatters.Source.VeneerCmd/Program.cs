@@ -189,6 +189,7 @@ namespace FlowMatters.Source.VeneerCmd
         private static void RunWithRiverSystemDependencies(Options options)
         {
             SynchronizationContext.SetSynchronizationContext(new SynchronizationContext());
+            FlowMatters.Source.Veneer.AutoStart.InitialiseOnLoadAttribute.MarkInitialised();
             Constants.SetLargeDataOptions();
             try
             {
