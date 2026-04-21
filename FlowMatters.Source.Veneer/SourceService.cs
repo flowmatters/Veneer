@@ -47,7 +47,7 @@ using TIME.ScenarioManagement;
 
 namespace FlowMatters.Source.WebServer
 {
-    [ServiceContract,ServiceBehavior(InstanceContextMode = InstanceContextMode.PerCall, ConcurrencyMode = ConcurrencyMode.Multiple)]
+    [ServiceContract,ServiceBehavior(InstanceContextMode = InstanceContextMode.PerCall, ConcurrencyMode = ConcurrencyMode.Multiple, UseSynchronizationContext = false)]
     [ServiceKnownType(typeof(double[]))]
     [ServiceKnownType(typeof(double[][]))]
     [ServiceKnownType(typeof(double[][][]))]

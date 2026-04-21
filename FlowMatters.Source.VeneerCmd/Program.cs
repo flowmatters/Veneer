@@ -31,6 +31,7 @@ namespace FlowMatters.Source.VeneerCmd
         static void Main(string[] args)
         {
             SynchronizationContext.SetSynchronizationContext(new SynchronizationContext());
+            FlowMatters.Source.Veneer.AutoStart.InitialiseOnLoadAttribute.MarkInitialised();
             Constants.SetLargeDataOptions();
             try
             {
