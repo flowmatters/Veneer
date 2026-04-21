@@ -253,8 +253,6 @@ namespace FlowMatters.Source.VeneerCmd
                 Console.WriteLine($"Registered {customEndpoints.Length} custom endpoints");
             }
 
-            Show("Server started. Ctrl-C to exit, or POST /shutdown command");
-
             AsyncContext.Run(() => _server.Start());
             while (true)
             {

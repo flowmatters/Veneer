@@ -29,7 +29,6 @@ namespace FlowMatters.Source.Veneer
         private IWebHost _host;
         private RiverSystemScenario _scenario;
         private List<int> _registeredOnPorts = new List<int>();
-        private bool _isEndpointRegistered = false;
         private bool _allowScript;
 
         public bool AllowRemoteConnections { get; set; }
@@ -111,49 +110,37 @@ namespace FlowMatters.Source.Veneer
                 {
                     app.UseServiceModel(builder =>
                     {
-                        if (!_isEndpointRegistered)
+                        var binding = new WebHttpBinding
                         {
-                            // Create the web binding
-                            var binding = new WebHttpBinding
-                            {
-                                MaxReceivedMessageSize = 1024 * 1024 * 1024 // 1 gigabyte
-                            };
+                            MaxReceivedMessageSize = 1024 * 1024 * 1024 // 1 gigabyte
+                        };
 
-                            // Set https if applicable
-                            var protocol = "http";
-                            if (AllowSsl)
-                            {
-                                protocol = "https";
-                                binding.Security = new WebHttpSecurity { Mode = WebHttpSecurityMode.Transport };
-                            }
-
-                            // Different urls for local and remote connections
-                            var host = AllowRemoteConnections ? "0.0.0.0" : "localhost";
-
-                            // Register the service type
-                            builder.AddService<SourceService>();
-
-                            // In CoreWCF, we handle host restrictions through the endpoint address
-                            //builder.AddServiceWebEndpoint<SourceService, ISourceService>(binding, "");
-                            builder.AddServiceWebEndpoint<SourceService, ISourceService>(binding, $"{protocol}://{host}:{_port}");
-
-                            builder.ConfigureServiceHostBase<SourceService>(serviceHost =>
-                            {
-                                var reply = new ReplyFormatSwitchBehaviour();
-                                var cors = new EnableCrossOriginResourceSharingBehavior();
-
-                                foreach (var endpoint in serviceHost.Description.Endpoints)
-                                {
-                                    if (endpoint.Binding is WebHttpBinding b)
-                                    {
-                                        endpoint.EndpointBehaviors.Add(reply);
-                                        endpoint.EndpointBehaviors.Add(cors);
-                                    }
-                                }
-                            });
-
-                            _isEndpointRegistered = true;
+                        var protocol = "http";
+                        if (AllowSsl)
+                        {
+                            protocol = "https";
+                            binding.Security = new WebHttpSecurity { Mode = WebHttpSecurityMode.Transport };
                         }
+
+                        var host = AllowRemoteConnections ? "0.0.0.0" : "localhost";
+
+                        builder.AddService<SourceService>();
+                        builder.AddServiceWebEndpoint<SourceService, ISourceService>(binding, $"{protocol}://{host}:{_port}");
+
+                        builder.ConfigureServiceHostBase<SourceService>(serviceHost =>
+                        {
+                            var reply = new ReplyFormatSwitchBehaviour();
+                            var cors = new EnableCrossOriginResourceSharingBehavior();
+
+                            foreach (var endpoint in serviceHost.Description.Endpoints)
+                            {
+                                if (endpoint.Binding is WebHttpBinding b)
+                                {
+                                    endpoint.EndpointBehaviors.Add(reply);
+                                    endpoint.EndpointBehaviors.Add(cors);
+                                }
+                            }
+                        });
                     });
                 });
 
@@ -161,7 +148,10 @@ namespace FlowMatters.Source.Veneer
             {
                 Running = false;
                 _host = builder.Build();
-                var task = _host.RunAsync();
+
+                // StartAsync performs the Kestrel bind. AddressInUse / permission errors surface here,
+                // so the readiness logs below only run after the listen socket is actually bound.
+                await _host.StartAsync();
 
                 Log("Veneer, by Flow Matters: https://www.flowmatters.com.au");
                 try
@@ -179,7 +169,7 @@ namespace FlowMatters.Source.Veneer
 
                 Running = true;
 
-                await task;
+                await _host.WaitForShutdownAsync();
             }
             catch (Exception ex) when (IsAddressInUse(ex))
             {
@@ -309,7 +299,6 @@ namespace FlowMatters.Source.Veneer
                 Log("Stopping Service");
                 await _host.StopAsync();
                 _host = null;
-                _isEndpointRegistered = false;
             }
             Running = false;
         }
