@@ -39,9 +39,24 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
             MemoryStream errorStream = new MemoryStream();
             StringWriter errorWriter = new StringWriter();
 
+            ScriptEngine engine = null;
             try
             {
-                var engine = Python.CreateEngine();
+                if (script.Debug)
+                {
+                    var options = new Dictionary<string, object>
+                    {
+                        { "Debug", true },
+                        { "Frames", true },
+                        { "FullFrames", true },
+                        { "Tracing", true },
+                    };
+                    engine = Python.CreateEngine(options);
+                }
+                else
+                {
+                    engine = Python.CreateEngine();
+                }
 
                 if(SynchronizationContext.Current==null)
                     SynchronizationContext.SetSynchronizationContext(new SynchronizationContext());
@@ -65,7 +80,16 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
             }
             catch (Exception e)
             {
-                ex = new SimpleException(e);
+                string pythonTrace = "Could not get Python stack trace";
+                try
+                {
+                    pythonTrace = engine?.GetService<ExceptionOperations>()?.FormatException(e);
+                }
+                catch
+                {
+                    // FormatException can itself fail if the exception didn't originate from Python
+                }
+                ex = new SimpleException(e, pythonTrace);
             }
 
             return new IronPythonResponse()
