@@ -26,6 +26,18 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
 {
     class ScriptRunner
     {
+        private static readonly Lazy<ScriptEngine> SharedEngine =
+            new Lazy<ScriptEngine>(CreateAndConfigureEngine, LazyThreadSafetyMode.ExecutionAndPublication);
+
+        private static readonly object EngineLock = new object();
+
+        private static ScriptEngine CreateAndConfigureEngine()
+        {
+            var engine = Python.CreateEngine();
+            AddAssemblyReferences(engine);
+            return engine;
+        }
+
         public RiverSystemScenario Scenario { get; set; }
         public IProjectHandler<RiverSystemProject> ProjectHandler { get; set; }
 
@@ -41,27 +53,29 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
 
             try
             {
-                var engine = Python.CreateEngine();
-
                 if(SynchronizationContext.Current==null)
                     SynchronizationContext.SetSynchronizationContext(new SynchronizationContext());
 
-                AddAssemblyReferences(engine);
-                engine.Runtime.IO.SetOutput(outputStream, outputWriter);
-                engine.Runtime.IO.SetErrorOutput(errorStream, errorWriter);
+                var engine = SharedEngine.Value;
 
-                var scope = engine.CreateScope();
-                scope.SetVariable("scenario", Scenario);
-
-                if (ProjectHandler == null)
+                lock (EngineLock)
                 {
-                    ProjectHandler = ProjectManager.Instance?.ProjectHandler;
+                    engine.Runtime.IO.SetOutput(outputStream, outputWriter);
+                    engine.Runtime.IO.SetErrorOutput(errorStream, errorWriter);
+
+                    var scope = engine.CreateScope();
+                    scope.SetVariable("scenario", Scenario);
+
+                    if (ProjectHandler == null)
+                    {
+                        ProjectHandler = ProjectManager.Instance?.ProjectHandler;
+                    }
+                    scope.SetVariable("project_handler", ProjectHandler);
+                    var sourceCode = engine.CreateScriptSourceFromString(script.Script);
+                    actual = sourceCode.Execute<object>(scope);
+                    if (scope.ContainsVariable("result"))
+                        actual = scope.GetVariable("result");
                 }
-                scope.SetVariable("project_handler", ProjectHandler);
-                var sourceCode = engine.CreateScriptSourceFromString(script.Script);
-                actual = sourceCode.Execute<object>(scope);
-                if (scope.ContainsVariable("result"))
-                    actual = scope.GetVariable("result");
             }
             catch (Exception e)
             {
