@@ -7,5 +7,6 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
     public class IronPythonScript
     {
         [DataMember] public string Script { get; set; }
+        [DataMember] public bool Debug { get; set; }
     }
 }
