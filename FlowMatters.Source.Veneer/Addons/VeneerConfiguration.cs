@@ -57,9 +57,7 @@ namespace FlowMatters.Source.Veneer.Addons
             VeneerConfiguration config,
             RiverSystemScenario currentScenario)
         {
-            var filter = !string.IsNullOrEmpty(addon?.scenario)
-                ? addon.scenario
-                : config?.targetScenario;
+            var filter = EffectiveFilter(addon, config);
 
             if (string.IsNullOrEmpty(filter)) return true;
             if (currentScenario == null) return false;
