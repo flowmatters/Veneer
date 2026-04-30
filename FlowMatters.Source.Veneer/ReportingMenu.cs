@@ -12,6 +12,8 @@ using FlowMatters.Source.WebServer;
 using FlowMatters.Source.WebServerPanel;
 using RiverSystem;
 using RiverSystem.Api;
+using RiverSystem.Forms;
+using TIME.Management;
 
 namespace FlowMatters.Source.Veneer
 {
@@ -82,6 +84,7 @@ namespace FlowMatters.Source.Veneer
                 }
 
                 var config = VeneerConfiguration.Load(Scenario);
+                var currentScenario = MainForm.Instance.CurrentScenario;
                 if (config?.addons != null)
                 {
                     var addonsForMenu = config.addons.Where(a => GetTopLevelMenu(a.menu) == mnu);
@@ -102,6 +105,16 @@ namespace FlowMatters.Source.Veneer
                                 item.Click += (o, args) => LaunchExeAddon(addon.path);
                                 break;
 
+                        }
+
+                        if (!VeneerConfiguration.AddonAppliesTo(addon, config, currentScenario))
+                        {
+                            var filter = VeneerConfiguration.EffectiveFilter(addon, config);
+                            item.Enabled = false;
+                            item.ToolTipText = $"Requires scenario '{filter}' to be active";
+                            TIME.Management.Log.WriteError(
+                                this,
+                                $"Veneer addon '{addon.name}' disabled: requires scenario '{filter}', current is '{currentScenario?.Name ?? "none"}'");
                         }
                     }
                 }
