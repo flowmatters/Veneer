@@ -2,6 +2,7 @@
 using System.IO;
 using System.Reflection;
 using System.Windows.Forms;
+using FlowMatters.Source.WebServer;
 using FlowMatters.Source.WebServerPanel;
 using RiverSystem;
 using RiverSystem.ApplicationLayer.Consumer.Forms;
