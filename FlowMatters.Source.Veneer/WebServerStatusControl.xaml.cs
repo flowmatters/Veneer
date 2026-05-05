@@ -54,6 +54,17 @@ namespace FlowMatters.Source.WebServerPanel
         private Timer _timer;
         private LogLevel _minimumLogLevel = LogLevel.Info;
 
+        private string _boundScenarioName = "(none)";
+        public string BoundScenarioName
+        {
+            get { return _boundScenarioName; }
+            private set
+            {
+                _boundScenarioName = value;
+                // Task 2 will wire UpdateTarget once BoundScenarioLabel is added to the XAML.
+            }
+        }
+
         public WebServerStatusControl()
         {
             _activeInstance = this;
@@ -90,7 +101,9 @@ namespace FlowMatters.Source.WebServerPanel
                     ReportingMenu.Instance.ClearMenu();
                 }
                 _scenario = value;
-              
+
+                BoundScenarioName = _scenario != null ? _scenario.Name : "(none)";
+
                 if(_scenario != null)
                 {
                     StartServer();
