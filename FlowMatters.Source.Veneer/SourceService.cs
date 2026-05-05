@@ -49,7 +49,7 @@ namespace FlowMatters.Source.Veneer
     {
         // Static state shared across PerCall instances
         private static Dictionary<int,string[]> _runLogs = new Dictionary<int,string[]>();
-        private static ScenarioInvoker _currentScenarioInvoker;
+        internal static ScenarioInvoker _currentScenarioInvoker;
         private static readonly object _runLock = new object();
 
         private static RiverSystemScenario _sharedScenario;

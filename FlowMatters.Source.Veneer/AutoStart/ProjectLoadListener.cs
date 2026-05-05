@@ -28,6 +28,8 @@ namespace FlowMatters.Source.Veneer.AutoStart
         }
 
         private ProjectManager _pm;
+        private RiverSystem.RiverSystemScenario _lastSeen;
+        private bool _tickInProgress;
 
         internal enum ScenarioTransition
         {
@@ -65,6 +67,11 @@ namespace FlowMatters.Source.Veneer.AutoStart
             {
                 _pm.ProjectLoaded += _pm_ProjectLoaded;
             }
+
+            _timer = new Timer(1000.0);
+            _timer.AutoReset = true;
+            _timer.Elapsed += _timer_Elapsed;
+            _timer.Start();
         }
 
         private void _pm_ProjectLoaded(object sender,
@@ -75,22 +82,6 @@ namespace FlowMatters.Source.Veneer.AutoStart
             {
                 e.Project.SetFullFilename(combined);
             }
-
-            var scenarios = e.Project.GetRSScenarios();
-            if (scenarios.Length == 0)
-            {
-                return;
-            }
-
-            if (!scenarios[0].Loaded)
-            {
-                return;
-            }
-
-            _timer = new Timer(1000.0);
-            _timer.AutoReset = false;
-            _timer.Elapsed += _timer_Elapsed;
-            _timer.Start();
         }
 
         private Timer _timer;
@@ -98,18 +89,68 @@ namespace FlowMatters.Source.Veneer.AutoStart
         private void _timer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
 #if V4 && BEFORE_V4_3
+            return;
 #else
-            if (MainForm.Instance.CurrentScenario == null)
+            if (_tickInProgress) return;
+            _tickInProgress = true;
+            try
             {
-                _timer = new Timer(1000.0);
-                _timer.AutoReset = false;
-                _timer.Elapsed += _timer_Elapsed;
-                _timer.Start();
-                return;
-            }
+                if (MainForm.Instance == null) return;
 
-            ScenarioLoaded();
+                var current = MainForm.Instance.CurrentScenario;
+                var runInProgress = SourceService._currentScenarioInvoker != null
+                                    && SourceService._currentScenarioInvoker.IsRunning;
+
+                var transition = Classify(_lastSeen, current, runInProgress);
+
+                switch (transition)
+                {
+                    case ScenarioTransition.None:
+                        return;
+
+                    case ScenarioTransition.DeferredDueToRun:
+                        // Task 5 adds one-shot deferred-rebind logging here.
+                        return;
+
+                    case ScenarioTransition.FirstSighting:
+                        MainForm.Instance.Invoke(new Action(() => ScenarioLoaded()));
+                        _lastSeen = current;
+                        return;
+
+                    case ScenarioTransition.Rebind:
+                    case ScenarioTransition.Cleared:
+                        MainForm.Instance.Invoke(new Action(() => ApplyScenarioChange(current)));
+                        _lastSeen = current;
+                        return;
+                }
+            }
+            catch (Exception ex)
+            {
+                try { TIME.Management.Log.WriteError(this, "Veneer scenario watcher tick failed: " + ex.Message); }
+                catch { /* never let logging kill the watcher */ }
+            }
+            finally
+            {
+                _tickInProgress = false;
+            }
 #endif
+        }
+
+        private void ApplyScenarioChange(RiverSystem.RiverSystemScenario newScenario)
+        {
+            var control = WebServerStatusControl.ActiveInstance;
+            if (control != null)
+            {
+                control.Scenario = newScenario;
+            }
+            else
+            {
+                ReportingMenu.Instance.ClearMenu();
+                if (newScenario != null)
+                {
+                    ReportingMenu.Instance.InitialiseRequiredMenus(MainForm.Instance, newScenario);
+                }
+            }
         }
 
         private void ScenarioLoaded()
