@@ -30,6 +30,7 @@ namespace FlowMatters.Source.Veneer.AutoStart
         private ProjectManager _pm;
         private RiverSystem.RiverSystemScenario _lastSeen;
         private bool _tickInProgress;
+        private RiverSystem.RiverSystemScenario _deferredRebindTarget;
 
         internal enum ScenarioTransition
         {
@@ -106,19 +107,34 @@ namespace FlowMatters.Source.Veneer.AutoStart
                 switch (transition)
                 {
                     case ScenarioTransition.None:
+                        _deferredRebindTarget = null;
                         return;
 
                     case ScenarioTransition.DeferredDueToRun:
-                        // Task 5 adds one-shot deferred-rebind logging here.
+                        if (!ReferenceEquals(_deferredRebindTarget, current))
+                        {
+                            _deferredRebindTarget = current;
+                            var oldName = _lastSeen != null ? _lastSeen.Name : "none";
+                            var newName = current != null ? current.Name : "none";
+                            TIME.Management.Log.WriteInfo(this, string.Format(
+                                "Veneer scenario change detected ({0} → {1}) but a run is in progress; rebind deferred",
+                                oldName, newName));
+                        }
                         return;
 
                     case ScenarioTransition.FirstSighting:
+                        _deferredRebindTarget = null;
                         MainForm.Instance.Invoke(new Action(() => ScenarioLoaded()));
                         _lastSeen = current;
                         return;
 
                     case ScenarioTransition.Rebind:
                     case ScenarioTransition.Cleared:
+                        _deferredRebindTarget = null;
+                        var fromName = _lastSeen != null ? _lastSeen.Name : "none";
+                        var toName = current != null ? current.Name : "none";
+                        TIME.Management.Log.WriteInfo(this,
+                            string.Format("Veneer active scenario changed: {0} → {1}", fromName, toName));
                         MainForm.Instance.Invoke(new Action(() => ApplyScenarioChange(current)));
                         _lastSeen = current;
                         return;
