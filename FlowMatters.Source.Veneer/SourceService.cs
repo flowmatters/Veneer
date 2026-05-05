@@ -56,7 +56,7 @@ namespace FlowMatters.Source.WebServer
     {
         // Make these static to maintain state across instances
         private static Dictionary<int,string[]> _runLogs = new Dictionary<int,string[]>();
-        private static ScenarioInvoker _currentScenarioInvoker; // Track current running scenario invoker
+        internal static ScenarioInvoker _currentScenarioInvoker; // Track current running scenario invoker
         private static readonly object _runLock = new object(); // Thread safety for run operations
 
         private static RiverSystemScenario _sharedScenario;
