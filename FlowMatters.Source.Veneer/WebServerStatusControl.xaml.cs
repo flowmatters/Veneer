@@ -51,7 +51,8 @@ namespace FlowMatters.Source.Veneer
             private set
             {
                 _boundScenarioName = value;
-                // Task 2 will wire UpdateTarget once BoundScenarioLabel is added to the XAML.
+                if (BoundScenarioLabel != null)
+                    BoundScenarioLabel.GetBindingExpression(System.Windows.Controls.Label.ContentProperty)?.UpdateTarget();
             }
         }
 
