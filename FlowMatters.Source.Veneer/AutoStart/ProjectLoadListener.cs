@@ -28,6 +28,36 @@ namespace FlowMatters.Source.Veneer.AutoStart
         }
 
         private ProjectManager _pm;
+
+        internal enum ScenarioTransition
+        {
+            None,
+            FirstSighting,
+            Rebind,
+            Cleared,
+            DeferredDueToRun,
+        }
+
+        internal static ScenarioTransition Classify(
+            RiverSystem.RiverSystemScenario lastSeen,
+            RiverSystem.RiverSystemScenario current,
+            bool runInProgress)
+        {
+            if (ReferenceEquals(lastSeen, current))
+                return ScenarioTransition.None;
+
+            if (runInProgress)
+                return ScenarioTransition.DeferredDueToRun;
+
+            if (lastSeen == null)
+                return ScenarioTransition.FirstSighting;
+
+            if (current == null)
+                return ScenarioTransition.Cleared;
+
+            return ScenarioTransition.Rebind;
+        }
+
         protected ProjectLoadListener()
         {
             _pm = ProjectManager.Instance;
