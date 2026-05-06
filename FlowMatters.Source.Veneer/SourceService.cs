@@ -92,6 +92,7 @@ namespace FlowMatters.Source.WebServer
             // Get the shared scenario from a static location
             // You'll need to ensure the scenario is accessible statically
             Scenario = _sharedScenario;
+            ProjectHandler = _sharedProjectHandler;
         }
 
         private static RiverSystemScenario GetCurrentScenario()
