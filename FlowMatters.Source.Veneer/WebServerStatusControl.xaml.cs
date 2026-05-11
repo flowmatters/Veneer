@@ -4,9 +4,11 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Forms;
 using FlowMatters.Source.Veneer.Addons;
+using System.Windows.Controls;
 using FlowMatters.Source.WebServer;
 using FlowMatters.Source.WebServerPanel;
 using Newtonsoft.Json;
@@ -34,12 +36,17 @@ namespace FlowMatters.Source.Veneer
         public static bool DefaultAllowScripts = false;
         public static bool DefaultAllowSsl = false;
 
+        private static WebServerStatusControl _activeInstance;
+        public static WebServerStatusControl ActiveInstance => _activeInstance;
+
         private RiverSystemScenario _scenario;
         private SynchronizationContext _originalContext;
         private Timer _timer;
+        private LogLevel _minimumLogLevel = LogLevel.Info;
 
         public WebServerStatusControl()
         {
+            _activeInstance = this;
             Port = DefaultPort;
             AllowRemoteConnections = DefaultAllowRemote;
             AllowSsl = DefaultAllowSsl;
@@ -47,6 +54,9 @@ namespace FlowMatters.Source.Veneer
             InitializeComponent();
             _originalContext = SynchronizationContext.Current;
             this.DataContext = this;
+
+            LogLevelCombo.ItemsSource = Enum.GetValues(typeof(LogLevel));
+            LogLevelCombo.SelectedItem = _minimumLogLevel;
 
             _timer = new Timer(1000.0);
             _timer.AutoReset = false;
@@ -57,7 +67,7 @@ namespace FlowMatters.Source.Veneer
         private void _timer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
             if (Scenario == null)
-                ServerLogEvent(this, "No active scenario. Load a project file before opening Web Server Monitoring");
+                ServerLogEvent(this, "No active scenario. Load a project file before opening Web Server Monitoring", LogLevel.Warning);
         }
 
         public RiverSystemScenario Scenario
@@ -131,7 +141,7 @@ namespace FlowMatters.Source.Veneer
             {
                 _allowSsl = value;
                 if (value)
-                    ServerLogEvent(this, "Note: Enabling SSL requires a valid SSL certificate.");
+                    ServerLogEvent(this, "Note: Enabling SSL requires a valid SSL certificate.", LogLevel.Warning);
                 RestartIfRunning();
             }
         }
@@ -144,16 +154,38 @@ namespace FlowMatters.Source.Veneer
             }
         }
 
-        private void StartServer()
+        private async void StartServer()
         {
-            _server = new SourceRESTfulService(Port) {AllowRemoteConnections = AllowRemoteConnections, AllowSsl = AllowSsl};
-            _server.Scenario = Scenario;
-            _server.LogGenerator += ServerLogEvent;
-            _server.Start();
-            _port = _server.Port;
-            PortTxt.GetBindingExpression(TextBox.TextProperty).UpdateTarget();
-            _server.AllowScript = AllowScripts;
-            UpdateButtons();
+            try
+            {
+                _server = new SourceRESTfulService(Port) {AllowRemoteConnections = AllowRemoteConnections, AllowSsl = AllowSsl};
+                _server.Scenario = Scenario;
+                _server.LogGenerator += ServerLogEvent;
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await _server.Start();
+                    }
+                    catch (Exception ex)
+                    {
+                        ServerLogEvent(this, $"Server error: {ex.Message}", LogLevel.Error);
+                    }
+                });
+
+                // Wait for the server to start on the thread pool thread
+                while (!_server.Running)
+                    await Task.Delay(100);
+
+                _port = _server.Port;
+                PortTxt.GetBindingExpression(TextBox.TextProperty).UpdateTarget();
+                _server.AllowScript = AllowScripts;
+                UpdateButtons();
+            }
+            catch (Exception ex)
+            {
+                ServerLogEvent(this, $"Failed to start server: {ex.Message}", LogLevel.Error);
+            }
         }
 
         public bool NotRunning { get { return !Running; } }
@@ -162,26 +194,63 @@ namespace FlowMatters.Source.Veneer
             get { return (_server != null) && _server.Running; }
         }
 
-        void ServerLogEvent(object sender, string msg)
+        void ServerLogEvent(object sender, string msg, LogLevel level = LogLevel.Info)
         {
-            _originalContext.Post( delegate
-                {
-                    LogBox.Text = msg + "\n" + LogBox.Text;                    
-                },null);
+            _originalContext.Post(delegate
+            {
+                if (level < _minimumLogLevel)
+                    return;
+
+                var scrollViewer = GetScrollViewer(LogBox);
+                bool wasAtBottom = scrollViewer == null ||
+                    scrollViewer.VerticalOffset >= scrollViewer.ScrollableHeight - 10;
+
+                LogBox.AppendText(msg + "\n");
+
+                if (wasAtBottom)
+                    LogBox.ScrollToEnd();
+            }, null);
         }
 
-        private void StopServer()
+        private static ScrollViewer GetScrollViewer(DependencyObject depObj)
         {
-            if(Running)
-                _server.Stop();
-            _server = null;
-            UpdateButtons();
+            if (depObj is ScrollViewer sv) return sv;
+            for (int i = 0; i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(depObj); i++)
+            {
+                var child = System.Windows.Media.VisualTreeHelper.GetChild(depObj, i);
+                var result = GetScrollViewer(child);
+                if (result != null) return result;
+            }
+            return null;
+        }
+
+        private void LogLevelCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (LogLevelCombo.SelectedItem is LogLevel selected)
+                _minimumLogLevel = selected;
+        }
+
+        private async void StopServer()
+        {
+            try
+            {
+                if(Running)
+                    await Task.Run(() => _server.Stop());
+                _server = null;
+                UpdateButtons();
+            }
+            catch (Exception ex)
+            {
+                ServerLogEvent(this, $"Failed to stop server: {ex.Message}", LogLevel.Error);
+            }
         }
 
         public void Dispose()
         {
             StopServer();
             UpdateButtons();
+            if (_activeInstance == this)
+                _activeInstance = null;
         }
 
         private void ClearBtn_OnClick(object sender, RoutedEventArgs e)
@@ -224,12 +293,19 @@ namespace FlowMatters.Source.Veneer
 
             MainForm.Instance.Invoke(new Action(() =>
             {
+                // If a Veneer panel already exists, bring it to front instead of creating a duplicate
+                var existingPanel = WebServerStatusPanel.ActivePanel;
+                if (existingPanel != null)
+                {
+                    existingPanel.ActivateWindow();
+                    return;
+                }
+
                 var t = typeof(MenuPluginHelper);
                 var invoker = t.GetMethod("ShowAnalysisWindow", BindingFlags.NonPublic | BindingFlags.Instance);
                 invoker.Invoke(MainForm.Instance.MenuPluginHelper, new[]
                 {
                     typeof(WebServerStatusPanel)
-                    //null
                 });
             }));
 #endif
