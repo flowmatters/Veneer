@@ -336,6 +336,16 @@
     <EmbeddedResource Include="WebServerStatusPanel.resx">
       <DependentUpon>WebServerStatusPanel.cs</DependentUpon>
     </EmbeddedResource>
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\NodeIcons\circle.svg" />
+    <EmbeddedResource Include="Resources\NodeIcons\triangle.svg" />
+    <EmbeddedResource Include="Resources\NodeIcons\diamond.svg" />
+    <EmbeddedResource Include="Resources\NodeIcons\hexagon.svg" />
+    <EmbeddedResource Include="Resources\NodeIcons\plus.svg" />
+    <EmbeddedResource Include="Resources\NodeIcons\trapezoid.svg" />
+  </ItemGroup>
+  <ItemGroup>
     <None Include="Lib\abc.py" />
     <None Include="Lib\aifc.py" />
     <None Include="Lib\antigravity.py" />
