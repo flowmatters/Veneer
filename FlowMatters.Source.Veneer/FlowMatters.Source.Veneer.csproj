@@ -279,6 +279,7 @@
     <Compile Include="Formatting\TableResponseFormatter.cs" />
     <Compile Include="Formatting\TimeSeriesResponseFormatter.cs" />
     <Compile Include="Formatting\ReplyFormatSwitchBehaviour.cs" />
+    <Compile Include="Formatting\SchematicNameSanitiser.cs" />
     <Compile Include="ExchangeObjects\FunctionValue.cs" />
     <Compile Include="ExchangeObjects\InputSetSummary.cs" />
     <Compile Include="AutoStart\InitialiseOnLoadAttribute.cs" />
@@ -297,6 +298,7 @@
     <Compile Include="SourceService.cs" />
     <Compile Include="UriTemplates.cs" />
     <Compile Include="VariableSummary.cs" />
+    <Compile Include="Tests\SchematicNameSanitiserTests.cs" />
     <Compile Include="WebServerStatusPanel.cs">
       <SubType>UserControl</SubType>
     </Compile>
