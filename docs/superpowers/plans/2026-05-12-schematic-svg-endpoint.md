@@ -590,8 +590,12 @@ namespace FlowMatters.Source.Veneer.Formatting
         private const string DefaultNodeFill = "#cccccc";
         private const string DefaultNodeStroke = "#333333";
 
-        public static SchematicSvgResult Build(Network network, SchematicNetworkConfigurationPersistent schematic)
+        public static SchematicSvgResult Build(Network network, SchematicNetworkConfigurationPersistent schematic, string resourceBaseUrl)
         {
+            // resourceBaseUrl is the scheme+authority of the Veneer host (e.g. "http://localhost:9876"),
+            // used to make PNG-fallback <image href="..."> absolute. The widget inlines the SVG into the
+            // dashboard's DOM, so relative URLs would resolve against the dashboard's origin and miss.
+            // Same-document <use href="#veneer-icon-..."> fragment references are unaffected.
             // 1. Resolve schematic coordinates for every node.
             var nodes = network.nodes.Cast<Node>().ToList();
             var locations = nodes
@@ -619,7 +623,7 @@ namespace FlowMatters.Source.Veneer.Formatting
             EmitDefs(sb);
             EmitStyle(sb);
             sidecar.Links = EmitLinks(sb, nodes, links, locations, linkTagNames);
-            sidecar.Nodes = EmitNodes(sb, nodes, locations, nodeTagNames, bbox.IconSize);
+            sidecar.Nodes = EmitNodes(sb, nodes, locations, nodeTagNames, bbox.IconSize, resourceBaseUrl);
             EmitSvgFooter(sb);
 
             return new SchematicSvgResult { Svg = sb.ToString(), Sidecar = sidecar };
@@ -767,7 +771,8 @@ namespace FlowMatters.Source.Veneer.Formatting
             List<Node> nodes,
             List<PointF> locations,
             List<string> nodeTagNames,
-            double iconSize)
+            double iconSize,
+            string resourceBaseUrl)
         {
             var sidecarNodes = new List<SchematicNodeTag>(nodes.Count);
             sb.Append("<g class=\"veneer-nodes\">");
@@ -814,7 +819,7 @@ namespace FlowMatters.Source.Veneer.Formatting
                 else
                 {
                     var iconRes = WebUtility.UrlEncode(ResourceNameForNode(n));
-                    sb.Append("<image href=\"/resources/").Append(iconRes).Append("\"")
+                    sb.Append("<image href=\"").Append(resourceBaseUrl).Append("/resources/").Append(iconRes).Append("\"")
                       .Append(" x=\"").Append(F(x))
                       .Append("\" y=\"").Append(F(y))
                       .Append("\" width=\"").Append(F(iconSize))
@@ -1016,7 +1021,8 @@ public Stream GetSchematicSvg()
             "scenario has no schematic; use /network for geographic coordinates");
     }
 
-    var result = SchematicSvgBuilder.Build(Scenario.Network, schematic);
+    var resourceBaseUrl = GetResourceBaseUrl();
+    var result = SchematicSvgBuilder.Build(Scenario.Network, schematic, resourceBaseUrl);
     WebOperationContext.Current.OutgoingResponse.ContentType = "image/svg+xml";
     return new MemoryStream(Encoding.UTF8.GetBytes(result.Svg));
 }
@@ -1040,7 +1046,7 @@ public SchematicTagMap GetSchematicSvgTags()
         return null;
     }
 
-    var result = SchematicSvgBuilder.Build(Scenario.Network, schematic);
+    var result = SchematicSvgBuilder.Build(Scenario.Network, schematic, GetResourceBaseUrl());
     return result.Sidecar;
 }
 
@@ -1051,10 +1057,18 @@ private static Stream WriteJsonError(HttpStatusCode status, string message)
     var json = "{\"error\":\"" + message.Replace("\"", "\\\"") + "\"}";
     return new MemoryStream(Encoding.UTF8.GetBytes(json));
 }
+
+private static string GetResourceBaseUrl()
+{
+    // Scheme + authority of the request that hit us; used to make PNG icon hrefs absolute so
+    // the dashboard widget (which inlines the SVG into its own document) can still resolve them.
+    var uri = WebOperationContext.Current.IncomingRequest.UriTemplateMatch.RequestUri;
+    return uri.GetLeftPart(UriPartial.Authority);
+}
 ```
 
 Notes on integration:
-- `Scenario` is the `protected RiverSystemScenario Scenario` accessor on `SourceService` (resolved from `_sharedScenario` per the per-call constructor at line 94).
+- `Scenario` is the public `RiverSystemScenario Scenario` accessor on `SourceService` (resolved from `_sharedScenario` per the per-call constructor at line 94).
 - `ScriptHelpers.GetSchematic` at line 298 returns a newly-created empty `SchematicNetworkConfigurationPersistent` if none is stored — hence the `ExistingFeatureShapeProperties.Count == 0` check, which is the actual signal that no schematic has been authored.
 - Returning `Stream` for the SVG keeps the WCF dispatcher from JSON-wrapping the response; the existing `GetResource` endpoint (line 218–231) is the precedent.
 - `WriteJsonError` is local to the SVG endpoint; if the codebase already has a JSON error helper, prefer that (none exists at the time of writing).
