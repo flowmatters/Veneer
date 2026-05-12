@@ -121,18 +121,33 @@ A small `<style>` block at the top of the document gives clicked elements a defa
 
 ### Defaults
 
-The root `<svg>` declares document-wide defaults via `data-default-*` so every element renders sensibly when no row is selected or when a column is null:
+The widget's `data-default-<name>` lookup is keyed by the **exact tag name** — it does not decompose tags. So `$link_5_stroke$` only falls back to `data-default-link_5_stroke`, not to a document-wide `data-default-link-stroke`. To guarantee that an unbound document renders as a grey skeleton diagram (rather than leaving literal `$link_5_stroke$` text in the output, per the authoring guide), every `$tag$` must have a matching `data-default-<tag>` somewhere in the document.
+
+**Emit per-element defaults.** For each link emit:
 
 ```xml
-data-default-link-stroke="#888888"
-data-default-link-stroke-width="2"
-data-default-link-opacity="1"
-data-default-node-fill="#cccccc"
-data-default-node-stroke="#333333"
-data-default-node-opacity="1"
+data-default-link_<tag>_stroke="#888888"
+data-default-link_<tag>_stroke_width="2"
+data-default-link_<tag>_opacity="1"
+data-default-link_<tag>_label="<link.Name escaped>"
 ```
 
-The widget's `data-default-<name>` lookup is keyed by tag name, so `$link_5_stroke$` falls back to the value of `data-default-link-5-stroke` — but we don't emit per-element defaults, so the global ones above are what actually apply via the widget's fallback chain. (Equivalent to: dashboard table missing → grey skeleton diagram.)
+For each SVG-restylable node emit:
+
+```xml
+data-default-node_<tag>_fill="#cccccc"
+data-default-node_<tag>_stroke="#333333"
+data-default-node_<tag>_opacity="1"
+data-default-node_<tag>_label="<node.Name escaped>"
+```
+
+For each PNG-fallback node, only `opacity` and `label` defaults are emitted (matching the `tags` list).
+
+Defaults live as attributes on the element they apply to — keying is per-tag-name, but co-locating defaults with their consuming element keeps the document self-documenting and avoids a separate "defaults block" that planners must keep in sync with element emission. The authoring guide explicitly notes defaults can live on any element.
+
+`label` defaults use the element's display name (HTML-escaped, since `data-default-*` values are inserted as-is without re-escaping per the authoring guide line 84-86).
+
+Size impact: each link adds ~4 attributes and each styleable node ~4 attributes; for a 500-element network this is roughly 4–8 KB of additional markup — acceptable.
 
 ## Coordinates and sizing
 
@@ -155,13 +170,7 @@ Single global size: `iconSize = diag / 80` where `diag = sqrt(width² + height²
 
 ```xml
 <svg xmlns="http://www.w3.org/2000/svg"
-     viewBox="<minX> <minY> <width> <height>"
-     data-default-link-stroke="#888888"
-     data-default-link-stroke-width="2"
-     data-default-link-opacity="1"
-     data-default-node-fill="#cccccc"
-     data-default-node-stroke="#333333"
-     data-default-node-opacity="1">
+     viewBox="<minX> <minY> <width> <height>">
   <defs>
     <symbol id="veneer-icon-circle"    viewBox="-1 -1 2 2">…</symbol>
     <symbol id="veneer-icon-triangle"  viewBox="-1 -1 2 2">…</symbol>
@@ -180,7 +189,11 @@ Single global size: `iconSize = diag / 80` where `diag = sqrt(width² + height²
           stroke="$link_<tag>_stroke$"
           stroke-width="$link_<tag>_stroke_width$"
           opacity="$link_<tag>_opacity$"
-          data-hg-value="link:<tag>">
+          data-hg-value="link:<tag>"
+          data-default-link_<tag>_stroke="#888888"
+          data-default-link_<tag>_stroke_width="2"
+          data-default-link_<tag>_opacity="1"
+          data-default-link_<tag>_label="<link.Name escaped>">
       <title>$link_<tag>_label$</title>
     </line>
     <!-- one per link -->
@@ -193,7 +206,11 @@ Single global size: `iconSize = diag / 80` where `diag = sqrt(width² + height²
          fill="$node_<tag>_fill$"
          stroke="$node_<tag>_stroke$"
          opacity="$node_<tag>_opacity$"
-         data-hg-value="node:<tag>">
+         data-hg-value="node:<tag>"
+         data-default-node_<tag>_fill="#cccccc"
+         data-default-node_<tag>_stroke="#333333"
+         data-default-node_<tag>_opacity="1"
+         data-default-node_<tag>_label="<node.Name escaped>">
       <title>$node_<tag>_label$</title>
     </use>
 
@@ -201,7 +218,9 @@ Single global size: `iconSize = diag / 80` where `diag = sqrt(width² + height²
     <image href="/resources/<IconName>"
            x="…" y="…" width="…" height="…"
            opacity="$node_<tag>_opacity$"
-           data-hg-value="node:<tag>">
+           data-hg-value="node:<tag>"
+           data-default-node_<tag>_opacity="1"
+           data-default-node_<tag>_label="<node.Name escaped>">
       <title>$node_<tag>_label$</title>
     </image>
   </g>
