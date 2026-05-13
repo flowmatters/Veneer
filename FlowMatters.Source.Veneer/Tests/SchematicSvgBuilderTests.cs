@@ -21,8 +21,8 @@ namespace FlowMatters.Source.Veneer.Tests
             Assert.That(result[1], Is.EqualTo(-55.0).Within(1e-9));  // minY (flipped)
             Assert.That(result[2], Is.EqualTo(110.0).Within(1e-9)); // width
             Assert.That(result[3], Is.EqualTo(60.0).Within(1e-9));  // height
-            // iconSize = sqrt(100^2 + 50^2) / 80
-            Assert.That(result[4], Is.EqualTo(System.Math.Sqrt(12500) / 80.0).Within(1e-9));
+            // iconSize = sqrt(100^2 + 50^2) / 240
+            Assert.That(result[4], Is.EqualTo(System.Math.Sqrt(12500) / 240.0).Within(1e-9));
         }
 
         [Test]

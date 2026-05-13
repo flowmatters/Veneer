@@ -22,11 +22,19 @@ namespace FlowMatters.Source.Veneer.Formatting
 
     internal static class SchematicSvgBuilder
     {
+        // Defaults are applied via a <style> block with class selectors. When the widget
+        // substitutes a $tag$ into inline style="...", the inline value wins. When the tag
+        // doesn't resolve (static render, or no row bound), the literal "$tag$" stays inside
+        // style="...", browsers drop it as an invalid CSS value, and the class-rule default
+        // applies. That's how unbound documents still render as a grey skeleton.
         private const string DefaultLinkStroke = "#888888";
         private const string DefaultLinkStrokeWidth = "2";
         private const string DefaultOpacity = "1";
         private const string DefaultNodeFill = "#cccccc";
         private const string DefaultNodeStroke = "#333333";
+
+        // Icon size is computed as bbox-diagonal / IconSizeDivisor. Higher = smaller icons.
+        private const double IconSizeDivisor = 240.0;
 
         public static SchematicSvgResult Build(Network network, SchematicNetworkConfigurationPersistent schematic, string resourceBaseUrl)
         {
@@ -95,7 +103,7 @@ namespace FlowMatters.Source.Veneer.Formatting
                 return new BBox
                 {
                     MinX = cx - 50, MinY = cy - 50, Width = 100, Height = 100,
-                    IconSize = 100.0 / 80.0
+                    IconSize = 100.0 / IconSizeDivisor
                 };
             }
 
@@ -120,7 +128,7 @@ namespace FlowMatters.Source.Veneer.Formatting
                 Height = rawHeight + 2 * pad,
             };
             var diag = Math.Sqrt(rawWidth * rawWidth + rawHeight * rawHeight);
-            padded.IconSize = diag / 80.0;
+            padded.IconSize = diag / IconSizeDivisor;
             return padded;
         }
 
@@ -154,8 +162,17 @@ namespace FlowMatters.Source.Veneer.Formatting
 
         private static void EmitStyle(StringBuilder sb)
         {
-            // Dashboard widget toggles .hg-selected on click; the rule below provides a fallback.
-            sb.Append("<style>[data-hg-value]{cursor:pointer;}.hg-selected{stroke:#1a73e8;stroke-width:3;}</style>");
+            sb.Append("<style>")
+              .Append(".veneer-links line{stroke:").Append(DefaultLinkStroke)
+              .Append(";stroke-width:").Append(DefaultLinkStrokeWidth)
+              .Append(";opacity:").Append(DefaultOpacity).Append(";}")
+              .Append(".veneer-nodes use{fill:").Append(DefaultNodeFill)
+              .Append(";stroke:").Append(DefaultNodeStroke)
+              .Append(";opacity:").Append(DefaultOpacity).Append(";}")
+              .Append(".veneer-nodes image{opacity:").Append(DefaultOpacity).Append(";}")
+              .Append("[data-hg-value]{cursor:pointer;}")
+              .Append(".hg-selected{stroke:#1a73e8;stroke-width:3;}")
+              .Append("</style>");
         }
 
         private static SchematicLinkTag[] EmitLinks(
@@ -184,19 +201,14 @@ namespace FlowMatters.Source.Veneer.Formatting
                 var fromLoc = locations[fromIdx];
                 var toLoc = locations[toIdx];
 
-                var nameEsc = HtmlEscape(link.Name);
                 sb.Append("<line x1=\"").Append(F(fromLoc.X))
                   .Append("\" y1=\"").Append(F(-fromLoc.Y))
                   .Append("\" x2=\"").Append(F(toLoc.X))
                   .Append("\" y2=\"").Append(F(-toLoc.Y))
-                  .Append("\" stroke=\"$link_").Append(tag).Append("_stroke$\"")
-                  .Append(" stroke-width=\"$link_").Append(tag).Append("_stroke_width$\"")
-                  .Append(" opacity=\"$link_").Append(tag).Append("_opacity$\"")
+                  .Append("\" style=\"stroke:$link_").Append(tag).Append("_stroke$")
+                  .Append(";stroke-width:$link_").Append(tag).Append("_stroke_width$")
+                  .Append(";opacity:$link_").Append(tag).Append("_opacity$\"")
                   .Append(" data-hg-value=\"link:").Append(tag).Append("\"")
-                  .Append(" data-default-link_").Append(tag).Append("_stroke=\"").Append(DefaultLinkStroke).Append("\"")
-                  .Append(" data-default-link_").Append(tag).Append("_stroke_width=\"").Append(DefaultLinkStrokeWidth).Append("\"")
-                  .Append(" data-default-link_").Append(tag).Append("_opacity=\"").Append(DefaultOpacity).Append("\"")
-                  .Append(" data-default-link_").Append(tag).Append("_label=\"").Append(nameEsc).Append("\"")
                   .Append("><title>$link_").Append(tag).Append("_label$</title></line>");
 
                 sidecarLinks.Add(new SchematicLinkTag
@@ -232,7 +244,7 @@ namespace FlowMatters.Source.Veneer.Formatting
 
                 var x = loc.X - iconSize / 2.0;
                 var y = -loc.Y - iconSize / 2.0;
-                var nameEsc = HtmlEscape(n.Name);
+                var modelTypeAttr = modelTypeName != null ? HtmlEscape(modelTypeName) : "";
 
                 if (shape != null)
                 {
@@ -241,14 +253,11 @@ namespace FlowMatters.Source.Veneer.Formatting
                       .Append("\" y=\"").Append(F(y))
                       .Append("\" width=\"").Append(F(iconSize))
                       .Append("\" height=\"").Append(F(iconSize)).Append("\"")
-                      .Append(" fill=\"$node_").Append(tag).Append("_fill$\"")
-                      .Append(" stroke=\"$node_").Append(tag).Append("_stroke$\"")
-                      .Append(" opacity=\"$node_").Append(tag).Append("_opacity$\"")
+                      .Append(" style=\"fill:$node_").Append(tag).Append("_fill$")
+                      .Append(";stroke:$node_").Append(tag).Append("_stroke$")
+                      .Append(";opacity:$node_").Append(tag).Append("_opacity$\"")
                       .Append(" data-hg-value=\"node:").Append(tag).Append("\"")
-                      .Append(" data-default-node_").Append(tag).Append("_fill=\"").Append(DefaultNodeFill).Append("\"")
-                      .Append(" data-default-node_").Append(tag).Append("_stroke=\"").Append(DefaultNodeStroke).Append("\"")
-                      .Append(" data-default-node_").Append(tag).Append("_opacity=\"").Append(DefaultOpacity).Append("\"")
-                      .Append(" data-default-node_").Append(tag).Append("_label=\"").Append(nameEsc).Append("\"")
+                      .Append(" data-veneer-model-type=\"").Append(modelTypeAttr).Append("\"")
                       .Append("><title>$node_").Append(tag).Append("_label$</title></use>");
 
                     sidecarNodes.Add(new SchematicNodeTag
@@ -269,10 +278,9 @@ namespace FlowMatters.Source.Veneer.Formatting
                       .Append("\" y=\"").Append(F(y))
                       .Append("\" width=\"").Append(F(iconSize))
                       .Append("\" height=\"").Append(F(iconSize)).Append("\"")
-                      .Append(" opacity=\"$node_").Append(tag).Append("_opacity$\"")
+                      .Append(" style=\"opacity:$node_").Append(tag).Append("_opacity$\"")
                       .Append(" data-hg-value=\"node:").Append(tag).Append("\"")
-                      .Append(" data-default-node_").Append(tag).Append("_opacity=\"").Append(DefaultOpacity).Append("\"")
-                      .Append(" data-default-node_").Append(tag).Append("_label=\"").Append(nameEsc).Append("\"")
+                      .Append(" data-veneer-model-type=\"").Append(modelTypeAttr).Append("\"")
                       .Append("><title>$node_").Append(tag).Append("_label$</title></image>");
 
                     sidecarNodes.Add(new SchematicNodeTag
