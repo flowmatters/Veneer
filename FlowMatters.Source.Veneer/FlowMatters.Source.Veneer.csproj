@@ -262,6 +262,7 @@
     <Compile Include="ExchangeObjects\RunLink.cs" />
     <Compile Include="ExchangeObjects\RunParameters.cs" />
     <Compile Include="ExchangeObjects\RunSummary.cs" />
+    <Compile Include="ExchangeObjects\SchematicTagMap.cs" />
     <Compile Include="ExchangeObjects\SimpleException.cs" />
     <Compile Include="ExchangeObjects\SimplePiecewise.cs" />
     <Compile Include="ExchangeObjects\SimpleTimeSeries.cs" />
