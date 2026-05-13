@@ -249,6 +249,67 @@ namespace FlowMatters.Source.WebServer
         }
 
         [OperationContract]
+        [WebInvoke(Method = "GET", UriTemplate = UriTemplates.SchematicSvg)]
+        public Stream GetSchematicSvg()
+        {
+            Log("Requested schematic SVG");
+            if (Scenario == null)
+                return WriteJsonError(HttpStatusCode.NotFound, "no scenario loaded");
+
+            var schematic = ScriptHelpers.GetSchematic(Scenario);
+            if (schematic == null || schematic.ExistingFeatureShapeProperties == null ||
+                schematic.ExistingFeatureShapeProperties.Count == 0)
+            {
+                return WriteJsonError(HttpStatusCode.NotFound,
+                    "scenario has no schematic; use /network for geographic coordinates");
+            }
+
+            var resourceBaseUrl = GetResourceBaseUrl();
+            var result = SchematicSvgBuilder.Build(Scenario.Network, schematic, resourceBaseUrl);
+            WebOperationContext.Current.OutgoingResponse.ContentType = "image/svg+xml";
+            return new MemoryStream(Encoding.UTF8.GetBytes(result.Svg));
+        }
+
+        [OperationContract]
+        [WebInvoke(Method = "GET", ResponseFormat = WebMessageFormat.Json, UriTemplate = UriTemplates.SchematicSvgTags)]
+        public SchematicTagMap GetSchematicSvgTags()
+        {
+            Log("Requested schematic SVG tags");
+            if (Scenario == null)
+            {
+                WebOperationContext.Current.OutgoingResponse.StatusCode = HttpStatusCode.NotFound;
+                return null;
+            }
+
+            var schematic = ScriptHelpers.GetSchematic(Scenario);
+            if (schematic == null || schematic.ExistingFeatureShapeProperties == null ||
+                schematic.ExistingFeatureShapeProperties.Count == 0)
+            {
+                WebOperationContext.Current.OutgoingResponse.StatusCode = HttpStatusCode.NotFound;
+                return null;
+            }
+
+            var result = SchematicSvgBuilder.Build(Scenario.Network, schematic, GetResourceBaseUrl());
+            return result.Sidecar;
+        }
+
+        private static Stream WriteJsonError(HttpStatusCode status, string message)
+        {
+            WebOperationContext.Current.OutgoingResponse.StatusCode = status;
+            WebOperationContext.Current.OutgoingResponse.ContentType = "application/json";
+            var json = "{\"error\":\"" + message.Replace("\"", "\\\"") + "\"}";
+            return new MemoryStream(Encoding.UTF8.GetBytes(json));
+        }
+
+        private static string GetResourceBaseUrl()
+        {
+            // Scheme + authority of the request that hit us; used to make PNG icon hrefs absolute so
+            // the dashboard widget (which inlines the SVG into its own document) can still resolve them.
+            var uri = WebOperationContext.Current.IncomingRequest.UriTemplateMatch.RequestUri;
+            return uri.GetLeftPart(UriPartial.Authority);
+        }
+
+        [OperationContract]
         [WebInvoke(Method = "GET", ResponseFormat = WebMessageFormat.Json, UriTemplate = UriTemplates.Node)]
         public GeoJSONFeature GetNode(string nodeId)
         {
