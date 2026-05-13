@@ -15,14 +15,14 @@ namespace FlowMatters.Source.Veneer.Formatting
         private static readonly Dictionary<string, string> TypeToShape =
             new Dictionary<string, string>(StringComparer.Ordinal)
             {
-                { "InflowNodeModel",                  "plus" },
-                { "ConfluenceNodeModel",              "circle" },
-                { "GaugeNodeModel",                   "trapezoid" },
-                { "StorageNodeModel",                 "triangle" },
-                { "SupplyPointNodeModel",             "diamond" },
-                { "MinimumFlowRequirementNodeModel",  "hexagon" },
-                { "MaximumFlowConstraintNodeModel",   "hexagon" },
-                // Variants found in different Source versions can be added here as discovered.
+                // Names verified against actual NodeModel.GetType().Name in a live scenario.
+                { "InjectedFlow",               "plus" },      // inflow
+                { "ConfluenceNodeModel",        "circle" },
+                { "GaugeNodeModel",             "trapezoid" },
+                { "StorageNodeModel",           "triangle" },
+                { "ExtractionNodeModel",        "diamond" },   // supply point
+                { "MinimumFlowConstraintModel", "hexagon" },   // minimum flow
+                { "RiverConstraintNodeModel",   "hexagon" },   // maximum flow constraint
             };
 
         private static readonly string[] AllShapes =
