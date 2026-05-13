@@ -91,15 +91,16 @@ namespace FlowMatters.Source.Veneer.Formatting
 
         private static BBox ComputeBoundingBox(List<PointF> sourceLocations)
         {
-            // Source schematic Y grows upward; SVG y grows downward. We negate Y at emit time.
-            // For the viewBox, that means after flip: minY' = -maxY_source, maxY' = -minY_source.
+            // Source schematic Y already grows downward (same as SVG), so coordinates pass through
+            // unchanged. Flipping previously made the diagram appear upside-down relative to
+            // Source's schematic editor view.
             if (sourceLocations.Count == 0 ||
                 (sourceLocations.All(p => Math.Abs(p.X - sourceLocations[0].X) < 1e-9 &&
                                           Math.Abs(p.Y - sourceLocations[0].Y) < 1e-9)))
             {
                 // Degenerate: single point or empty — use a 100x100 centred viewBox.
                 var cx = sourceLocations.Count > 0 ? sourceLocations[0].X : 0.0;
-                var cy = sourceLocations.Count > 0 ? -sourceLocations[0].Y : 0.0;
+                var cy = sourceLocations.Count > 0 ? sourceLocations[0].Y : 0.0;
                 return new BBox
                 {
                     MinX = cx - 50, MinY = cy - 50, Width = 100, Height = 100,
@@ -109,12 +110,8 @@ namespace FlowMatters.Source.Veneer.Formatting
 
             var minX = sourceLocations.Min(p => (double)p.X);
             var maxX = sourceLocations.Max(p => (double)p.X);
-            var minYsrc = sourceLocations.Min(p => (double)p.Y);
-            var maxYsrc = sourceLocations.Max(p => (double)p.Y);
-
-            // Flipped Y
-            var minY = -maxYsrc;
-            var maxY = -minYsrc;
+            var minY = sourceLocations.Min(p => (double)p.Y);
+            var maxY = sourceLocations.Max(p => (double)p.Y);
 
             var rawWidth = maxX - minX;
             var rawHeight = maxY - minY;
@@ -202,9 +199,9 @@ namespace FlowMatters.Source.Veneer.Formatting
                 var toLoc = locations[toIdx];
 
                 sb.Append("<line x1=\"").Append(F(fromLoc.X))
-                  .Append("\" y1=\"").Append(F(-fromLoc.Y))
+                  .Append("\" y1=\"").Append(F(fromLoc.Y))
                   .Append("\" x2=\"").Append(F(toLoc.X))
-                  .Append("\" y2=\"").Append(F(-toLoc.Y))
+                  .Append("\" y2=\"").Append(F(toLoc.Y))
                   .Append("\" style=\"stroke:$link_").Append(tag).Append("_stroke$")
                   .Append(";stroke-width:$link_").Append(tag).Append("_stroke_width$")
                   .Append(";opacity:$link_").Append(tag).Append("_opacity$\"")
@@ -243,7 +240,7 @@ namespace FlowMatters.Source.Veneer.Formatting
                 var shape = NodeIconLibrary.GetShapeFor(modelTypeName);
 
                 var x = loc.X - iconSize / 2.0;
-                var y = -loc.Y - iconSize / 2.0;
+                var y = loc.Y - iconSize / 2.0;
                 var modelTypeAttr = modelTypeName != null ? HtmlEscape(modelTypeName) : "";
 
                 if (shape != null)
