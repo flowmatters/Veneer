@@ -165,8 +165,15 @@ namespace FlowMatters.Source.Veneer.Formatting
               .Append(";opacity:").Append(DefaultOpacity).Append(";}")
               .Append(".veneer-nodes use{fill:").Append(DefaultNodeFill)
               .Append(";stroke:").Append(DefaultNodeStroke)
-              .Append(";opacity:").Append(DefaultOpacity).Append(";}")
-              .Append(".veneer-nodes image{opacity:").Append(DefaultOpacity).Append(";}")
+              .Append(";opacity:").Append(DefaultOpacity).Append(";}");
+            // Per-shape fill defaults for static rendering. Widget rendering carries the same colour
+            // via per-element data-default-node_<tag>_fill.
+            foreach (var kv in NodeIconLibrary.AllShapeDefaultFills())
+            {
+                sb.Append(".veneer-nodes use[href=\"#veneer-icon-").Append(kv.Key)
+                  .Append("\"]{fill:").Append(kv.Value).Append(";}");
+            }
+            sb.Append(".veneer-nodes image{opacity:").Append(DefaultOpacity).Append(";}")
               .Append("[data-hg-value]{cursor:pointer;}")
               .Append(".hg-selected{stroke:#1a73e8;stroke-width:3;}")
               .Append("</style>");
@@ -206,6 +213,7 @@ namespace FlowMatters.Source.Veneer.Formatting
                   .Append(";stroke-width:$link_").Append(tag).Append("_stroke_width$")
                   .Append(";opacity:$link_").Append(tag).Append("_opacity$\"")
                   .Append(" data-hg-value=\"link:").Append(tag).Append("\"")
+                  .Append(" data-default-link_").Append(tag).Append("_label=\"").Append(HtmlEscape(link.Name)).Append("\"")
                   .Append("><title>$link_").Append(tag).Append("_label$</title></line>");
 
                 sidecarLinks.Add(new SchematicLinkTag
@@ -242,9 +250,11 @@ namespace FlowMatters.Source.Veneer.Formatting
                 var x = loc.X - iconSize / 2.0;
                 var y = loc.Y - iconSize / 2.0;
                 var modelTypeAttr = modelTypeName != null ? HtmlEscape(modelTypeName) : "";
+                var nameEsc = HtmlEscape(n.Name);
 
                 if (shape != null)
                 {
+                    var defaultFill = NodeIconLibrary.GetDefaultFillFor(shape) ?? DefaultNodeFill;
                     sb.Append("<use href=\"#veneer-icon-").Append(shape).Append("\"")
                       .Append(" x=\"").Append(F(x))
                       .Append("\" y=\"").Append(F(y))
@@ -255,6 +265,8 @@ namespace FlowMatters.Source.Veneer.Formatting
                       .Append(";opacity:$node_").Append(tag).Append("_opacity$\"")
                       .Append(" data-hg-value=\"node:").Append(tag).Append("\"")
                       .Append(" data-veneer-model-type=\"").Append(modelTypeAttr).Append("\"")
+                      .Append(" data-default-node_").Append(tag).Append("_fill=\"").Append(defaultFill).Append("\"")
+                      .Append(" data-default-node_").Append(tag).Append("_label=\"").Append(nameEsc).Append("\"")
                       .Append("><title>$node_").Append(tag).Append("_label$</title></use>");
 
                     sidecarNodes.Add(new SchematicNodeTag
@@ -278,6 +290,7 @@ namespace FlowMatters.Source.Veneer.Formatting
                       .Append(" style=\"opacity:$node_").Append(tag).Append("_opacity$\"")
                       .Append(" data-hg-value=\"node:").Append(tag).Append("\"")
                       .Append(" data-veneer-model-type=\"").Append(modelTypeAttr).Append("\"")
+                      .Append(" data-default-node_").Append(tag).Append("_label=\"").Append(nameEsc).Append("\"")
                       .Append("><title>$node_").Append(tag).Append("_label$</title></image>");
 
                     sidecarNodes.Add(new SchematicNodeTag
