@@ -645,4 +645,12 @@
   <ItemGroup>
     <Resource Include="Resources\Icon_Only_RGB_for_LI.png" />
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\NodeIcons\circle.svg" />
+    <EmbeddedResource Include="Resources\NodeIcons\triangle.svg" />
+    <EmbeddedResource Include="Resources\NodeIcons\diamond.svg" />
+    <EmbeddedResource Include="Resources\NodeIcons\hexagon.svg" />
+    <EmbeddedResource Include="Resources\NodeIcons\plus.svg" />
+    <EmbeddedResource Include="Resources\NodeIcons\trapezoid.svg" />
+  </ItemGroup>
 </Project>
