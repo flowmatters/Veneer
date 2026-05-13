@@ -44,7 +44,9 @@ namespace FlowMatters.Source.Veneer.Formatting
             // Same-document <use href="#veneer-icon-..."> fragment references are unaffected.
 
             // 1. Resolve schematic coordinates for every node.
-            var nodes = network.nodes.Cast<Node>().ToList();
+            // Use Nodes/Links (capital) which expose IEnumerable; lowercase nodes/links returns
+            // a NodeSet/LinkSet that doesn't implement IEnumerable directly on newer Source versions.
+            var nodes = network.Nodes.OfType<Node>().ToList();
             var locations = nodes
                 .Select(n => SchematicLocationForNode(n, schematic))
                 .ToList();
@@ -55,7 +57,7 @@ namespace FlowMatters.Source.Veneer.Formatting
             // 3. Sanitise names.
             var nodeTagNames = SchematicNameSanitiser.SaniseAndDeCollide(
                 nodes.Select(n => n.Name).ToList(), "node");
-            var links = network.links.Cast<Link>().ToList();
+            var links = network.Links.OfType<Link>().ToList();
             var linkTagNames = SchematicNameSanitiser.SaniseAndDeCollide(
                 links.Select(l => l.Name).ToList(), "link");
 
