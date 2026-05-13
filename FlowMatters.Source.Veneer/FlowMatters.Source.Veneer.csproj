@@ -276,6 +276,7 @@
     <Compile Include="ExchangeObjects\GeoJSONNetwork.cs" />
     <Compile Include="ExchangeObjects\VeneerStatus.cs" />
     <Compile Include="Formatting\NetworkToGeographic.cs" />
+    <Compile Include="Formatting\NodeIconLibrary.cs" />
     <Compile Include="Formatting\TableResponseFormatter.cs" />
     <Compile Include="Formatting\TimeSeriesResponseFormatter.cs" />
     <Compile Include="Formatting\ReplyFormatSwitchBehaviour.cs" />
