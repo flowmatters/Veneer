@@ -282,6 +282,8 @@
     <Compile Include="Formatting\TimeSeriesResponseFormatter.cs" />
     <Compile Include="Formatting\ReplyFormatSwitchBehaviour.cs" />
     <Compile Include="Formatting\SchematicNameSanitiser.cs" />
+    <Compile Include="Formatting\SchematicSvgBuilder.cs" />
+    <Compile Include="Tests\SchematicSvgBuilderTests.cs" />
     <Compile Include="ExchangeObjects\FunctionValue.cs" />
     <Compile Include="ExchangeObjects\InputSetSummary.cs" />
     <Compile Include="AutoStart\InitialiseOnLoadAttribute.cs" />
