@@ -28,6 +28,33 @@ namespace FlowMatters.Source.Veneer.Formatting
         private static readonly string[] AllShapes =
             { "circle", "triangle", "diamond", "hexagon", "plus", "trapezoid" };
 
+        // Per-shape default fill colour, used as a static-render fallback (CSS) and as the per-element
+        // data-default-node_<tag>_fill that the widget falls back to when no row is bound.
+        // Shapes not listed here use the generic node-fill default from SchematicSvgBuilder.
+        private static readonly Dictionary<string, string> ShapeDefaultFill =
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                { "triangle",  "#1f77b4" },   // storage — blue
+                { "plus",      "#1f77b4" },   // inflow — blue
+                { "trapezoid", "#d62728" },   // gauge — red
+                { "diamond",   "#2ca02c" },   // extraction — green
+                { "hexagon",   "#ff7f0e" },   // min/max flow — orange
+                // circle (confluence) intentionally absent → use generic grey default.
+            };
+
+        /// <summary>Returns the default fill colour for a shape id, or null if it has no per-shape override.</summary>
+        public static string GetDefaultFillFor(string shapeId)
+        {
+            string colour;
+            return ShapeDefaultFill.TryGetValue(shapeId ?? "", out colour) ? colour : null;
+        }
+
+        /// <summary>Returns all (shape, colour) pairs that have a per-shape override.</summary>
+        public static IEnumerable<KeyValuePair<string, string>> AllShapeDefaultFills()
+        {
+            return ShapeDefaultFill;
+        }
+
         private static readonly Lazy<Dictionary<string, string>> SymbolMarkup =
             new Lazy<Dictionary<string, string>>(LoadAll);
 
