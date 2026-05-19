@@ -31,6 +31,10 @@ namespace FlowMatters.Source.WebServer
             }
 
             featureList.AddRange(from Link l in source.links select new GeoJSONFeature(l,source.Scenario,schematicAsCoordinates));
+            // Wetland conveyance and other lateral links live on separate Network collections
+            // from the main Links. See GeoJSONFeature(LateralLink, ...) for the URI / feature_type scheme.
+            featureList.AddRange(source.LateralLinks.OfType<LateralLink>().Select(l => new GeoJSONFeature(l, source, source.Scenario, schematicAsCoordinates)));
+            featureList.AddRange(source.ConveyanceLinks.OfType<LateralLink>().Select(l => new GeoJSONFeature(l, source, source.Scenario, schematicAsCoordinates)));
             featureList.AddRange(catchments.Select(c => new GeoJSONFeature((Catchment)c,source.Scenario.BoundaryForCatchment(c))));
             features = featureList.ToArray();
         }
