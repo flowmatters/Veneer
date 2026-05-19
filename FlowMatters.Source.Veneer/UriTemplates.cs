@@ -51,6 +51,10 @@ namespace FlowMatters.Source.Veneer
 
         public const string Link = "/network/link/{linkId}";
 
+        public const string LateralLink = "/network/lateral_link/{linkId}";
+
+        public const string ConveyanceLink = "/network/conveyance_link/{linkId}";
+
         public const string Catchments = "/network/catchments";
 
         public const string Catchment = "/network/catchments/{catchmentId}";

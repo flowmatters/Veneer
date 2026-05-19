@@ -8,6 +8,7 @@ using Microsoft.CSharp.RuntimeBinder;
 using RiverSystem;
 using RiverSystem.Catchments;
 using RiverSystem.Forms.Core.SchematicBuilder;
+using RiverSystem.Wetlands;
 using TIME.DataTypes;
 using TIME.DataTypes.Polygons;
 using Network = RiverSystem.Network;
@@ -117,6 +118,46 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects
                 {
 
                     geometry = new GeoJSONGeometry(SchematicLocationForNode(l.from,schematic),SchematicLocationForNode(l.to,schematic));
+                    return;
+                }
+            }
+            geometry = new GeoJSONGeometry(l, useSchematicLocation);
+        }
+
+        public GeoJSONFeature(LateralLink l, Network network, RiverSystemScenario scenario, bool useSchematicLocation)
+        {
+            // ConveyanceLink derives from LateralLink and is what wires wetlands into the
+            // network. Both kinds live on separate Network collections from the main Links,
+            // so they need their own URI namespace and feature_type.
+            string featureType;
+            string urlTemplate;
+            int idx;
+            if (l is ConveyanceLink cl)
+            {
+                featureType = "conveyance_link";
+                urlTemplate = UriTemplates.ConveyanceLink;
+                idx = network.ConveyanceLinks.IndexOf(cl);
+            }
+            else
+            {
+                featureType = "lateral_link";
+                urlTemplate = UriTemplates.LateralLink;
+                idx = network.LateralLinks.IndexOf(l);
+            }
+            id = urlTemplate.Replace("{linkId}", idx.ToString());
+            properties.Add("name", l.Name);
+            properties.Add(FeatureTypeProperty, featureType);
+            properties.Add("from_node", NodeURL(l.LeftNode, network));
+            properties.Add("to_node", NodeURL(l.RightNode, network));
+
+            if (useSchematicLocation)
+            {
+                var schematic = ScriptHelpers.GetSchematic(scenario);
+                if (schematic != null)
+                {
+                    geometry = new GeoJSONGeometry(
+                        SchematicLocationForNode(l.LeftNode, schematic),
+                        SchematicLocationForNode(l.RightNode, schematic));
                     return;
                 }
             }
