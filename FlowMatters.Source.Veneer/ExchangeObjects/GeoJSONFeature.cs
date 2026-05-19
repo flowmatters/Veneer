@@ -147,8 +147,8 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects
             id = urlTemplate.Replace("{linkId}", idx.ToString());
             properties.Add("name", l.Name);
             properties.Add(FeatureTypeProperty, featureType);
-            properties.Add("from_node", NodeURL(l.LeftNode, network));
-            properties.Add("to_node", NodeURL(l.RightNode, network));
+            properties.Add("left_node", NodeURL(l.LeftNode, network));
+            properties.Add("right_node", NodeURL(l.RightNode, network));
 
             if (useSchematicLocation)
             {
