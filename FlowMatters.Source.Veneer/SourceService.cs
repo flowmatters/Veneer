@@ -1,4 +1,4 @@
-#if V3 || V4_0 || V4_1 || V4_2 || V4_3 || V4_4 || V4_5
+﻿#if V3 || V4_0 || V4_1 || V4_2 || V4_3 || V4_4 || V4_5
 #define BEFORE_RECORDING_ATTRIBUTES_REFACTOR
 #endif
 
@@ -15,7 +15,9 @@ using System.Net;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Threading;
+using CoreWCF;
 using CoreWCF.Web;
+using ServiceKnownTypeAttribute = System.ServiceModel.ServiceKnownTypeAttribute;
 using FlowMatters.Source.Veneer.DomainActions;
 using FlowMatters.Source.Veneer.ExchangeObjects;
 using FlowMatters.Source.Veneer.ExchangeObjects.DataSources;
@@ -42,6 +44,7 @@ namespace FlowMatters.Source.Veneer
     [System.ServiceModel.ServiceKnownType(typeof(double[][]))]
     [System.ServiceModel.ServiceKnownType(typeof(double[][][]))]
     [System.ServiceModel.ServiceKnownType(typeof(double[][][][]))]
+    [ServiceBehavior(InstanceContextMode = InstanceContextMode.PerCall, ConcurrencyMode = ConcurrencyMode.Multiple, UseSynchronizationContext = false)]
     public class SourceService : ISourceService
     {
         // Static state shared across PerCall instances
@@ -127,7 +130,7 @@ namespace FlowMatters.Source.Veneer
 
         public VeneerStatus GetRoot()
         {
-            Log("Requested /");
+            Log("Requested /", LogLevel.Debug);
             return new VeneerStatus(Scenario);
         }
 
@@ -145,7 +148,7 @@ namespace FlowMatters.Source.Veneer
             }
             else
             {
-                Log("Shutdown not supported");
+                Log("Shutdown not supported", LogLevel.Warning);
             }
 
             throw new Exception("Shutdown not supported");
@@ -268,13 +271,17 @@ namespace FlowMatters.Source.Veneer
             for(int i = 0; i < runs.Length; i++)
             {
                 var run = runs[i];
+                var meta = run.MetaData;
                 links[i] = new RunLink
                     {
                         RunName = run.Name,
                         RunUrl = "/runs/" + run.RunNumber,
                         DateRun = run.DateRun.ToString(CultureInfo.InvariantCulture),
                         Scenario = run.Scenario.Name,
-                        Status = run.RunResultIndicator.ToString()
+                        Status = run.RunResultIndicator.ToString(),
+                        StartDate = meta.ContainsKey("ConfigurationStartDate") ? meta["ConfigurationStartDate"]?.ToString() : null,
+                        EndDate = meta.ContainsKey("ConfigurationEndDate") ? meta["ConfigurationEndDate"]?.ToString() : null,
+                        TimeStep = meta.ContainsKey("ConfigurationTimeStep") ? meta["ConfigurationTimeStep"]?.ToString() : null
                     };
             }
 
@@ -311,9 +318,9 @@ namespace FlowMatters.Source.Veneer
             }
             catch (Exception e)
             {
-                Log("Run Failed");
-                Log(e.Message);
-                Log(e.StackTrace);
+                Log("Run Failed", LogLevel.Error);
+                Log(e.Message, LogLevel.Error);
+                Log(e.StackTrace, LogLevel.Error);
                 throw new WebFaultException<SimulationFault>(new SimulationFault(e), HttpStatusCode.InternalServerError);
             }
             finally
@@ -350,14 +357,14 @@ namespace FlowMatters.Source.Veneer
 
             if (currentInvoker == null)
             {
-                Log("No active run to cancel.");
+                Log("No active run to cancel.", LogLevel.Warning);
                 WebOperationContext.Current.OutgoingResponse.StatusCode = HttpStatusCode.NotFound;
                 return;
             }
 
             if (!currentInvoker.IsRunning)
             {
-                Log("No running simulation to cancel.");
+                Log("No running simulation to cancel.", LogLevel.Warning);
                 WebOperationContext.Current.OutgoingResponse.StatusCode = HttpStatusCode.BadRequest;
                 return;
             }
@@ -365,19 +372,19 @@ namespace FlowMatters.Source.Veneer
             try
             {
                 currentInvoker.CancelRun();
-                Log("Cancellation request sent to running simulation.");
+                Log("Cancellation request sent to running simulation.", LogLevel.Warning);
                 WebOperationContext.Current.OutgoingResponse.StatusCode = HttpStatusCode.OK;
             }
             catch (Exception e)
             {
-                Log($"Error cancelling run: {e.Message}");
+                Log($"Error cancelling run: {e.Message}", LogLevel.Error);
                 throw new WebFaultException<SimulationFault>(new SimulationFault(e), HttpStatusCode.InternalServerError);
             }
         }
 
         public RunStatus GetRunStatus()
         {
-            Log("Requested run status.");
+            Log("Requested run status.", LogLevel.Debug);
             ScenarioInvoker currentInvoker;
             lock (_runLock)
             {
@@ -1128,10 +1135,10 @@ namespace FlowMatters.Source.Veneer
             return src.Replace("#","").Replace("/","%2F").Replace(":","");
         }
 
-        protected void Log(string query)
+        protected void Log(string query, LogLevel level = LogLevel.Info)
         {
             if (_sharedLogGenerator != null)
-                _sharedLogGenerator(this, query);
+                _sharedLogGenerator(this, query, level);
         }
 
         public string Ping()
