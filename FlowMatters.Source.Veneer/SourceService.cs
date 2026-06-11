@@ -49,7 +49,7 @@ namespace FlowMatters.Source.Veneer
     {
         // Static state shared across PerCall instances
         private static Dictionary<int,string[]> _runLogs = new Dictionary<int,string[]>();
-        private static ScenarioInvoker _currentScenarioInvoker;
+        internal static ScenarioInvoker _currentScenarioInvoker;
         private static readonly object _runLock = new object();
 
         private static RiverSystemScenario _sharedScenario;
@@ -223,6 +223,61 @@ namespace FlowMatters.Source.Veneer
         {
             Log("Requested network in geographic coordinates");
             return NetworkToGeographic.ToGeographic(Scenario.Network,Scenario.GeographicData.Projection as AbstractProjectionInfo);
+        }
+
+        public Stream GetSchematicSvg()
+        {
+            Log("Requested schematic SVG");
+            if (Scenario == null)
+                return WriteJsonError(HttpStatusCode.NotFound, "no scenario loaded");
+
+            var schematic = ScriptHelpers.GetSchematic(Scenario);
+            if (schematic == null || schematic.ExistingFeatureShapeProperties == null ||
+                schematic.ExistingFeatureShapeProperties.Count == 0)
+            {
+                return WriteJsonError(HttpStatusCode.NotFound,
+                    "scenario has no schematic; use /network for geographic coordinates");
+            }
+
+            var resourceBaseUrl = GetResourceBaseUrl();
+            var result = SchematicSvgBuilder.Build(Scenario.Network, schematic, resourceBaseUrl);
+            WebOperationContext.Current.OutgoingResponse.ContentType = "image/svg+xml";
+            return new MemoryStream(System.Text.Encoding.UTF8.GetBytes(result.Svg));
+        }
+
+        public SchematicTagMap GetSchematicSvgTags()
+        {
+            Log("Requested schematic SVG tags");
+            if (Scenario == null)
+            {
+                WebOperationContext.Current.OutgoingResponse.StatusCode = HttpStatusCode.NotFound;
+                return null;
+            }
+
+            var schematic = ScriptHelpers.GetSchematic(Scenario);
+            if (schematic == null || schematic.ExistingFeatureShapeProperties == null ||
+                schematic.ExistingFeatureShapeProperties.Count == 0)
+            {
+                WebOperationContext.Current.OutgoingResponse.StatusCode = HttpStatusCode.NotFound;
+                return null;
+            }
+
+            var result = SchematicSvgBuilder.Build(Scenario.Network, schematic, GetResourceBaseUrl());
+            return result.Sidecar;
+        }
+
+        private static Stream WriteJsonError(HttpStatusCode status, string message)
+        {
+            WebOperationContext.Current.OutgoingResponse.StatusCode = status;
+            WebOperationContext.Current.OutgoingResponse.ContentType = "application/json";
+            var json = "{\"error\":\"" + message.Replace("\"", "\\\"") + "\"}";
+            return new MemoryStream(System.Text.Encoding.UTF8.GetBytes(json));
+        }
+
+        private static string GetResourceBaseUrl()
+        {
+            var uri = WebOperationContext.Current.IncomingRequest.UriTemplateMatch.RequestUri;
+            return uri.GetLeftPart(UriPartial.Authority);
         }
 
         public GeoJSONFeature GetNode(string nodeId)
