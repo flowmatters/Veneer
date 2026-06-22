@@ -271,28 +271,8 @@ def save_patch_to_temp(content: str) -> str:
 		f.write(content)
 	return path
 
-def apply_patch(patch_path: str) -> bool:
-	"""Apply patch with --reject mode. Returns True if applied cleanly."""
-	result = subprocess.run(
-		['git', 'apply', '--reject', '--whitespace=nowarn', patch_path],
-		capture_output=True, text=True)
-	if result.returncode != 0:
-		print('WARNING: Patch did not apply cleanly. Some hunks may have been rejected.')
-		print(result.stderr)
-		return False
-	return True
-
-def clean_reject_files():
-	"""Walk tree and delete all *.rej files."""
-	for root, dirs, files in os.walk('.'):
-		for f in files:
-			if f.endswith('.rej'):
-				try:
-					os.remove(os.path.join(root, f))
-				except OSError:
-					pass
-
 def make_temp_worktree(branch):
+	"""Create a detached temp worktree at origin/<branch> (or <branch>) and return its path."""
 	tmp = tempfile.mkdtemp(prefix='compile_all_wt_')
 	# Prefer the remote ref so a fresh CI clone (only local `master`) still resolves it.
 	ref = branch
@@ -307,6 +287,8 @@ def make_temp_worktree(branch):
 	return tmp
 
 def carry_dirty_changes(worktree):
+	"""Best-effort apply of the orchestrator tree's dirty diff into a temp worktree.
+	Only called for temp worktrees; reused long-lived worktrees already build in place dirty."""
 	patch = create_patch()
 	if not patch:
 		return
@@ -379,31 +361,31 @@ def build_version(branch_key, fullpath, version, custom, solution, effective_ref
 	Returns the build process returncode."""
 	is_custom = True if hasattr(custom, '__len__') else custom
 
-	print("\n*** COMPILING AGAINST %s [%s] ***" % (version, branch_key.upper()))
+	logger.info("\n*** COMPILING AGAINST %s [%s] ***" % (version, branch_key.upper()))
 	if os.path.exists(effective_refpath):
-		print("Removing references from %s" % effective_refpath)
+		logger.info("Removing references from %s" % effective_refpath)
 		clear_directory(effective_refpath)
 	if os.path.exists(effective_source):
-		print("Removing previous build from %s" % effective_source)
+		logger.info("Removing previous build from %s" % effective_source)
 		clear_directory(effective_source)
 	# Clean obj directories to remove stale NuGet-generated targets
 	# (e.g. master branch targets leaking into legacy_ci builds)
 	for obj_dir in glob(os.path.join(worktree, '*', 'obj')):
 		if os.path.isdir(obj_dir):
-			print("Removing stale obj directory %s" % obj_dir)
+			logger.info("Removing stale obj directory %s" % obj_dir)
 			rmtree(obj_dir)
 
-	print('Copying main references')
+	logger.info('Copying main references')
 	main_ref_dir = os.path.join(fullpath, args.reference_subdir) if args.reference_subdir else fullpath
 	references = copy_references(main_ref_dir, effective_refpath)
 
-	print('Copying plugin references')
+	logger.info('Copying plugin references')
 	references += copy_references(os.path.join(fullpath, 'Plugins'), os.path.join(effective_refpath, 'Plugins'), min_files=0)
 	for extra_ref in extra_refs:
 		full_ref_path = os.path.join(extra_ref, 'Compiled', version)
-		print('Copying reference output from ' + full_ref_path)
+		logger.info('Copying reference output from ' + full_ref_path)
 		references += copy_references(full_ref_path, effective_refpath)
-	print(f'Copied {len(references)} references')
+	logger.info(f'Copied {len(references)} references')
 
 	flags = []
 	effective_version = None
@@ -427,12 +409,12 @@ def build_version(branch_key, fullpath, version, custom, solution, effective_ref
 		else:
 			logger.info('Skipping BEFORE_V flags for non-numeric %s' % version)
 	for f in flags:
-		print('Defining custom compilation constant: %s' % f)
+		logger.info('Defining custom compilation constant: %s' % f)
 
 	# Actual build!
 	compilation_flags = '/p:DefineConstants=%s' % ('%3B'.join(flags))
 	cmd_args = build_command(branch_key, args, compilation_flags, solution)
-	print(subprocess.list2cmdline(cmd_args))
+	logger.info(subprocess.list2cmdline(cmd_args))
 	returncode = subprocess.run(cmd_args, cwd=worktree).returncode
 
 	if returncode == 0:
@@ -469,7 +451,7 @@ def build_version(branch_key, fullpath, version, custom, solution, effective_ref
 				else:
 					copyfile(artifact, the_dest)
 			except:
-				print('Error copying %s to %s' % (artifact, the_dest))
+				logger.error('Error copying %s to %s' % (artifact, the_dest))
 				raise
 
 		# CoreWCF builds produce a nested Veneer/ subdirectory for VeneerCmd output.
@@ -607,6 +589,8 @@ def main():
 		if g['is_temp']:
 			wt = make_temp_worktree(g['target_branch'])
 			created_temp = True
+			# temp worktrees start clean from origin/<branch>; carry the orchestrator tree's
+			# dirty diff. Reused worktrees already contain the user's working changes.
 			carry_dirty_changes(wt)
 		try:
 			solution = resolve_in_worktree(wt, args.solution)
