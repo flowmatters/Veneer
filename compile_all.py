@@ -46,7 +46,6 @@ from glob import glob
 from shutil import copyfile,rmtree,copytree
 from typing import List, Optional, Tuple, Dict
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 # Excepts solution in CWD!
@@ -295,6 +294,7 @@ def build_command(branch_key: str, args, compilation_flags: str) -> list:
 		return [msbuild, compilation_flags, args.solution]
 
 def main():
+	logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 	parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 	parser.description = """\nCompile a Plugin solution against all installed versions of Source
 \nCreated by Joel Rahman (joel@flowmatters.com.au).
