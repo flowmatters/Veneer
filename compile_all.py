@@ -37,7 +37,6 @@ For usage information, run with -help:
 python compile_all.py -h
 '''
 import os
-import sys
 import argparse
 import subprocess
 import tempfile
@@ -102,7 +101,7 @@ def clear_directory(folder):
 				os.unlink(file_path)
 			elif os.path.isdir(file_path): rmtree(file_path)
 		except Exception as e:
-			print(e)
+			logger.warning('Failed to clear %s: %s' % (file_path, e))
 		
 def flatten_subdirectory(parent, subdir_name, ref_sizes=None):
 	"""Merge contents of parent/subdir_name/ into parent/, then remove the subdirectory.
@@ -114,7 +113,7 @@ def flatten_subdirectory(parent, subdir_name, ref_sizes=None):
 	if not os.path.isdir(subdir_path):
 		return
 	ref_sizes = ref_sizes or {}
-	print('Flattening %s/ into %s' % (subdir_name, parent))
+	logger.info('Flattening %s/ into %s' % (subdir_name, parent))
 	copied = 0
 	skipped = 0
 	for item in os.listdir(subdir_path):
@@ -145,7 +144,7 @@ def flatten_subdirectory(parent, subdir_name, ref_sizes=None):
 		else:
 			copyfile(src, dst)
 			copied += 1
-	print('  Copied %d items, skipped %d Source references' % (copied, skipped))
+	logger.info('  Copied %d items, skipped %d Source references' % (copied, skipped))
 	rmtree(subdir_path)
 
 def copy_references(source, dest, min_files=1):
@@ -342,7 +341,7 @@ def ensure_stub_build_imports(solution_path: str):
 			os.makedirs(os.path.dirname(full_path), exist_ok=True)
 			with open(full_path, 'w') as f:
 				f.write(STUB_CONTENT)
-			print("  Created stub: %s" % full_path)
+			logger.info("  Created stub: %s" % full_path)
 
 # --- Build command helper ---
 
@@ -518,18 +517,18 @@ def main():
 	if os.path.exists(LAST_FAILS_FN):
 		fails_previous_run = open(LAST_FAILS_FN,'r').read().splitlines()
 		os.remove(LAST_FAILS_FN)
-		print('Will run %d previous failed compiles first'%len(fails_previous_run))
-		print(LAST_FAILS_FN)
+		logger.info('Will run %d previous failed compiles first'%len(fails_previous_run))
+		logger.info(LAST_FAILS_FN)
 	else:
-		print('No record of previous fails. Will run in order found')
+		logger.info('No record of previous fails. Will run in order found')
 		fails_previous_run = []
 
 	#if 'Veneer' in args.solution:
 	#	args.source = '.'+args.source
-	print('Expect compiled assemblies in %s (%s)'%(args.source,os.path.abspath(args.source)))
+	logger.info('Expect compiled assemblies in %s (%s)'%(args.source,os.path.abspath(args.source)))
 	all_versions = discover_versions(args.ewater, args.source_dir_prefix)
 	logger.info("*** FOUND %d INSTALLED VERSIONS OF SOURCE" % (len(all_versions)))
-	print("\n".join(all_versions))
+	logger.info("\n".join(all_versions))
 
 	ignore_fn = args.solution + ".ignore"
 	ignored = []
@@ -538,15 +537,15 @@ def main():
 		for ip in ignore_patterns:
 			ignored += glob(os.path.join(args.ewater, args.source_dir_prefix + ip.strip()))
 		ignored = sorted(set(ignored))
-		print("*** IGNORING %d VERSIONS ***" % (len(ignored)))
-		print("\n".join(ignored))
+		logger.info("*** IGNORING %d VERSIONS ***" % (len(ignored)))
+		logger.info("\n".join(ignored))
 
 	include_fn = args.solution + ".include"
 	include_patterns = []
 	if os.path.exists(include_fn):
 		include_patterns = [tuple(l.strip().split(',')) for l in open(include_fn).readlines() if len(l) and not l.startswith('#')]
-		print("*** INCLUDING %d EXTRA DIRECTORIES ***" % (len(include_patterns)))
-		print("\n".join([patt[1] + '('+patt[0]+')' for patt in include_patterns]))
+		logger.info("*** INCLUDING %d EXTRA DIRECTORIES ***" % (len(include_patterns)))
+		logger.info("\n".join([patt[1] + '('+patt[0]+')' for patt in include_patterns]))
 		include_patterns = [get_custom(include_pattern) for include_pattern in include_patterns]
 
 	versions_to_compile = sorted(set(all_versions) - set(ignored))
@@ -560,8 +559,8 @@ def main():
 	previous_success = [v for v in version_info if not v[1] in fails_previous_run]
 	version_info = previous_fails + previous_success
 
-	print("*** COMPILING AGAINST %d VERSIONS ***" % (len(version_info)))
-	print("\n".join([t[1] for t in version_info]))
+	logger.info("*** COMPILING AGAINST %d VERSIONS ***" % (len(version_info)))
+	logger.info("\n".join([t[1] for t in version_info]))
 
 	refs_fn = args.solution + '.refs'
 	extra_refs = []
@@ -591,10 +590,11 @@ def main():
 		if g['is_temp']:
 			wt = make_temp_worktree(g['target_branch'])
 			created_temp = True
-			# temp worktrees start clean from origin/<branch>; carry the orchestrator tree's
-			# dirty diff. Reused worktrees already contain the user's working changes.
-			carry_dirty_changes(wt)
 		try:
+			if created_temp:
+				# temp worktrees start clean from origin/<branch>; carry the orchestrator tree's
+				# dirty diff. Reused worktrees already contain the user's working changes.
+				carry_dirty_changes(wt)
 			solution = resolve_in_worktree(wt, args.solution)
 			effective_refpath = resolve_in_worktree(wt, args.refpath)
 			effective_source = resolve_in_worktree(wt, args.source)
@@ -616,11 +616,11 @@ def main():
 	# --- Results summary ---
 	failures = sorted([k for (k, v) in results.items() if v > 0])
 	successes = sorted([k for (k, v) in results.items() if v == 0])
-	print("\n*** RESULTS ***")
-	print("%d successful builds out of %d versions" % (len(successes), len(version_info)))
+	logger.info("\n*** RESULTS ***")
+	logger.info("%d successful builds out of %d versions" % (len(successes), len(results)))
 	if failures:
-		print("FAILED TO BUILD AGAINST %d VERSIONS" % (len(failures)))
-		print("\n".join(failures))
+		logger.info("FAILED TO BUILD AGAINST %d VERSIONS" % (len(failures)))
+		logger.info("\n".join(failures))
 		open(LAST_FAILS_FN, 'w').writelines('\n'.join(failures))
 
 
