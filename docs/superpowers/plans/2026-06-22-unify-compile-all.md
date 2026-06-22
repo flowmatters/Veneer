@@ -41,12 +41,17 @@ Refactor so importing `compile_all` runs no argparse and no build. Everything fr
 - Create: `C:\src\projects\Veneer\tests\__init__.py`
 - Create: `C:\src\projects\Veneer\tests\test_compile_all.py`
 
-- [ ] **Step 1: Add logging setup near the top of `compile_all.py`** (after imports, before the helpers), porting the fork's logger:
+- [ ] **Step 1: Add logging setup.** At module level (after imports, before helpers) add only the logger so it has no import-time side effects:
 
 ```python
 import logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+```
+
+Put the handler config inside `main()` (as its first statement, added in Step 2) so it configures logging only when run as a CLI:
+
+```python
+	logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 ```
 
 - [ ] **Step 2: Wrap the script body in `main()`**. Move the entire block starting at `parser = argparse.ArgumentParser(...)` through the final results-summary `print`/`open(LAST_FAILS_FN,...)` into `def main():`. Add at end of file:
