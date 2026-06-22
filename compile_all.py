@@ -58,6 +58,13 @@ def parse_version_string(basename, prefix):
 		return basename[len(prefix):]
 	return basename
 
+def discover_versions(ewater, prefix):
+	"""Return sorted version directories under `ewater` matching `<prefix>*`,
+	filtered to plausible Source version numbers."""
+	candidates = sorted(glob(os.path.join(ewater, prefix + '*')))
+	return [v for v in candidates
+		if valid_version(parse_version_string(os.path.basename(v), prefix).split('.'))]
+
 def unique_versions(all_versions:List[str], num_elements:int, prefix:str) -> List[str]:
 	# Iterate sorted so the LAST write per key is the lexicographically-last full
 	# path — makes "keep the highest build number" order-independent.
@@ -372,8 +379,8 @@ def main():
 	#if 'Veneer' in args.solution:
 	#	args.source = '.'+args.source
 	print('Expect compiled assemblies in %s (%s)'%(args.source,os.path.abspath(args.source)))
-	all_versions = sorted(glob(args.ewater + os.path.sep + "Source*"))
-	print("*** FOUND %d INSTALLED VERSIONS OF SOURCE" % (len(all_versions)))
+	all_versions = discover_versions(args.ewater, args.source_dir_prefix)
+	logger.info("*** FOUND %d INSTALLED VERSIONS OF SOURCE" % (len(all_versions)))
 	print("\n".join(all_versions))
 
 	ignore_fn = args.solution + ".ignore"
@@ -381,7 +388,7 @@ def main():
 	if os.path.exists(ignore_fn):
 		ignore_patterns = open(args.solution + ".ignore").readlines()
 		for ip in ignore_patterns:
-			ignored += glob(args.ewater + os.path.sep + "Source " + ip.strip())
+			ignored += glob(os.path.join(args.ewater, args.source_dir_prefix + ip.strip()))
 		ignored = sorted(set(ignored))
 		print("*** IGNORING %d VERSIONS ***" % (len(ignored)))
 		print("\n".join(ignored))
