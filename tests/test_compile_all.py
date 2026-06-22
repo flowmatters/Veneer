@@ -1,4 +1,5 @@
 import os, sys
+import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import compile_all  # must import with no side effects
 
@@ -44,6 +45,16 @@ def test_copy_references_min_files_zero_tolerates_empty(tmp_path):
 def test_copy_references_default_asserts_on_empty(tmp_path):
 	src = tmp_path / 'empty2'; src.mkdir()
 	dest = tmp_path / 'dest2'
-	import pytest
 	with pytest.raises(AssertionError):
 		compile_all.copy_references(str(src), str(dest))  # default min_files=1
+
+def test_discover_versions_filters_non_numeric(tmp_path):
+	for name in ['Source 6.1.0.12345', 'Source 5.30.0.1', 'Source Catchments',
+			'Source 9.0.0.1', 'SourceFoo']:
+		(tmp_path / name).mkdir()
+	out = [os.path.basename(p) for p in compile_all.discover_versions(str(tmp_path), 'Source ')]
+	assert 'Source 6.1.0.12345' in out
+	assert 'Source 5.30.0.1' in out
+	assert 'Source Catchments' not in out   # non-numeric, filtered by valid_version
+	assert 'Source 9.0.0.1' not in out      # major > 7, filtered by valid_version
+	assert 'SourceFoo' not in out           # no space -> excluded by the "Source *" glob
