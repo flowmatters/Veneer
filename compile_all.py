@@ -58,6 +58,20 @@ def unique_versions(all_versions:List[str],num_elements:int) -> List[str]:
 		uniq_versions[v_num] = v
 	return sorted(uniq_versions.values())
 
+MAX_VERSION = [7, 99, 4]
+
+def valid_version(components):
+	for comp, max_v in zip(components[:len(MAX_VERSION)], MAX_VERSION):
+		try:
+			comp = int(comp)
+		except (ValueError, TypeError):
+			logger.info('%s is not a valid Source version number.' % '.'.join(map(str, components)))
+			return False
+		if comp > max_v:
+			logger.info('%s exceeds MAX_VERSION.' % '.'.join(map(str, components)))
+			return False
+	return True
+
 LAST_FAILS_FN = '_last_fails.txt'
 def clear_directory(folder):
 	for the_file in os.listdir(folder):
@@ -518,7 +532,6 @@ def main():
 						effective_version = custom.split('.')
 
 				if effective_version or not is_custom:
-					MAX_VERSION = [7, 50, 4]
 					if effective_version:
 						version_components = effective_version
 					else:
