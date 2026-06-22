@@ -226,6 +226,28 @@ def group_versions_by_branch(version_info: list, corewcf_min_version: Tuple[int,
 		groups[branch_key].append(entry)
 	return groups
 
+def compute_build_plan(branch_groups, branch_names, worktrees, current_branch):
+	"""Return an ordered list of build-group dicts:
+	{branch_key, target_branch, worktree_path (None => create temp), is_temp, versions}.
+	Existing worktrees are reused (built in place); missing ones are flagged for
+	temp creation. The current branch's group is ordered first."""
+	plan = []
+	for branch_key in ('wcf', 'corewcf'):
+		versions = branch_groups.get(branch_key) or []
+		if not versions:
+			continue
+		target_branch = branch_names[branch_key]
+		wt = worktrees.get(target_branch)
+		plan.append({
+			'branch_key': branch_key,
+			'target_branch': target_branch,
+			'worktree_path': wt,
+			'is_temp': wt is None,
+			'versions': versions,
+		})
+	plan.sort(key=lambda g: 0 if g['target_branch'] == current_branch else 1)
+	return plan
+
 # --- Git operation helpers ---
 
 def get_current_branch() -> str:
