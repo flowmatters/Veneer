@@ -58,3 +58,27 @@ def test_discover_versions_filters_non_numeric(tmp_path):
 	assert 'Source Catchments' not in out   # non-numeric, filtered by valid_version
 	assert 'Source 9.0.0.1' not in out      # major > 7, filtered by valid_version
 	assert 'SourceFoo' not in out           # no space -> excluded by the "Source *" glob
+
+def test_parse_worktree_list_maps_branch_to_path():
+	sample = (
+		"worktree C:/src/projects/Veneer\n"
+		"HEAD c54f6d4\n"
+		"branch refs/heads/master\n"
+		"\n"
+		"worktree C:/src/projects/Veneer-legacy\n"
+		"HEAD fbae695\n"
+		"branch refs/heads/legacy_ci\n"
+		"\n"
+	)
+	out = compile_all.parse_worktree_list(sample)
+	assert out == {'master': 'C:/src/projects/Veneer',
+		'legacy_ci': 'C:/src/projects/Veneer-legacy'}
+
+def test_parse_worktree_list_skips_detached():
+	sample = (
+		"worktree /tmp/wt\n"
+		"HEAD abc123\n"
+		"detached\n"
+		"\n"
+	)
+	assert compile_all.parse_worktree_list(sample) == {}
