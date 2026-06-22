@@ -89,6 +89,10 @@ def valid_version(components):
 			return False
 	return True
 
+def resolve_in_worktree(worktree_path, relpath):
+	"""Resolve a build path (refpath/source/solution) relative to a worktree root."""
+	return os.path.normpath(os.path.join(worktree_path, relpath))
+
 LAST_FAILS_FN = '_last_fails.txt'
 def clear_directory(folder):
 	for the_file in os.listdir(folder):

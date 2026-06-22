@@ -112,3 +112,11 @@ def test_plan_omits_empty_groups():
 	plan = compile_all.compute_build_plan(groups, {'wcf': 'legacy_ci', 'corewcf': 'master'},
 		{'master': '/wt/master'}, current_branch='master')
 	assert [g['branch_key'] for g in plan] == ['corewcf']
+
+def test_resolve_in_worktree_joins_and_normalizes():
+	out = compile_all.resolve_in_worktree('/wt/master', '../Output')
+	assert out == os.path.normpath('/wt/Output')
+
+def test_resolve_in_worktree_relative_inside():
+	out = compile_all.resolve_in_worktree('/wt/master', 'References')
+	assert out == os.path.normpath('/wt/master/References')
