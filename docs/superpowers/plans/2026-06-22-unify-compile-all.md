@@ -15,6 +15,7 @@
 - `C:\src\projects\mdba-firm\FIRM_Veneer_Builds` (private CI — `azure-pipelines.yml`, and retire the fork). Separate repo, separate commits.
 
 **Conventions:**
+- **The shell's default working directory is `C:\src\projects\mdba-firm\FIRM_Veneer_Builds` (the FIRM repo), NOT the Veneer repo.** Every command in Tasks 1–10 (test runs AND `git add`/`git commit`) operates on the Veneer repo and MUST be run from `C:/src/projects/Veneer` — prefix each with `cd C:/src/projects/Veneer && ...`. The commit blocks below omit the prefix for brevity; add it. Tasks 11–12 run in the FIRM repo and show their own `cd`.
 - The existing `compile_all.py` uses **TAB indentation** — all edits must use tabs, not spaces.
 - Use the `logging` logger (`logger.info(...)`), not `print`, throughout the unified script (port from the fork).
 - Pure functions go above `main()`; the module must be importable without side effects (no argparse/build at import time) so tests can import it.
@@ -166,10 +167,11 @@ def test_parse_version_no_prefix_match_returns_basename():
 	assert compile_all.parse_version_string('Source Catchments', 'Source ') == 'Catchments'
 
 def test_unique_versions_collapses_to_num_elements():
-	dirs = ['/x/Source 6.1.0.111', '/x/Source 6.1.0.222', '/x/Source 5.30.0.1']
+	# Deliberately unsorted input to prove the function keeps the lexicographically-last
+	# full path per (major.minor.patch), independent of input order.
+	dirs = ['/x/Source 6.1.0.222', '/x/Source 5.30.0.1', '/x/Source 6.1.0.111']
 	out = compile_all.unique_versions(dirs, 3, 'Source ')
-	# one entry per (major.minor.patch); lexicographically-last full path kept
-	assert out == ['/x/Source 5.30.0.1', '/x/Source 6.1.0.222']
+	assert out == ['/x/Source 5.30.0.1', '/x/Source 6.1.0.222']  # .222 > .111 kept
 ```
 
 - [ ] **Step 2: Run — verify failure.** Run: `python -m pytest tests/test_compile_all.py -k "parse_version or unique_versions" -v` → FAIL.
@@ -190,8 +192,11 @@ Rewrite `unique_versions` to take the prefix:
 
 ```python
 def unique_versions(all_versions, num_elements, prefix):
+	# Iterate sorted so the LAST write per key is the lexicographically-last full
+	# path — makes the "keep the highest build number" behavior order-independent
+	# (the current upstream relies on the caller pre-sorting; this is more robust).
 	uniq_versions = {}
-	for v in all_versions:
+	for v in sorted(all_versions):
 		v_num = parse_version_string(os.path.basename(v), prefix)
 		v_num = '.'.join(v_num.split('.')[:num_elements])
 		uniq_versions[v_num] = v
@@ -275,7 +280,7 @@ references = copy_references(main_ref_dir, effective_refpath)
 references += copy_references(os.path.join(fullpath, 'Plugins'), os.path.join(effective_refpath, 'Plugins'), min_files=0)
 ```
 
-(`effective_refpath` is introduced in Task 7; until then use `args.refpath`.)
+(`effective_refpath` — the per-worktree-resolved refs path — is introduced in Task 9. In Tasks 4–8 the script still builds in the single current tree, so use `args.refpath` directly here; Task 9 substitutes `effective_refpath` when it extracts `build_version`.)
 
 - [ ] **Step 6: Update the build-loop version-component parse** from `version.split(' ')[1].split('.')` to:
 
@@ -317,13 +322,16 @@ Test (with `tmp_path` creating fake dirs):
 
 ```python
 def test_discover_versions_filters_non_numeric(tmp_path):
-	for name in ['Source 6.1.0.12345', 'Source 5.30.0.1', 'Source Catchments', 'Source 9.0.0.1']:
+	for name in ['Source 6.1.0.12345', 'Source 5.30.0.1', 'Source Catchments',
+			'Source 9.0.0.1', 'SourceFoo']:
 		(tmp_path / name).mkdir()
 	out = [os.path.basename(p) for p in compile_all.discover_versions(str(tmp_path), 'Source ')]
 	assert 'Source 6.1.0.12345' in out
 	assert 'Source 5.30.0.1' in out
-	assert 'Source Catchments' not in out   # non-numeric, filtered
-	assert 'Source 9.0.0.1' not in out      # major > 7, filtered
+	assert 'Source Catchments' not in out   # non-numeric, filtered by valid_version
+	assert 'Source 9.0.0.1' not in out      # major > 7, filtered by valid_version
+	assert 'SourceFoo' not in out           # no space -> excluded by the "Source *" glob
+	                                        # (the intentional glob narrowing, spec §1)
 ```
 
 - [ ] **Step 2: Run — verify failure**, then implement `discover_versions`, then verify pass.
@@ -554,11 +562,13 @@ parser.add_argument('--keep-temp-worktrees', action='store_true', default=False,
 
 Remove the `--no-branch-switch`, `--wcf-branch`/`--corewcf-branch` defaults stay; the branch names feed `branch_names`.
 
-- [ ] **Step 2: Delete the obsolete git helpers and their call sites:** `get_current_branch` stays (still needed for ordering); **remove** `has_tracked_changes` (replaced), `git_stash_save`, `git_stash_pop`, `git_checkout`, `revert_tracked_changes`, the in-place `compile_order`/`need_switch`/stash/patch block, and the `finally:` branch-restore block. Keep `create_patch`, `save_patch_to_temp`, `apply_patch`, `clean_reject_files` — reused by the temp-worktree dirty-carry below (move them near it).
+- [ ] **Step 2: Delete the obsolete git helpers and their call sites:** `get_current_branch` stays (still needed for ordering); **remove** `has_tracked_changes` (replaced), `git_stash_save`, `git_stash_pop`, `git_checkout`, `revert_tracked_changes`, the in-place `compile_order`/`need_switch`/stash/patch block, and the `finally:` branch-restore block. Also **remove the `--no-branch-switch` flag and every `args.no_branch_switch` branch** (current lines ~407–417, 429, 451–457) — the whole orchestration loop is rewritten, so grep for `no_branch_switch` afterward to confirm no dead references remain. Keep `create_patch`, `save_patch_to_temp`, `apply_patch`, `clean_reject_files` — reused by the temp-worktree dirty-carry below (move them near it).
 
 - [ ] **Step 3: Implement the new orchestration in `main()`** (sketch; integrate with existing per-version build/harvest body, which moves into `build_version(...)`):
 
 ```python
+# corewcf_min_version: the (major, minor) tuple parsed from --corewcf-min-version near
+# the top of main() (moved there from module scope in Task 1). It must exist before this point.
 worktrees = list_worktrees()
 current_branch = get_current_branch()
 branch_names = {'wcf': args.wcf_branch, 'corewcf': args.corewcf_branch}
@@ -594,7 +604,8 @@ for g in plan:
 		for (fullpath, version, custom) in g['versions']:
 			results[version] = build_version(
 				g['branch_key'], fullpath, version, custom,
-				solution, effective_refpath, effective_source, destination, wt, args)
+				solution, effective_refpath, effective_source, destination, wt,
+				extra_refs, args)
 			if results[version] != 0 and args.fail:
 				break
 	finally:
@@ -631,7 +642,13 @@ def carry_dirty_changes(worktree):
 	os.remove(patch_path)
 ```
 
-- [ ] **Step 5: Extract `build_version(...)`** from the existing per-version loop body — the references staging, DefineConstants flag computation, `build_command` invocation (`cwd=worktree`), branch-aware harvesting (WCF basename filter vs CoreWCF size-aware + `flatten_subdirectory`), and `--keep`/`--copy_to_source`. Return the build returncode. Use `effective_refpath`/`effective_source`/`destination` (absolute) instead of `args.refpath`/`args.source`/`args.destination`. Pass `cwd=wt` to `subprocess.run` for the build command. **No logic change** beyond the path/cwd parameterization.
+- [ ] **Step 5: Extract `build_version(...)`** from the existing per-version loop body. Signature:
+  `build_version(branch_key, fullpath, version, custom, solution, effective_refpath, effective_source, destination, worktree, extra_refs, args)`. It contains: the references staging (main + Plugins + the `.refs` `extra_refs` loop — **`extra_refs` must be a parameter**, it is used at current `compile_all.py:502-505`), DefineConstants flag computation, `build_command` invocation, branch-aware harvesting (WCF basename filter vs CoreWCF size-aware + `flatten_subdirectory`), and `--keep`/`--copy_to_source`. Return the build returncode. Specifics:
+  - Use `effective_refpath`/`effective_source`/`destination` (absolute) instead of `args.refpath`/`args.source`/`args.destination` everywhere in the moved body (including the `extra_refs` copy target and harvest globs).
+  - Pass `cwd=worktree` to the build `subprocess.run`, and pass `solution` (already worktree-resolved) as the solution arg.
+  - **Guard the `BEFORE_V` `int(vc)` call** (current line 523, `vc_num = int(vc)`): a `.include` custom entry can carry a non-numeric `effective_version`. Wrap the version-component loop so a non-numeric component logs and skips the `BEFORE_V` emission rather than raising — e.g. `if not valid_version(version_components): logger.info('Skipping BEFORE_V flags for non-numeric %s' % version); ` then only emit `V*`/`BEFORE_V*` when numeric. (Note: the fork's in-loop `valid_version` "Skipping" log does not actually skip — do not copy that bug.)
+  - The inline `MAX_VERSION = [7, 50, 4]` (current line 516) was already deleted in Task 2 Step 3; ensure relocating this block does not reintroduce it — the body now reads the module-level `MAX_VERSION`.
+  - **No other logic change** beyond the path/cwd parameterization and the guard above.
 
 - [ ] **Step 6: Smoke-test `--dry-run` against the real local worktrees** (no build, no binaries needed beyond a directory to discover — point `--ewater` at any dir, or use an `.ignore` to empty the set):
 
@@ -670,6 +687,8 @@ Expected: discovers `BinSourceX.Y.Z`, correct branch grouping incl. any Source 6
 - [ ] **Step 3: Real build of one WCF + one CoreWCF version** (drop `--dry-run`; use a tight `.ignore` so only ~2 versions build). Confirm: WCF builds via MSBuild in the `legacy_ci` worktree, CoreWCF via `dotnet` in `master`, outputs harvested under `Compiled/<version>/`, CoreWCF `Veneer/` subdir flattened, no Source reference DLLs leaked into output (size-aware filter).
 
 - [ ] **Step 4: Verify the dev's working trees are untouched** after the run: `git -C C:/src/projects/Veneer status` and `git -C C:/src/projects/Veneer-legacy status` show no unexpected branch change or leftover `.rej`/patch artifacts. (No commit — verification only. Record results in the PR/commit message.)
+
+- [ ] **Step 5: Check sidecar `.ignore`/`.include`/`.refs` files vs. the active prefix.** Since `.ignore` patterns are globbed with `<source-dir-prefix> + pattern`, an `.ignore` authored for one layout (e.g. `Source ` patterns) is silently inert under the other prefix. Inspect any `Veneer.sln.ignore`/`.include`/`.refs` present in the Veneer checkout and the FIRM invocation, and confirm each parses and matches as intended under the prefix that invocation passes. Document any mismatch.
 
 ---
 
