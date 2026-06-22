@@ -120,3 +120,27 @@ def test_resolve_in_worktree_joins_and_normalizes():
 def test_resolve_in_worktree_relative_inside():
 	out = compile_all.resolve_in_worktree('/wt/master', 'References')
 	assert out == os.path.normpath('/wt/master/References')
+
+def test_determine_branch_discovered_binsource6_is_corewcf():
+	entry = ('/x/BinSource6.20.0.14258', 'BinSource6.20.0.14258', False)
+	assert compile_all.determine_branch(entry, (6, 0), 'BinSource') == 'corewcf'
+
+def test_determine_branch_discovered_installed_source6_is_corewcf():
+	entry = ('/x/Source 6.1.0.14090', 'Source 6.1.0.14090', False)
+	assert compile_all.determine_branch(entry, (6, 0), 'Source ') == 'corewcf'
+
+def test_determine_branch_discovered_source5_is_wcf():
+	entry = ('/x/BinSource5.30.0.12680', 'BinSource5.30.0.12680', False)
+	assert compile_all.determine_branch(entry, (6, 0), 'BinSource') == 'wcf'
+
+def test_determine_branch_custom_entry_uses_effective_version():
+	# custom entry: (path, shortname, effective_version_string)
+	entry = ('/x/whatever', 'Veneer_for_Source_6.1.0', '6.1.0')
+	assert compile_all.determine_branch(entry, (6, 0), 'BinSource') == 'corewcf'
+
+def test_group_versions_by_branch_threads_prefix():
+	vi = [('/x/BinSource6.20.0.1', 'BinSource6.20.0.1', False),
+		('/x/BinSource5.30.0.1', 'BinSource5.30.0.1', False)]
+	groups = compile_all.group_versions_by_branch(vi, (6, 0), 'BinSource')
+	assert [e[1] for e in groups['corewcf']] == ['BinSource6.20.0.1']
+	assert [e[1] for e in groups['wcf']] == ['BinSource5.30.0.1']
