@@ -689,6 +689,12 @@ Expected: discovers installed `Source X.Y.Z` dirs, groups <6.0 → WCF / ≥6.0 
 `python compile_all.py --dry-run --source-dir-prefix BinSource --reference-subdir Source -e <path-to>/FIRM_ModelBinaries/Binaries --refpath ../Output Veneer.sln`
 Expected: discovers `BinSourceX.Y.Z`, correct branch grouping incl. any Source 6, correct worktree assignment.
 
+> **Verification finding (resolved):** the binaries-layout dry-run revealed that `determine_branch`
+> was not prefix-aware — a discovered `BinSource6.20.0.14258` failed to parse and defaulted to WCF.
+> Fixed by threading `--source-dir-prefix` through `determine_branch`/`group_versions_by_branch` (they
+> now strip the prefix via `parse_version_string` before extracting major.minor). Regression tests
+> added. After the fix, CoreWCF correctly includes the discovered Source 6 set.
+
 - [ ] **Step 3: Real build of one WCF + one CoreWCF version** (drop `--dry-run`; use a tight `.ignore` so only ~2 versions build). Confirm: WCF builds via MSBuild in the `legacy_ci` worktree, CoreWCF via `dotnet` in `master`, outputs harvested under `Compiled/<version>/`, CoreWCF `Veneer/` subdir flattened, no Source reference DLLs leaked into output (size-aware filter).
 
 - [ ] **Step 4: Verify the dev's working trees are untouched** after the run: `git -C C:/src/projects/Veneer status` and `git -C C:/src/projects/Veneer-legacy status` show no unexpected branch change or leftover `.rej`/patch artifacts. (No commit — verification only. Record results in the PR/commit message.)

@@ -96,6 +96,12 @@ Reuse upstream's logic: each discovered version is assigned to a branch group by
   group (`legacy_ci`).
 - `--wcf-branch` (default `legacy_ci`), `--corewcf-branch` (default `master`).
 - Custom (`.include`) entries without an effective version default to the WCF group.
+- **Branch determination must be prefix-aware.** A discovered (non-custom) version's name carries the
+  `--source-dir-prefix` (e.g. `BinSource6.20.0.14258`), so `determine_branch`/`group_versions_by_branch`
+  must strip the prefix via `parse_version_string(version, prefix)` before extracting major.minor.
+  Otherwise a `BinSource`-prefixed Source 6 fails to parse and silently defaults to WCF — defeating the
+  Source 6 goal. (Caught during Task 10 verification; custom `.include` entries already pass a clean
+  numeric version and are unaffected.)
 
 ### 3. Worktree-aware orchestration (reuse-before-create)
 
