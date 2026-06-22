@@ -82,3 +82,33 @@ def test_parse_worktree_list_skips_detached():
 		"\n"
 	)
 	assert compile_all.parse_worktree_list(sample) == {}
+
+def _groups(wcf, corewcf):
+	# minimal version_info entries: (fullpath, version, custom)
+	mk = lambda n: ('/x/%s' % n, n, False)
+	return {'wcf': [mk(v) for v in wcf], 'corewcf': [mk(v) for v in corewcf]}
+
+def test_plan_reuses_existing_worktrees():
+	groups = _groups(['Source 5.30.0.1'], ['Source 6.1.0.1'])
+	branch_names = {'wcf': 'legacy_ci', 'corewcf': 'master'}
+	worktrees = {'master': '/wt/master', 'legacy_ci': '/wt/legacy'}
+	plan = compile_all.compute_build_plan(groups, branch_names, worktrees, current_branch='master')
+	by_key = {g['branch_key']: g for g in plan}
+	assert by_key['corewcf']['worktree_path'] == '/wt/master' and not by_key['corewcf']['is_temp']
+	assert by_key['wcf']['worktree_path'] == '/wt/legacy' and not by_key['wcf']['is_temp']
+	# current branch group ordered first
+	assert plan[0]['branch_key'] == 'corewcf'
+
+def test_plan_marks_missing_worktree_temp():
+	groups = _groups(['Source 5.30.0.1'], ['Source 6.1.0.1'])
+	branch_names = {'wcf': 'legacy_ci', 'corewcf': 'master'}
+	worktrees = {'master': '/wt/master'}  # no legacy_ci worktree
+	plan = compile_all.compute_build_plan(groups, branch_names, worktrees, current_branch='master')
+	wcf = [g for g in plan if g['branch_key'] == 'wcf'][0]
+	assert wcf['worktree_path'] is None and wcf['is_temp']
+
+def test_plan_omits_empty_groups():
+	groups = _groups([], ['Source 6.1.0.1'])
+	plan = compile_all.compute_build_plan(groups, {'wcf': 'legacy_ci', 'corewcf': 'master'},
+		{'master': '/wt/master'}, current_branch='master')
+	assert [g['branch_key'] for g in plan] == ['corewcf']
