@@ -50,10 +50,20 @@ logger = logging.getLogger(__name__)
 
 # Excepts solution in CWD!
 
-def unique_versions(all_versions:List[str],num_elements:int) -> List[str]:
+def parse_version_string(basename, prefix):
+	"""Strip `prefix` from a version-directory basename to get the version string.
+	'Source 6.1.0' + 'Source ' -> '6.1.0'; 'BinSource6.1.0' + 'BinSource' -> '6.1.0'.
+	Returns the basename unchanged if the prefix is absent."""
+	if basename.startswith(prefix):
+		return basename[len(prefix):]
+	return basename
+
+def unique_versions(all_versions:List[str], num_elements:int, prefix:str) -> List[str]:
+	# Iterate sorted so the LAST write per key is the lexicographically-last full
+	# path — makes "keep the highest build number" order-independent.
 	uniq_versions = {}
-	for v in all_versions:
-		v_num = os.path.basename(v).split(' ')[1]
+	for v in sorted(all_versions):
+		v_num = parse_version_string(os.path.basename(v), prefix)
 		v_num = '.'.join(v_num.split('.')[:num_elements])
 		uniq_versions[v_num] = v
 	return sorted(uniq_versions.values())
@@ -330,6 +340,9 @@ def main():
 	parser.add_argument("--refpath","-r",
 		      help="Specify path to place references",
 		      default="References")
+	parser.add_argument('--source-dir-prefix',
+		      help='Prefix of version directories under --ewater (also used to derive the version string and .ignore globs). Default matches installed Source; pass e.g. "BinSource" for a binaries-repo layout.',
+		      default='Source ')
 	parser.add_argument('--fail','-f',help="Fail fast: Stop after first failure",action='store_true',default=False)
 	parser.add_argument('--keep','-k',help='Keep references in output directory',action='store_true',default=False)
 	parser.add_argument('--copy_to_source','-c',help='Copy outputs to Source directory WHEN COMPILING AGAINST CUSTOM VERSION OF SOURCE',action='store_true',default=False)
@@ -381,7 +394,7 @@ def main():
 		include_patterns = [get_custom(include_pattern) for include_pattern in include_patterns]
 
 	versions_to_compile = sorted(set(all_versions) - set(ignored))
-	versions_to_compile = unique_versions(versions_to_compile,3)
+	versions_to_compile = unique_versions(versions_to_compile, 3, args.source_dir_prefix)
 
 	shortnames = [os.path.basename(v) for v in versions_to_compile]
 	version_info = list(zip(versions_to_compile,shortnames,[False]*len(versions_to_compile)))
