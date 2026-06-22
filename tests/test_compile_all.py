@@ -144,3 +144,32 @@ def test_group_versions_by_branch_threads_prefix():
 	groups = compile_all.group_versions_by_branch(vi, (6, 0), 'BinSource')
 	assert [e[1] for e in groups['corewcf']] == ['BinSource6.20.0.1']
 	assert [e[1] for e in groups['wcf']] == ['BinSource5.30.0.1']
+
+def test_extract_build_errors_picks_diagnostics():
+	lines = [
+		"Determining projects to restore...",
+		r"C:\a\1\s\Veneer\Foo.csproj : warning NU1701: blah blah",
+		r"CSC : error CS9057: The analyzer assembly 'X.dll' references version '4.12.0.0' [Foo.csproj]",
+		"    1 Error(s)",
+		"Build FAILED.",
+	]
+	out = compile_all.extract_build_errors(lines)
+	assert any('CS9057' in l for l in out)        # the real error is captured
+	assert all('NU1701' not in l for l in out)    # warnings are excluded
+	assert all('Error(s)' not in l for l in out)  # the count summary is not an error line
+
+def test_extract_build_errors_dedupes_and_preserves_order():
+	lines = ["X.csproj : error CS1: msg", "X.csproj : error CS1: msg", "Y.csproj : error CS2: other"]
+	out = compile_all.extract_build_errors(lines)
+	assert out == ["X.csproj : error CS1: msg", "Y.csproj : error CS2: other"]
+
+def test_extract_build_errors_caps_at_max_lines():
+	lines = ["F.csproj : error CS%d: m" % i for i in range(50)]
+	out = compile_all.extract_build_errors(lines, max_lines=10)
+	assert len(out) == 10
+
+def test_extract_build_errors_fallback_to_tail_when_no_diagnostics():
+	lines = ["configuring", "", "Segmentation fault", "make: *** [all] Error 1"]
+	out = compile_all.extract_build_errors(lines, max_lines=2)
+	# no coded diagnostics -> last 2 non-empty lines
+	assert out == ["Segmentation fault", "make: *** [all] Error 1"]
