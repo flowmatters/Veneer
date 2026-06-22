@@ -137,15 +137,14 @@ def flatten_subdirectory(parent, subdir_name, ref_sizes=None):
 	print('  Copied %d items, skipped %d Source references' % (copied, skipped))
 	rmtree(subdir_path)
 
-def copy_references(source,dest):
-	print('Copying references from %s to %s'%(source,dest))
+def copy_references(source, dest, min_files=1):
+	logger.info('Copying references from %s to %s' % (source, dest))
 	if not os.path.exists(dest):
 		os.mkdir(dest)
-
-	assemblies = glob(source+os.path.sep+"*.exe") + glob(source+os.path.sep+"*.dll")
-	assert len(assemblies)
-	for a in assemblies: copyfile(a,dest+os.path.sep+os.path.basename(a))
-
+	assemblies = glob(source + os.path.sep + "*.exe") + glob(source + os.path.sep + "*.dll")
+	assert len(assemblies) >= min_files, f'Expected at least {min_files} binaries in {source}'
+	for a in assemblies:
+		copyfile(a, dest + os.path.sep + os.path.basename(a))
 	return [os.path.basename(a) for a in assemblies]
 
 def build_reference_sizes(ref_basenames, refpath):
@@ -343,6 +342,8 @@ def main():
 	parser.add_argument('--source-dir-prefix',
 		      help='Prefix of version directories under --ewater (also used to derive the version string and .ignore globs). Default matches installed Source; pass e.g. "BinSource" for a binaries-repo layout.',
 		      default='Source ')
+	parser.add_argument('--reference-subdir', default='',
+		help='Subdirectory inside each version dir holding the main Source DLLs. Empty = flat (installed layout); pass e.g. "Source" for a binaries-repo layout.')
 	parser.add_argument('--fail','-f',help="Fail fast: Stop after first failure",action='store_true',default=False)
 	parser.add_argument('--keep','-k',help='Keep references in output directory',action='store_true',default=False)
 	parser.add_argument('--copy_to_source','-c',help='Copy outputs to Source directory WHEN COMPILING AGAINST CUSTOM VERSION OF SOURCE',action='store_true',default=False)
@@ -527,10 +528,11 @@ def main():
 						rmtree(obj_dir)
 
 				print('Copying main references')
-				references = copy_references(fullpath, args.refpath)
+				main_ref_dir = os.path.join(fullpath, args.reference_subdir) if args.reference_subdir else fullpath
+				references = copy_references(main_ref_dir, args.refpath)
 
 				print('Copying plugin references')
-				references += copy_references(os.path.join(fullpath, 'Plugins'), os.path.join(args.refpath, 'Plugins'))
+				references += copy_references(os.path.join(fullpath, 'Plugins'), os.path.join(args.refpath, 'Plugins'), min_files=0)
 				for extra_ref in extra_refs:
 					full_ref_path = os.path.join(extra_ref, 'Compiled', version)
 					print('Copying reference output from ' + full_ref_path)
@@ -548,7 +550,7 @@ def main():
 					if effective_version:
 						version_components = effective_version
 					else:
-						version_components = version.split(' ')[1].split('.')
+						version_components = parse_version_string(version, args.source_dir_prefix).split('.')
 					flags = ['V' + '_'.join(version_components[0:n+1]) for n in range(len(version_components))]
 					before_flag = 'BEFORE_V'
 					for (ix, vc) in enumerate(version_components[:3]):

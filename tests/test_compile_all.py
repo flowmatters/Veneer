@@ -33,3 +33,17 @@ def test_unique_versions_collapses_to_num_elements():
 	dirs = ['/x/Source 6.1.0.222', '/x/Source 5.30.0.1', '/x/Source 6.1.0.111']
 	out = compile_all.unique_versions(dirs, 3, 'Source ')
 	assert out == ['/x/Source 5.30.0.1', '/x/Source 6.1.0.222']  # .222 > .111 kept
+
+def test_copy_references_min_files_zero_tolerates_empty(tmp_path):
+	src = tmp_path / 'empty'; src.mkdir()
+	dest = tmp_path / 'dest'
+	# Should NOT raise when min_files=0 and no assemblies present
+	result = compile_all.copy_references(str(src), str(dest), min_files=0)
+	assert result == []
+
+def test_copy_references_default_asserts_on_empty(tmp_path):
+	src = tmp_path / 'empty2'; src.mkdir()
+	dest = tmp_path / 'dest2'
+	import pytest
+	with pytest.raises(AssertionError):
+		compile_all.copy_references(str(src), str(dest))  # default min_files=1
