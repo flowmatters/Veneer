@@ -56,18 +56,34 @@ Produce a **single unified `compile_all.py`**, owned by the Veneer repo (point o
 ### 1. Reference layout — installed by default, neutral overrides
 
 No auto-detection (auto-detecting `BinSource` would bake a private convention into the public repo).
-Instead, default to the installed layout and expose two generic flags:
+Instead, default to the installed layout and expose two generic flags. Both current scripts parse the
+version differently (upstream `basename.split(' ')[1]`; fork `basename.split('BinSource')[1]`); the
+unified script replaces both with a single **prefix-strip** model so one flag drives everything:
 
-- `--source-dir-prefix` (default `"Source "`): prefix stripped from each version directory's basename
-  to derive the version string, and used to build the discovery glob (`<prefix>[1-9]*`) and the
-  `.ignore` globs. Installed layout uses the default; the private pipeline passes `"BinSource"`.
+- `--source-dir-prefix` (default `"Source "`, note the trailing space): a literal string used three
+  consistent ways —
+  - **discovery glob:** `<prefix>*` → `"Source *"` (installed) / `"BinSource*"` (pipeline);
+  - **`.ignore` glob base:** `<prefix>` + pattern → `"Source " + "2*"` / `"BinSource" + "2*"` (this
+    matches both current scripts: upstream uses `"Source "`, fork uses `"BinSource"`);
+  - **version string:** `basename[len(prefix):]` → `"Source 6.1.0"` → `"6.1.0"`,
+    `"BinSource6.1.0"` → `"6.1.0"`.
+
+  Using prefix-strip (not `split`) is what lets a single flag absorb the `"Source "`-with-space vs
+  `"BinSource"`-no-space asymmetry. Directories whose stripped remainder is non-numeric (e.g.
+  `"Source Catchments"`) are dropped by `valid_version()` rather than crashing `int()` — the version
+  filter must guard against non-numeric components.
 - `--reference-subdir` (default `""`): subdirectory inside each version dir holding the main Source
   DLLs. Empty = flat (installed). The private pipeline passes `"Source"`. The plugin references
   subdir stays `<dir>/Plugins` in both layouts (matches current upstream behavior).
 
-Keep `valid_version()` + `MAX_VERSION` filtering (a harmless safety net the fork has and upstream
-dropped). Keep `copy_references(..., min_files=0)` for the Plugins dir so layouts without plugins
-don't assert-fail.
+Note this *changes* upstream's installed discovery glob from `"Source*"` to `"Source *"` (and now
+relies on `valid_version()` to drop `"Source Catchments"` rather than matching then ignoring it) — an
+intentional, minor behavior change for the default path.
+
+Port from the fork: keep `valid_version()` + `MAX_VERSION` filtering (a safety net the fork has and
+upstream dropped), and add the fork's `min_files` parameter to `copy_references` (upstream's version
+has no such param and hard-`assert`s `len(assemblies)`), calling `copy_references(..., min_files=0)`
+for the Plugins dir so layouts without plugins don't assert-fail.
 
 The public repo thus only knows "you can point me at a differently-named tree whose refs are in a
 subdir" — generic and innocuous. All FIRM specifics live in the private pipeline YAML.
@@ -95,9 +111,22 @@ At startup, enumerate existing worktrees (`git worktree list --porcelain`) and b
    worktree (`.rej` tolerated; cross-branch apply is inherently lossy when files differ between
    branches). CI takes this fallback path naturally (fresh clone on `master`, no `legacy_ci` worktree).
 
-This **eliminates** upstream's `git stash` / in-place `git checkout` / branch-restoration /
-`.rej`-cleanup-in-real-tree machinery. The dev's primary working tree is never mutated or checked out,
-so an interrupted run cannot strand them on the wrong branch with a half-applied patch.
+This is a **rewrite** of upstream's existing branch-switching subsystem, not an addition: upstream
+*currently* switches branches in place via `git_stash_save`/`git_stash_pop`/`git_checkout`/
+`create_patch`/`apply_patch`/`revert_tracked_changes`/`clean_reject_files` (orchestrated in the main
+loop). All of that is **removed**. The dev's primary working tree is never mutated or checked out, so
+an interrupted run cannot strand them on the wrong branch with a half-applied patch. (The helpers the
+build *reuses* — `build_command`, `ensure_stub_build_imports`, `flatten_subdirectory`,
+`build_reference_sizes`/`is_same_as_reference` — are unaffected and carried over verbatim.)
+
+Upstream's `--no-branch-switch` flag is **dropped** — it only made sense for in-place switching. The
+worktree model has no switch to disable; building only the current branch's group is achieved by
+simply having no worktree (and no fallback creation) for the other branch, or can be reintroduced as a
+`--only-current-branch` flag if a need emerges (YAGNI for now).
+
+**Worktree discovery robustness:** a worktree in detached-HEAD state emits no `branch` line in
+`git worktree list --porcelain`; the `branch → path` map must tolerate missing branch lines (skip
+them) rather than assume every worktree has a branch.
 
 Build order may prefer the current worktree first, but with worktrees there is no switching cost.
 
@@ -122,6 +151,18 @@ leakage can't happen.
 Each build executes with the worktree root as working directory and the solution path relative to it
 (both branches have `Veneer.sln` at the same relative location).
 
+**Path resolution per worktree (resolves the relative-path ambiguity):** `--refpath` and `--source`
+are interpreted **relative to each worktree's root**, not the orchestrator's CWD. Both the Python-side
+staging operations (`clear_directory`, `copy_references`, the output-harvest `glob`) and the build
+subprocess must agree on these locations, because the Veneer `.csproj` HintPaths read references from
+`--refpath` and emit to `--source` at paths fixed relative to the project/solution. So for a build in
+worktree `W` the script computes `effective_refpath = normpath(join(W, args.refpath))` and likewise
+for `source`, stages DLLs there, and runs the build with `cwd=W`. The single-tree (degenerate) case is
+just `W == CWD`. **Verify during implementation** that `Veneer.sln`'s csproj HintPaths actually
+resolve to the staged `--refpath` location under this scheme (the current CI passes
+`--refpath ../Output`, a sibling *outside* the checkout — confirm what `<W>/../Output` resolves to for
+both the long-lived and temp-worktree cases).
+
 ### 5. Output harvesting
 
 Keep upstream's branch-aware harvesting:
@@ -138,11 +179,14 @@ Keep upstream's branch-aware harvesting:
 
 ### 6. `MAX_VERSION` reconciliation
 
-Standardize on the superset **`[7, 99, 4]`** (FIRM fork's value; upstream uses `[7, 50, 4]`), hoisted
-to a single module-level constant. `MAX_VERSION` only controls how many `BEFORE_V<n>` forward-guard
-constants are emitted; the plugin's `#if` blocks must see every constant they reference, and extra
-ones are harmless, so the larger bound is the safe choice. **Verify during implementation** against
-the actual `#if BEFORE_V*` usages in the Veneer plugin source.
+Standardize on the superset **`[7, 99, 4]`** (FIRM fork's value; upstream uses `[7, 50, 4]`).
+Note this is a small refactor, not a no-op: upstream defines `MAX_VERSION` as a **function-local
+literal re-assigned inside the build loop**, while the fork has it at module scope (and uses it in
+`valid_version`). The unified script hoists it to a single module-level constant. `MAX_VERSION` only
+controls how many `BEFORE_V<n>` forward-guard constants are emitted; the plugin's `#if` blocks must
+see every constant they reference, and extra ones are harmless, so the larger bound is the safe
+choice. **Verify during implementation** against the actual `#if BEFORE_V*` usages in the Veneer
+plugin source.
 
 ### 7. Logging
 
@@ -151,11 +195,18 @@ Adopt the FIRM fork's `logging` module usage (a recent upstream-of-the-fork impr
 
 ## CI changes (private `FIRM_Veneer_Builds/azure-pipelines.yml`)
 
-- `clone_veneer` step: check out **`master`** instead of `legacy_ci`; keep a full `git clone` so both
-  branch refs are present for `git worktree add`.
+- `clone_veneer` step: check out **`master`** instead of `legacy_ci`. The current step already does a
+  full `git clone` (no `fetchDepth`), but a default clone creates only a local `master` branch ref —
+  `legacy_ci` exists only as `origin/legacy_ci`. The script's temp-worktree creation must therefore
+  `git worktree add <temp> origin/legacy_ci` (explicit remote ref), not bare `legacy_ci`, unless git's
+  DWIM is relied upon; prefer the explicit `origin/<branch>` form for robustness.
 - **Remove** the `copy FIRM_Veneer_Builds\compile_all.py Veneer` line.
-- Invoke with neutral overrides, e.g.:
-  `python compile_all.py --source-dir-prefix BinSource --reference-subdir Source --ewater ../FIRM_ModelBinaries/Binaries --msbuild %msbuildpath% --dotnet dotnet Veneer.sln`
+- Invoke with neutral overrides, **preserving the existing `--refpath ../Output`** (load-bearing — the
+  Veneer.sln HintPaths expect references in `../Output`; dropping it reverts to the default
+  `References` inside the checkout and breaks the build). E.g.:
+  `python compile_all.py --refpath ../Output --source-dir-prefix BinSource --reference-subdir Source --ewater ../FIRM_ModelBinaries/Binaries --msbuild %msbuildpath% --dotnet dotnet Veneer.sln`
+  (Per §4, `--refpath ../Output` is resolved relative to each worktree root — verify this yields the
+  intended location for the temp `legacy_ci` worktree as well as the `master` checkout.)
 - Run twice (retry-failures-first via `_last_fails.txt`) as today.
 
 ### External prerequisites (not part of this script)
@@ -170,5 +221,8 @@ Adopt the FIRM fork's `logging` module usage (a recent upstream-of-the-fork impr
 - **`MAX_VERSION` set** must cover all `BEFORE_V*` constants referenced by the plugin source — verify.
 - **`Veneer.sln` solution structure** must satisfy the two conventions the script assumes (references
   picked up from a writable refs dir, all projects emit to a common output dir) on both branches.
-- The `.include` / `.refs` / `.ignore` sidecar-file behavior is preserved; confirm the FIRM pipeline's
-  sidecar files (if any) still parse under the unified discovery.
+- The `.include` / `.refs` / `.ignore` sidecar-file behavior: adopt upstream's **comment-tolerant**
+  `.include` parsing (`if len(l) and not l.startswith('#')`), which is a superset of the fork's
+  (`if len(l)`) — fork sidecar files without `#` comments are unaffected. Confirm no FIRM sidecar
+  relies on a literal leading-`#` line being treated as data, and that all sidecar files still parse
+  under the unified discovery.
