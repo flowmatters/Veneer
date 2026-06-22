@@ -37,6 +37,8 @@ For usage information, run with -help:
 python compile_all.py -h
 '''
 import os
+import re
+import sys
 import argparse
 import subprocess
 import tempfile
@@ -354,6 +356,42 @@ def build_command(branch_key: str, args, compilation_flags: str, solution: str) 
 		msbuild = args.msbuild.strip('"')
 		return [msbuild, compilation_flags, solution]
 
+# --- Build invocation + error extraction ---
+
+def run_and_capture(cmd_args, cwd=None):
+	"""Run a build command, streaming its combined stdout/stderr live to our stdout
+	while also capturing every line. Returns (returncode, [output_lines]). Capturing
+	lets us replay the relevant error diagnostics in the final results summary."""
+	proc = subprocess.Popen(cmd_args, cwd=cwd, stdout=subprocess.PIPE,
+		stderr=subprocess.STDOUT, text=True, bufsize=1)
+	lines = []
+	for line in proc.stdout:
+		sys.stdout.write(line)
+		lines.append(line.rstrip('\n'))
+	proc.wait()
+	return proc.returncode, lines
+
+# Matches MSBuild/CSC diagnostics like 'CSC : error CS9057: ...' or
+# 'Foo.csproj(12,5): error MSB3021: ...' (but not 'warning ...' or '1 Error(s)').
+_BUILD_ERROR_RE = re.compile(r':\s+(?:error|fatal error)\s+[A-Za-z]{1,8}\d+', re.IGNORECASE)
+
+def extract_build_errors(output_lines, max_lines=25):
+	"""Pull compiler/MSBuild error diagnostics out of captured build output,
+	de-duplicated and capped at max_lines. If no recognised diagnostic is found
+	(e.g. a tool crash or non-standard failure), fall back to the last few non-empty
+	lines so the summary still shows something useful."""
+	errors = []
+	seen = set()
+	for line in output_lines:
+		s = line.strip()
+		if s and _BUILD_ERROR_RE.search(s) and s not in seen:
+			seen.add(s)
+			errors.append(s)
+	if errors:
+		return errors[:max_lines]
+	tail = [l.strip() for l in output_lines if l.strip()]
+	return tail[-max_lines:]
+
 # --- Per-version build/harvest ---
 
 def build_version(branch_key, fullpath, version, custom, solution, effective_refpath,
@@ -416,7 +454,8 @@ def build_version(branch_key, fullpath, version, custom, solution, effective_ref
 	compilation_flags = '/p:DefineConstants=%s' % ('%3B'.join(flags))
 	cmd_args = build_command(branch_key, args, compilation_flags, solution)
 	logger.info(subprocess.list2cmdline(cmd_args))
-	returncode = subprocess.run(cmd_args, cwd=worktree).returncode
+	returncode, output_lines = run_and_capture(cmd_args, cwd=worktree)
+	build_errors = extract_build_errors(output_lines) if returncode != 0 else []
 
 	if returncode == 0:
 		version_dest = destination + os.path.sep + version
@@ -465,7 +504,7 @@ def build_version(branch_key, fullpath, version, custom, solution, effective_ref
 			for artifact in [fn for fn in glob(effective_source + os.path.sep + "*")]:
 				copyfile(artifact, os.path.join(fullpath, os.path.basename(artifact)))
 
-	return returncode
+	return returncode, build_errors
 
 def main():
 	logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -584,6 +623,7 @@ def main():
 
 	destination = os.path.abspath(args.destination)   # shared harvest tree
 	results = {}
+	build_failures = {}   # version -> extracted error excerpt (for the end-of-run replay)
 	for g in plan:
 		wt = g['worktree_path']
 		created_temp = False
@@ -603,11 +643,14 @@ def main():
 				for pkgs in glob(os.path.join(wt, '*', 'Packages')):
 					if os.path.isdir(pkgs): rmtree(pkgs)
 			for (fullpath, version, custom) in g['versions']:
-				results[version] = build_version(
+				returncode, build_errors = build_version(
 					g['branch_key'], fullpath, version, custom,
 					solution, effective_refpath, effective_source, destination, wt,
 					extra_refs, args)
-				if results[version] != 0 and args.fail:
+				results[version] = returncode
+				if returncode != 0:
+					build_failures[version] = build_errors
+				if returncode != 0 and args.fail:
 					break
 		finally:
 			if created_temp and not args.keep_temp_worktrees:
@@ -622,6 +665,15 @@ def main():
 		logger.info("FAILED TO BUILD AGAINST %d VERSIONS" % (len(failures)))
 		logger.info("\n".join(failures))
 		open(LAST_FAILS_FN, 'w').writelines('\n'.join(failures))
+		logger.info("\n*** FAILURE DETAILS ***")
+		for v in failures:
+			excerpt = build_failures.get(v)
+			logger.info("--- %s ---" % v)
+			if excerpt:
+				for line in excerpt:
+					logger.info("    %s" % line)
+			else:
+				logger.info("    (no error lines captured; see full build log above)")
 
 
 if __name__ == '__main__':
