@@ -195,10 +195,12 @@ def get_major_minor_version(version_str: str) -> Tuple[int, int]:
 	parts = v.split('.')
 	return (int(parts[0]), int(parts[1]))
 
-def determine_branch(version_info_entry: tuple, corewcf_min_version: Tuple[int, int]) -> str:
+def determine_branch(version_info_entry: tuple, corewcf_min_version: Tuple[int, int], prefix: str = '') -> str:
 	"""Return 'wcf' or 'corewcf' based on version threshold.
 	version_info_entry is (fullpath, version_name, custom).
-	Custom entries without effective_version default to 'wcf'."""
+	Custom entries without effective_version default to 'wcf'.
+	prefix is the source-dir prefix (e.g. 'BinSource' or 'Source ') used to
+	strip directory-name prefixes before parsing major.minor."""
 	fullpath, version, custom = version_info_entry
 	is_custom = True if hasattr(custom, '__len__') else custom
 
@@ -206,8 +208,8 @@ def determine_branch(version_info_entry: tuple, corewcf_min_version: Tuple[int, 
 	if is_custom and hasattr(custom, '__len__'):
 		effective_version = custom
 	elif not is_custom:
-		# Standard installed version: parse from version name like 'Source 6.1.0.12345'
-		effective_version = version
+		# Standard discovered version: strip the configured prefix before parsing
+		effective_version = parse_version_string(version, prefix)
 
 	if effective_version is None:
 		# Custom entry without effective_version — default to WCF
@@ -222,11 +224,11 @@ def determine_branch(version_info_entry: tuple, corewcf_min_version: Tuple[int, 
 	except (ValueError, IndexError):
 		return 'wcf'
 
-def group_versions_by_branch(version_info: list, corewcf_min_version: Tuple[int, int]) -> Dict[str, list]:
+def group_versions_by_branch(version_info: list, corewcf_min_version: Tuple[int, int], prefix: str = '') -> Dict[str, list]:
 	"""Group version_info entries into {'wcf': [...], 'corewcf': [...]}."""
 	groups: Dict[str, list] = {'wcf': [], 'corewcf': []}
 	for entry in version_info:
-		branch_key = determine_branch(entry, corewcf_min_version)
+		branch_key = determine_branch(entry, corewcf_min_version, prefix)
 		groups[branch_key].append(entry)
 	return groups
 
@@ -570,7 +572,7 @@ def main():
 	worktrees = list_worktrees()
 	current_branch = get_current_branch()
 	branch_names = {'wcf': args.wcf_branch, 'corewcf': args.corewcf_branch}
-	branch_groups = group_versions_by_branch(version_info, corewcf_min_version)
+	branch_groups = group_versions_by_branch(version_info, corewcf_min_version, args.source_dir_prefix)
 	plan = compute_build_plan(branch_groups, branch_names, worktrees, current_branch)
 
 	for g in plan:
