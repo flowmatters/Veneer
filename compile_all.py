@@ -259,14 +259,8 @@ def get_current_branch() -> str:
 		capture_output=True, text=True, check=True)
 	return result.stdout.strip()
 
-def has_tracked_changes() -> bool:
-	result = subprocess.run(['git', 'diff', 'HEAD', '--quiet'])
-	return result.returncode != 0
-
 def create_patch() -> Optional[str]:
 	"""Return git diff HEAD content, or None if no changes."""
-	if not has_tracked_changes():
-		return None
 	result = subprocess.run(['git', 'diff', 'HEAD'], capture_output=True, text=True, check=True)
 	return result.stdout if result.stdout.strip() else None
 
@@ -276,20 +270,6 @@ def save_patch_to_temp(content: str) -> str:
 	with os.fdopen(fd, 'w') as f:
 		f.write(content)
 	return path
-
-def git_stash_save() -> bool:
-	"""Stash tracked and untracked changes. Returns True if something was stashed."""
-	result = subprocess.run(['git', 'stash', 'push', '-m', 'compile_all_py_auto_stash'],
-		capture_output=True, text=True)
-	return 'No local changes' not in result.stdout
-
-def git_stash_pop():
-	subprocess.run(['git', 'stash', 'pop'], capture_output=True, text=True)
-
-def git_checkout(branch: str):
-	result = subprocess.run(['git', 'checkout', branch], capture_output=True, text=True)
-	if result.returncode != 0:
-		raise RuntimeError(f'git checkout {branch} failed: {result.stderr}')
 
 def apply_patch(patch_path: str) -> bool:
 	"""Apply patch with --reject mode. Returns True if applied cleanly."""
@@ -302,9 +282,6 @@ def apply_patch(patch_path: str) -> bool:
 		return False
 	return True
 
-def revert_tracked_changes():
-	subprocess.run(['git', 'checkout', '--', '.'], capture_output=True, text=True)
-
 def clean_reject_files():
 	"""Walk tree and delete all *.rej files."""
 	for root, dirs, files in os.walk('.'):
@@ -314,6 +291,31 @@ def clean_reject_files():
 					os.remove(os.path.join(root, f))
 				except OSError:
 					pass
+
+def make_temp_worktree(branch):
+	tmp = tempfile.mkdtemp(prefix='compile_all_wt_')
+	# Prefer the remote ref so a fresh CI clone (only local `master`) still resolves it.
+	ref = branch
+	if subprocess.run(['git', 'rev-parse', '--verify', '--quiet', 'origin/' + branch],
+			capture_output=True).returncode == 0:
+		ref = 'origin/' + branch
+	res = subprocess.run(['git', 'worktree', 'add', '--detach', tmp, ref],
+		capture_output=True, text=True)
+	if res.returncode != 0:
+		raise RuntimeError('git worktree add failed for %s: %s' % (ref, res.stderr))
+	logger.info('Created temp worktree %s at %s' % (tmp, ref))
+	return tmp
+
+def carry_dirty_changes(worktree):
+	patch = create_patch()
+	if not patch:
+		return
+	patch_path = save_patch_to_temp(patch)
+	res = subprocess.run(['git', '-C', worktree, 'apply', '--reject', '--whitespace=nowarn', patch_path],
+		capture_output=True, text=True)
+	if res.returncode != 0:
+		logger.warning('Dirty changes did not apply cleanly to temp worktree (continuing): %s' % res.stderr)
+	os.remove(patch_path)
 
 def parse_worktree_list(porcelain_output):
 	"""Parse `git worktree list --porcelain` into {short_branch_name: worktree_path}.
@@ -360,14 +362,127 @@ def ensure_stub_build_imports(solution_path: str):
 
 # --- Build command helper ---
 
-def build_command(branch_key: str, args, compilation_flags: str) -> list:
+def build_command(branch_key: str, args, compilation_flags: str, solution: str) -> list:
 	"""Return the build command as a list of arguments for subprocess.run."""
 	if branch_key == 'corewcf':
 		return [args.dotnet, 'build', compilation_flags,
-			'/p:MSBuildWarningsAsMessages=MSB3277', args.solution]
+			'/p:MSBuildWarningsAsMessages=MSB3277', solution]
 	else:
 		msbuild = args.msbuild.strip('"')
-		return [msbuild, compilation_flags, args.solution]
+		return [msbuild, compilation_flags, solution]
+
+# --- Per-version build/harvest ---
+
+def build_version(branch_key, fullpath, version, custom, solution, effective_refpath,
+		effective_source, destination, worktree, extra_refs, args):
+	"""Stage references, build, and harvest one Source version inside `worktree`.
+	Returns the build process returncode."""
+	is_custom = True if hasattr(custom, '__len__') else custom
+
+	print("\n*** COMPILING AGAINST %s [%s] ***" % (version, branch_key.upper()))
+	if os.path.exists(effective_refpath):
+		print("Removing references from %s" % effective_refpath)
+		clear_directory(effective_refpath)
+	if os.path.exists(effective_source):
+		print("Removing previous build from %s" % effective_source)
+		clear_directory(effective_source)
+	# Clean obj directories to remove stale NuGet-generated targets
+	# (e.g. master branch targets leaking into legacy_ci builds)
+	for obj_dir in glob(os.path.join(worktree, '*', 'obj')):
+		if os.path.isdir(obj_dir):
+			print("Removing stale obj directory %s" % obj_dir)
+			rmtree(obj_dir)
+
+	print('Copying main references')
+	main_ref_dir = os.path.join(fullpath, args.reference_subdir) if args.reference_subdir else fullpath
+	references = copy_references(main_ref_dir, effective_refpath)
+
+	print('Copying plugin references')
+	references += copy_references(os.path.join(fullpath, 'Plugins'), os.path.join(effective_refpath, 'Plugins'), min_files=0)
+	for extra_ref in extra_refs:
+		full_ref_path = os.path.join(extra_ref, 'Compiled', version)
+		print('Copying reference output from ' + full_ref_path)
+		references += copy_references(full_ref_path, effective_refpath)
+	print(f'Copied {len(references)} references')
+
+	flags = []
+	effective_version = None
+	if is_custom:
+		flags = ['LOCAL_CODE', version]
+		if hasattr(custom, '__len__'):
+			effective_version = custom.split('.')
+
+	if effective_version or not is_custom:
+		if effective_version:
+			version_components = effective_version
+		else:
+			version_components = parse_version_string(version, args.source_dir_prefix).split('.')
+		if valid_version(version_components):
+			flags = ['V' + '_'.join(version_components[0:n+1]) for n in range(len(version_components))]
+			before_flag = 'BEFORE_V'
+			for (ix, vc) in enumerate(version_components[:3]):
+				vc_num = int(vc)
+				flags += [before_flag + str(num) for num in range(vc_num+1, MAX_VERSION[ix])]
+				before_flag += vc + '_'
+		else:
+			logger.info('Skipping BEFORE_V flags for non-numeric %s' % version)
+	for f in flags:
+		print('Defining custom compilation constant: %s' % f)
+
+	# Actual build!
+	compilation_flags = '/p:DefineConstants=%s' % ('%3B'.join(flags))
+	cmd_args = build_command(branch_key, args, compilation_flags, solution)
+	print(subprocess.list2cmdline(cmd_args))
+	returncode = subprocess.run(cmd_args, cwd=worktree).returncode
+
+	if returncode == 0:
+		version_dest = destination + os.path.sep + version
+		if not os.path.exists(version_dest):
+			os.makedirs(version_dest)
+
+		if args.keep:
+			copy_references(effective_refpath, version_dest)
+
+		# For CoreWCF builds, use size-aware filtering: the .NET 8 SDK copies
+		# all referenced assemblies to the output, including Source DLLs. We skip
+		# files identical to Source references (same name AND size) but keep files
+		# where Veneer needs a different version than Source ships.
+		ref_sizes = build_reference_sizes(references, effective_refpath) if branch_key == 'corewcf' else {}
+
+		for artifact in glob(effective_source + os.path.sep + "*"):
+			basename = os.path.basename(artifact)
+			if not args.keep:
+				if ref_sizes:
+					# CoreWCF: skip only if identical to Source reference
+					if not os.path.isdir(artifact) and is_same_as_reference(artifact, ref_sizes):
+						continue
+				else:
+					# WCF: original basename-only filter
+					if basename in references:
+						continue
+			try:
+				the_dest = version_dest + os.path.sep + basename
+				if os.path.isdir(artifact):
+					if os.path.exists(the_dest):
+						rmtree(the_dest)
+					copytree(artifact, the_dest)
+				else:
+					copyfile(artifact, the_dest)
+			except:
+				print('Error copying %s to %s' % (artifact, the_dest))
+				raise
+
+		# CoreWCF builds produce a nested Veneer/ subdirectory for VeneerCmd output.
+		# Flatten it by merging its contents into the top-level destination so the
+		# deployment structure matches the legacy WCF layout.
+		if branch_key == 'corewcf':
+			flatten_subdirectory(version_dest, 'Veneer', ref_sizes=ref_sizes)
+
+		if custom and args.copy_to_source:
+			for artifact in [fn for fn in glob(effective_source + os.path.sep + "*")]:
+				copyfile(artifact, os.path.join(fullpath, os.path.basename(artifact)))
+
+	return returncode
 
 def main():
 	logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -404,7 +519,10 @@ def main():
 	parser.add_argument('--corewcf-branch',help='Git branch for CoreWCF (.NET 8) builds',default='master')
 	parser.add_argument('--corewcf-min-version',help='Minimum Source version for CoreWCF (major.minor)',default='6.0')
 	parser.add_argument('--dotnet',help='Path to dotnet CLI for CoreWCF builds',default='dotnet')
-	parser.add_argument('--no-branch-switch',help='Disable branch switching (compile everything on current branch)',action='store_true',default=False)
+	parser.add_argument('--dry-run', action='store_true', default=False,
+		help='Print the resolved build plan (branch groups, worktrees, commands) and exit without building.')
+	parser.add_argument('--keep-temp-worktrees', action='store_true', default=False,
+		help='Do not remove temporary worktrees after building (debugging).')
 	parser.add_argument('solution',help="Path to Solution (.sln) file")
 
 	args = parser.parse_args()
@@ -467,234 +585,47 @@ def main():
 		extra_refs = open(refs_fn).readlines()
 
 	# --- Group versions by branch ---
+	worktrees = list_worktrees()
+	current_branch = get_current_branch()
+	branch_names = {'wcf': args.wcf_branch, 'corewcf': args.corewcf_branch}
 	branch_groups = group_versions_by_branch(version_info, corewcf_min_version)
-	branch_names = {
-		'wcf': args.wcf_branch,
-		'corewcf': args.corewcf_branch,
-	}
-	print("\n*** BRANCH ASSIGNMENT ***")
-	print("  WCF (%s): %d versions" % (args.wcf_branch, len(branch_groups['wcf'])))
-	for v in branch_groups['wcf']:
-		print("    %s" % v[1])
-	print("  CoreWCF (%s): %d versions" % (args.corewcf_branch, len(branch_groups['corewcf'])))
-	for v in branch_groups['corewcf']:
-		print("    %s" % v[1])
+	plan = compute_build_plan(branch_groups, branch_names, worktrees, current_branch)
 
-	# Determine compilation order: current branch first to minimize switches
-	original_branch = get_current_branch()
+	for g in plan:
+		loc = g['worktree_path'] or '(temp worktree to be created)'
+		logger.info('Group %s -> branch %s in %s: %d version(s)' % (
+			g['branch_key'].upper(), g['target_branch'], loc, len(g['versions'])))
+	if args.dry_run:
+		logger.info('--dry-run: not building.')
+		return
 
-	# Determine current branch key
-	if original_branch == args.corewcf_branch:
-		current_branch_key = 'corewcf'
-	else:
-		current_branch_key = 'wcf'
-
-	# In no-branch-switch mode, only compile versions appropriate for the current branch
-	if args.no_branch_switch:
-		skipped_key = 'wcf' if current_branch_key == 'corewcf' else 'corewcf'
-		skipped_versions = branch_groups[skipped_key]
-		if skipped_versions:
-			print("\n*** --no-branch-switch: skipping %d %s versions not appropriate for current branch (%s) ***" % (len(skipped_versions), skipped_key.upper(), original_branch))
-			for v in skipped_versions:
-				print("    SKIPPED: %s" % v[1])
-		compile_order = [(current_branch_key, original_branch, branch_groups[current_branch_key])]
-		if not branch_groups[current_branch_key]:
-			compile_order = []
-		print("\n*** --no-branch-switch: compiling %d versions on current branch (%s) using %s build ***" % (len(branch_groups[current_branch_key]), original_branch, current_branch_key))
-	else:
-		compile_order = []
-		for branch_key in ['wcf', 'corewcf']:
-			versions = branch_groups[branch_key]
-			if not versions:
-				continue
-			compile_order.append((branch_key, branch_names[branch_key], versions))
-		# Sort so current branch compiles first
-		compile_order.sort(key=lambda x: 0 if x[1] == original_branch else 1)
-
-	# Determine if we need to switch branches
-	need_switch = not args.no_branch_switch and len(compile_order) > 1
-
-	# Prepare git state (only if switching is needed)
-	patch_path = None
-	did_stash = False
-	if need_switch:
-		print("\n*** Preparing git state for branch switching ***")
-		patch_content = create_patch()
-		if patch_content:
-			patch_path = save_patch_to_temp(patch_content)
-			print("  Saved uncommitted changes to %s" % patch_path)
-		did_stash = git_stash_save()
-		if did_stash:
-			print("  Stashed working directory changes")
-
+	destination = os.path.abspath(args.destination)   # shared harvest tree
 	results = {}
-	fail_fast_triggered = False
-	current_on_branch = original_branch
-
-	try:
-		for (branch_key, target_branch, versions) in compile_order:
-			# Determine effective branch key for build command
-			if args.no_branch_switch:
-				effective_branch_key = current_branch_key
-			else:
-				effective_branch_key = branch_key
-
-			# Switch branch if needed
-			if not args.no_branch_switch and current_on_branch != target_branch:
-				print("\n*** Switching to branch '%s' for %s builds ***" % (target_branch, branch_key.upper()))
-				git_checkout(target_branch)
-				current_on_branch = target_branch
-				if patch_path:
-					ok = apply_patch(patch_path)
-					if ok:
-						print("  Applied uncommitted changes patch cleanly")
-					else:
-						print("  WARNING: Patch applied with rejections (continuing anyway)")
-
-			# Ensure stub build imports exist for CoreWCF builds
-			if effective_branch_key == 'corewcf':
-				ensure_stub_build_imports(args.solution)
-				# Remove legacy Packages directories (from packages.config NuGet restore).
-				# SDK-style projects auto-include *.xaml from the entire tree, which picks up
-				# XAML files inside IronPython packages and causes build errors.
-				for packages_dir in glob('*' + os.sep + 'Packages'):
-					if os.path.isdir(packages_dir):
-						print("  Removing legacy Packages directory %s" % packages_dir)
-						rmtree(packages_dir)
-
-			# Inner loop: build each version
-			for (fullpath, version, custom) in versions:
-				is_custom = True if hasattr(custom, '__len__') else custom
-
-				print("\n*** COMPILING AGAINST %s [%s] ***" % (version, effective_branch_key.upper()))
-				if os.path.exists(args.refpath):
-					print("Removing references from %s" % args.refpath)
-					clear_directory(args.refpath)
-				if os.path.exists(args.source):
-					print("Removing previous build from %s" % args.source)
-					clear_directory(args.source)
-				# Clean obj directories to remove stale NuGet-generated targets
-				# (e.g. master branch targets leaking into legacy_ci builds)
-				for obj_dir in glob('*' + os.path.sep + 'obj'):
-					if os.path.isdir(obj_dir):
-						print("Removing stale obj directory %s" % obj_dir)
-						rmtree(obj_dir)
-
-				print('Copying main references')
-				main_ref_dir = os.path.join(fullpath, args.reference_subdir) if args.reference_subdir else fullpath
-				references = copy_references(main_ref_dir, args.refpath)
-
-				print('Copying plugin references')
-				references += copy_references(os.path.join(fullpath, 'Plugins'), os.path.join(args.refpath, 'Plugins'), min_files=0)
-				for extra_ref in extra_refs:
-					full_ref_path = os.path.join(extra_ref, 'Compiled', version)
-					print('Copying reference output from ' + full_ref_path)
-					references += copy_references(full_ref_path, args.refpath)
-				print(f'Copied {len(references)} references')
-
-				flags = []
-				effective_version = None
-				if is_custom:
-					flags = ['LOCAL_CODE', version]
-					if hasattr(custom, '__len__'):
-						effective_version = custom.split('.')
-
-				if effective_version or not is_custom:
-					if effective_version:
-						version_components = effective_version
-					else:
-						version_components = parse_version_string(version, args.source_dir_prefix).split('.')
-					flags = ['V' + '_'.join(version_components[0:n+1]) for n in range(len(version_components))]
-					before_flag = 'BEFORE_V'
-					for (ix, vc) in enumerate(version_components[:3]):
-						vc_num = int(vc)
-						flags += [before_flag + str(num) for num in range(vc_num+1, MAX_VERSION[ix])]
-						before_flag += vc + '_'
-				for f in flags:
-					print('Defining custom compilation constant: %s' % f)
-
-				# Actual build!
-				compilation_flags = '/p:DefineConstants=%s' % ('%3B'.join(flags))
-				cmd_args = build_command(effective_branch_key, args, compilation_flags)
-				print(subprocess.list2cmdline(cmd_args))
-				results[version] = subprocess.run(cmd_args).returncode
-
-				if results[version] == 0:
-					version_dest = args.destination + os.path.sep + version
-					if not os.path.exists(version_dest):
-						os.makedirs(version_dest)
-
-					if args.keep:
-						copy_references(args.refpath, version_dest)
-
-					# For CoreWCF builds, use size-aware filtering: the .NET 8 SDK copies
-					# all referenced assemblies to the output, including Source DLLs. We skip
-					# files identical to Source references (same name AND size) but keep files
-					# where Veneer needs a different version than Source ships.
-					ref_sizes = build_reference_sizes(references, args.refpath) if effective_branch_key == 'corewcf' else {}
-
-					for artifact in glob(args.source + os.path.sep + "*"):
-						basename = os.path.basename(artifact)
-						if not args.keep:
-							if ref_sizes:
-								# CoreWCF: skip only if identical to Source reference
-								if not os.path.isdir(artifact) and is_same_as_reference(artifact, ref_sizes):
-									continue
-							else:
-								# WCF: original basename-only filter
-								if basename in references:
-									continue
-						try:
-							the_dest = version_dest + os.path.sep + basename
-							if os.path.isdir(artifact):
-								if os.path.exists(the_dest):
-									rmtree(the_dest)
-								copytree(artifact, the_dest)
-							else:
-								copyfile(artifact, the_dest)
-						except:
-							print('Error copying %s to %s' % (artifact, the_dest))
-							raise
-
-					# CoreWCF builds produce a nested Veneer/ subdirectory for VeneerCmd output.
-					# Flatten it by merging its contents into the top-level destination so the
-					# deployment structure matches the legacy WCF layout.
-					if effective_branch_key == 'corewcf':
-						flatten_subdirectory(version_dest, 'Veneer', ref_sizes=ref_sizes)
-
-					if custom and args.copy_to_source:
-						for artifact in [fn for fn in glob(args.source + os.path.sep + "*")]:
-							copyfile(artifact, os.path.join(fullpath, os.path.basename(artifact)))
-				elif args.fail:
-					fail_fast_triggered = True
+	for g in plan:
+		wt = g['worktree_path']
+		created_temp = False
+		if g['is_temp']:
+			wt = make_temp_worktree(g['target_branch'])
+			created_temp = True
+			carry_dirty_changes(wt)
+		try:
+			solution = resolve_in_worktree(wt, args.solution)
+			effective_refpath = resolve_in_worktree(wt, args.refpath)
+			effective_source = resolve_in_worktree(wt, args.source)
+			if g['branch_key'] == 'corewcf':
+				ensure_stub_build_imports(solution)
+				for pkgs in glob(os.path.join(wt, '*', 'Packages')):
+					if os.path.isdir(pkgs): rmtree(pkgs)
+			for (fullpath, version, custom) in g['versions']:
+				results[version] = build_version(
+					g['branch_key'], fullpath, version, custom,
+					solution, effective_refpath, effective_source, destination, wt,
+					extra_refs, args)
+				if results[version] != 0 and args.fail:
 					break
-
-			# Clean up applied patch changes before switching away
-			if not args.no_branch_switch:
-				revert_tracked_changes()
-				clean_reject_files()
-
-			if fail_fast_triggered:
-				break
-
-	finally:
-		# Always restore original branch and stash
-		if current_on_branch != original_branch:
-			print("\n*** Restoring original branch '%s' ***" % original_branch)
-			try:
-				revert_tracked_changes()
-				clean_reject_files()
-				git_checkout(original_branch)
-			except RuntimeError as e:
-				print("WARNING: Failed to restore original branch: %s" % e)
-		if did_stash:
-			print("  Restoring stashed changes")
-			git_stash_pop()
-		if patch_path:
-			try:
-				os.remove(patch_path)
-			except OSError:
-				pass
+		finally:
+			if created_temp and not args.keep_temp_worktrees:
+				subprocess.run(['git', 'worktree', 'remove', '--force', wt])
 
 	# --- Results summary ---
 	failures = sorted([k for (k, v) in results.items() if v > 0])
