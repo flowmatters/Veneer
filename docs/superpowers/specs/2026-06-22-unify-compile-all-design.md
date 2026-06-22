@@ -73,8 +73,13 @@ unified script replaces both with a single **prefix-strip** model so one flag dr
   `"Source Catchments"`) are dropped by `valid_version()` rather than crashing `int()` — the version
   filter must guard against non-numeric components.
 - `--reference-subdir` (default `""`): subdirectory inside each version dir holding the main Source
-  DLLs. Empty = flat (installed). The private pipeline passes `"Source"`. The plugin references
-  subdir stays `<dir>/Plugins` in both layouts (matches current upstream behavior).
+  DLLs. Empty = flat (installed). The private pipeline passes `"Source"`. **Plugin references are
+  staged from the MAIN reference dir's `Plugins` subdir** — `<dir>/Plugins` for installed, but
+  `<dir>/Source/Plugins` for the binaries layout (where Source's own plugins, incl. `engine*.dll`,
+  actually live). If a *sibling* `<dir>/Plugins` also exists and differs (binaries repos add extra
+  custom plugins there), it is staged too so those aren't dropped. (The original assumption that
+  Plugins is always `<dir>/Plugins` was wrong for the binaries layout — caught when the master
+  VeneerCmd build failed with MSB3030 looking for `Output/Plugins/engine13.dll`.)
 
 Note this *changes* upstream's installed discovery glob from `"Source*"` to `"Source *"` (and now
 relies on `valid_version()` to drop `"Source Catchments"` rather than matching then ignoring it) — an

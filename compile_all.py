@@ -419,7 +419,22 @@ def build_version(branch_key, fullpath, version, custom, solution, effective_ref
 	references = copy_references(main_ref_dir, effective_refpath)
 
 	logger.info('Copying plugin references')
-	references += copy_references(os.path.join(fullpath, 'Plugins'), os.path.join(effective_refpath, 'Plugins'), min_files=0)
+	# Source's own plugins (incl. engine*.dll) live in the MAIN reference dir's Plugins
+	# subdir: <dir>/Plugins for installed Source, <dir>/Source/Plugins for the binaries
+	# layout (where --reference-subdir=Source). Stage those. If a *sibling* <dir>/Plugins
+	# also exists and differs (binaries repos add extra custom plugins there), stage it too
+	# so we don't drop them. The primary (Source) plugins are copied last so they win any
+	# name collision.
+	plugin_dest = os.path.join(effective_refpath, 'Plugins')
+	primary_plugins = os.path.join(main_ref_dir, 'Plugins')
+	sibling_plugins = os.path.join(fullpath, 'Plugins')
+	plugin_sources = []
+	if os.path.isdir(sibling_plugins) and os.path.normpath(sibling_plugins) != os.path.normpath(primary_plugins):
+		plugin_sources.append(sibling_plugins)
+	if os.path.isdir(primary_plugins):
+		plugin_sources.append(primary_plugins)
+	for pdir in plugin_sources:
+		references += copy_references(pdir, plugin_dest, min_files=0)
 	for extra_ref in extra_refs:
 		full_ref_path = os.path.join(extra_ref, 'Compiled', version)
 		logger.info('Copying reference output from ' + full_ref_path)
