@@ -289,6 +289,26 @@ def clean_reject_files():
 				except OSError:
 					pass
 
+def parse_worktree_list(porcelain_output):
+	"""Parse `git worktree list --porcelain` into {short_branch_name: worktree_path}.
+	Worktrees in detached-HEAD state (no `branch` line) are omitted."""
+	worktrees = {}
+	path = None
+	for line in porcelain_output.splitlines():
+		if line.startswith('worktree '):
+			path = line[len('worktree '):].strip()
+		elif line.startswith('branch ') and path is not None:
+			ref = line[len('branch '):].strip()      # e.g. refs/heads/legacy_ci
+			worktrees[ref.rsplit('/', 1)[-1]] = path
+		elif line.strip() == '':
+			path = None
+	return worktrees
+
+def list_worktrees():
+	result = subprocess.run(['git', 'worktree', 'list', '--porcelain'],
+		capture_output=True, text=True, check=True)
+	return parse_worktree_list(result.stdout)
+
 # --- Stub build imports for CoreWCF builds ---
 
 STUB_IMPORT_PATHS = [
