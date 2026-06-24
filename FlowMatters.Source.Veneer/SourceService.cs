@@ -860,6 +860,15 @@ namespace FlowMatters.Source.WebServer
         }
 
         [OperationContract]
+        [WebInvoke(Method = "DELETE", UriTemplate = UriTemplates.InputSet)]
+        public void DeleteInputSet(string inputSetName)
+        {
+            Log("Deleting Input Set: " + inputSetName);
+            var sets = new InputSets(Scenario);
+            sets.Delete(inputSetName);
+        }
+
+        [OperationContract]
         [WebInvoke(Method = "POST", UriTemplate = UriTemplates.RunInputSet,RequestFormat = WebMessageFormat.Json)]
         public void RunInputSet(string inputSetName,string action)
         {
