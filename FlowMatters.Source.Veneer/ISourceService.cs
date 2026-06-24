@@ -154,6 +154,10 @@ namespace FlowMatters.Source.Veneer
         public void UpdateInputSet(string inputSetName, InputSetSummary summary);
 
         [OperationContract]
+        [WebInvoke(Method = "DELETE", UriTemplate = UriTemplates.InputSet)]
+        void DeleteInputSet(string inputSetName);
+
+        [OperationContract]
         [WebInvoke(Method = "POST", UriTemplate = UriTemplates.RunInputSet, RequestFormat = WebMessageFormat.Json)]
         void RunInputSet(string inputSetName, string action);
 

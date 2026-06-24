@@ -72,6 +72,23 @@ Content-Type: application/json
 
 ---
 
+## `DELETE /inputSets/{inputSetName}`
+
+Delete an input set and its associated configuration from the model.
+
+- **Request body**: none
+- **Response**: none (`200 OK`)
+- **veneer-py**: no dedicated helper yet — call `v.session.delete(url)` with the input set's `URL`.
+
+```http
+DELETE /inputSets/DryClimate HTTP/1.1
+```
+
+> `{inputSetName}` is the URL-safe form of the input set name (as returned in the `URL` field of
+> `GET /inputSets`). Deleting an input set that does not exist is a no-op (`200 OK`).
+
+---
+
 ## `POST /inputSets/{inputSetName}/{action}`
 
 Perform an action on an input set. The only supported action is **`run`**, which applies the
