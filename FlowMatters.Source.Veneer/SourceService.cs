@@ -790,6 +790,13 @@ namespace FlowMatters.Source.Veneer
             sets.UpdateInstructions(set, summary.Configuration);
         }
 
+        public void DeleteInputSet(string inputSetName)
+        {
+            Log("Deleting Input Set: " + inputSetName);
+            var sets = new InputSets(Scenario);
+            sets.Delete(inputSetName);
+        }
+
         public void RunInputSet(string inputSetName,string action)
         {
             if (action != "run")

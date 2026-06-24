@@ -55,6 +55,7 @@ to every path; in **live mode** no extension is added. That single switch is wha
 | GET | `/inputSets` | `input_sets()` |
 | POST | `/inputSets` | `create_input_set(input_set)` |
 | PUT | `/inputSets/{name}` | `update_input_set(name, input_set)` |
+| DELETE | `/inputSets/{name}` | (no dedicated helper yet) |
 | POST | `/inputSets/{name}/run` | `apply_input_set(name)` |
 | PUT | `/recorders` | `configure_recording(enable=[], disable=[])` |
 | GET | `/dataSources` | `data_sources()` |
