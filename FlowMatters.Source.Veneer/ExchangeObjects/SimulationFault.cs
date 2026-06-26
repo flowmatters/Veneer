@@ -16,7 +16,19 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects
             StackTrace = e.StackTrace;
         }
 
+        public SimulationFault(string message, string[] log)
+        {
+            Message = message;
+            Log = log;
+        }
+
         [DataMember] public string Message { get; set; }
         [DataMember] public string StackTrace { get; set; }
+
+        /// <summary>
+        /// Diagnostic messages captured from the Source log during the run. Populated when a
+        /// run fails (or completes without producing a result) so the client can see why.
+        /// </summary>
+        [DataMember(EmitDefaultValue = false)] public string[] Log { get; set; }
     }
 }
