@@ -15,7 +15,7 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects
     [DataContract]
     public class VeneerStatus
     {
-        public const int PROTOCOL_VERSION = 20260618;
+        public const int PROTOCOL_VERSION = 20260626;
         public VeneerStatus(RiverSystemScenario s)
         {
             Version = PROTOCOL_VERSION;

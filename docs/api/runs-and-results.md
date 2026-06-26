@@ -23,8 +23,11 @@ Runs the current scenario. The body is a flat JSON object of run parameters.
 - **`409 Conflict`**: a run is already in progress. Body is a
   [`SimulationFault`](schemas.md#simulationfault) — *"A simulation is already running. Cancel
   the current run before starting a new one."*
-- **`500 Internal Server Error`**: the run threw. Body is a `SimulationFault` carrying the
-  exception `Message` and `StackTrace`.
+- **`500 Internal Server Error`**: the run failed. Body is a `SimulationFault`. Two cases:
+  - The run threw — the fault carries the exception `Message` and `StackTrace`.
+  - The run completed without producing a result (Source aborted internally, e.g. an input
+    file could not be loaded). The fault carries an explanatory `Message` and a `Log` array of
+    the diagnostic messages captured from Source during the run.
 - **veneer-py**: `v.run_model(params=None, start=None, end=None, run_async=False, name=None)`
 
 > **The run is synchronous.** The HTTP request does not return until the simulation finishes;
