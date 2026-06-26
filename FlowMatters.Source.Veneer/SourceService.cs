@@ -367,6 +367,13 @@ namespace FlowMatters.Source.Veneer
             };
             TIME.Management.Log.MessageRecieved += runLogger;
 
+            // Snapshot the existing runs so we can detect whether this invocation actually
+            // produced a new one. RunManager.Execute() can return without throwing yet abort the
+            // simulation internally (e.g. a data file fails to load), reporting the cause only
+            // through the log stream captured above.
+            var runNumbersBefore = new HashSet<int>(
+                Scenario.Project.ResultManager.AllRuns().Select(run => run.RunNumber));
+
             try
             {
                 _currentScenarioInvoker.RunScenario(parameters, RunningInGUI, _sharedLogGenerator);
@@ -376,7 +383,9 @@ namespace FlowMatters.Source.Veneer
                 Log("Run Failed", LogLevel.Error);
                 Log(e.Message, LogLevel.Error);
                 Log(e.StackTrace, LogLevel.Error);
-                throw new WebFaultException<SimulationFault>(new SimulationFault(e), HttpStatusCode.InternalServerError);
+                throw new WebFaultException<SimulationFault>(
+                    new SimulationFault(e) { Log = messages.ToArray() },
+                    HttpStatusCode.InternalServerError);
             }
             finally
             {
@@ -388,16 +397,27 @@ namespace FlowMatters.Source.Veneer
             }
 
             var allRuns = Scenario.Project.ResultManager.AllRuns();
-            var last = allRuns.Last();
+            var newRun = allRuns.LastOrDefault(run => !runNumbersBefore.Contains(run.RunNumber));
 
-            RunLogs[last.RunNumber] = messages.ToArray();
-            Run r = RunsForId("latest")[0];
+            if (newRun == null)
+            {
+                // The run completed without throwing but added no result. Surface the captured log
+                // (which holds the real diagnostic) instead of returning an opaque error.
+                Log("Run completed without producing a result.", LogLevel.Error);
+                throw new WebFaultException<SimulationFault>(
+                    new SimulationFault(
+                        "The simulation finished without producing a run. See the log for the cause (e.g. missing or unreadable input data).",
+                        messages.ToArray()),
+                    HttpStatusCode.InternalServerError);
+            }
+
+            RunLogs[newRun.RunNumber] = messages.ToArray();
 
             WebOperationContext.Current.OutgoingResponse.StatusCode = HttpStatusCode.Redirect;
             WebOperationContext.Current.OutgoingResponse.Headers.Add("Location",
                                                                      WebOperationContext.Current.IncomingRequest.Headers
                                                                          ["Location"] +
-                                                                     String.Format("runs/{0}", r.RunNumber));
+                                                                     String.Format("runs/{0}", newRun.RunNumber));
         }
 
         public void CancelRun()

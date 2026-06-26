@@ -114,7 +114,8 @@ An empty object `{}` runs with the scenario's configured settings.
 | Field | Type | Notes |
 |-------|------|-------|
 | `Message` | string | |
-| `StackTrace` | string | |
+| `StackTrace` | string | Present when the fault wraps a thrown exception |
+| `Log` | string[] | Diagnostic messages captured from Source during the run. Present when a run completes without producing a result. Omitted when empty. |
 
 ---
 
