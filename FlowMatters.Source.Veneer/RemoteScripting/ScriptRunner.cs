@@ -26,6 +26,18 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
 {
     class ScriptRunner
     {
+        private static readonly Lazy<ScriptEngine> SharedEngine =
+            new Lazy<ScriptEngine>(CreateAndConfigureEngine, LazyThreadSafetyMode.ExecutionAndPublication);
+
+        private static readonly object EngineLock = new object();
+
+        private static ScriptEngine CreateAndConfigureEngine()
+        {
+            var engine = Python.CreateEngine();
+            AddAssemblyReferences(engine);
+            return engine;
+        }
+
         public RiverSystemScenario Scenario { get; set; }
         public IProjectHandler<RiverSystemProject> ProjectHandler { get; set; }
 
@@ -39,33 +51,48 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
             MemoryStream errorStream = new MemoryStream();
             StringWriter errorWriter = new StringWriter();
 
+            ScriptEngine engine = null;
             try
             {
-                var engine = Python.CreateEngine();
-
                 if(SynchronizationContext.Current==null)
                     SynchronizationContext.SetSynchronizationContext(new SynchronizationContext());
 
-                AddAssemblyReferences(engine);
-                engine.Runtime.IO.SetOutput(outputStream, outputWriter);
-                engine.Runtime.IO.SetErrorOutput(errorStream, errorWriter);
-
-                var scope = engine.CreateScope();
-                scope.SetVariable("scenario", Scenario);
-
-                if (ProjectHandler == null)
+                if (script.Debug)
                 {
-                    ProjectHandler = ProjectManager.Instance?.ProjectHandler;
+                    // Debug options must be set at engine creation, so we can't
+                    // share the engine in this mode.
+                    var options = new Dictionary<string, object>
+                    {
+                        { "Debug", true },
+                        { "Frames", true },
+                        { "FullFrames", true },
+                        { "Tracing", true },
+                    };
+                    engine = Python.CreateEngine(options);
+                    AddAssemblyReferences(engine);
+                    actual = ExecuteScript(engine, script, outputStream, outputWriter, errorStream, errorWriter);
                 }
-                scope.SetVariable("project_handler", ProjectHandler);
-                var sourceCode = engine.CreateScriptSourceFromString(script.Script);
-                actual = sourceCode.Execute<object>(scope);
-                if (scope.ContainsVariable("result"))
-                    actual = scope.GetVariable("result");
+                else
+                {
+                    engine = SharedEngine.Value;
+                    lock (EngineLock)
+                    {
+                        actual = ExecuteScript(engine, script, outputStream, outputWriter, errorStream, errorWriter);
+                    }
+                }
             }
             catch (Exception e)
             {
-                ex = new SimpleException(e);
+                string pythonTrace = "Could not get Python stack trace";
+                try
+                {
+                    pythonTrace = engine?.GetService<ExceptionOperations>()?.FormatException(e);
+                }
+                catch
+                {
+                    // FormatException can itself fail if the exception didn't originate from Python
+                }
+                ex = new SimpleException(e, pythonTrace);
             }
 
             return new IronPythonResponse()
@@ -75,6 +102,29 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
                 StandardOut = outputWriter.ToString(),
                 Exception = ex
             };
+        }
+
+        private object ExecuteScript(ScriptEngine engine, IronPythonScript script,
+            MemoryStream outputStream, StringWriter outputWriter,
+            MemoryStream errorStream, StringWriter errorWriter)
+        {
+            engine.Runtime.IO.SetOutput(outputStream, outputWriter);
+            engine.Runtime.IO.SetErrorOutput(errorStream, errorWriter);
+
+            var scope = engine.CreateScope();
+            scope.SetVariable("scenario", Scenario);
+
+            if (ProjectHandler == null)
+            {
+                ProjectHandler = ProjectManager.Instance?.ProjectHandler;
+            }
+            scope.SetVariable("project_handler", ProjectHandler);
+
+            var sourceCode = engine.CreateScriptSourceFromString(script.Script);
+            var result = sourceCode.Execute<object>(scope);
+            if (scope.ContainsVariable("result"))
+                result = scope.GetVariable("result");
+            return result;
         }
 
         private static void AddAssemblyReferences(ScriptEngine engine)

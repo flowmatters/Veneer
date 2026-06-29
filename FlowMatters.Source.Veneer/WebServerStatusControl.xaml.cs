@@ -44,6 +44,18 @@ namespace FlowMatters.Source.Veneer
         private Timer _timer;
         private LogLevel _minimumLogLevel = LogLevel.Info;
 
+        private string _boundScenarioName = "(none)";
+        public string BoundScenarioName
+        {
+            get { return _boundScenarioName; }
+            private set
+            {
+                _boundScenarioName = value;
+                if (BoundScenarioLabel != null)
+                    BoundScenarioLabel.GetBindingExpression(System.Windows.Controls.Label.ContentProperty)?.UpdateTarget();
+            }
+        }
+
         public WebServerStatusControl()
         {
             _activeInstance = this;
@@ -81,7 +93,9 @@ namespace FlowMatters.Source.Veneer
                     ReportingMenu.Instance.ClearMenu();
                 }
                 _scenario = value;
-              
+
+                BoundScenarioName = _scenario != null ? _scenario.Name : "(none)";
+
                 if(_scenario != null)
                 {
                     StartServer();

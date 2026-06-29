@@ -14,6 +14,7 @@ namespace FlowMatters.Source.Veneer.Addons
     {
         public VeneerAddon[] addons;
         public VeneerOptions options;
+        public string targetScenario;
 
         public static string ConfigurationFilename(RiverSystemScenario scenario)
         {
@@ -50,6 +51,29 @@ namespace FlowMatters.Source.Veneer.Addons
             var json = File.ReadAllText(filename);
             return Newtonsoft.Json.JsonConvert.DeserializeObject<VeneerConfiguration>(json);
         }
+
+        public static bool AddonAppliesTo(
+            VeneerAddon addon,
+            VeneerConfiguration config,
+            RiverSystemScenario currentScenario)
+        {
+            var filter = EffectiveFilter(addon, config);
+
+            if (string.IsNullOrEmpty(filter)) return true;
+            if (currentScenario == null) return false;
+
+            return string.Equals(
+                currentScenario.Name,
+                filter,
+                StringComparison.OrdinalIgnoreCase);
+        }
+
+        public static string EffectiveFilter(VeneerAddon addon, VeneerConfiguration config)
+        {
+            return !string.IsNullOrEmpty(addon?.scenario)
+                ? addon.scenario
+                : config?.targetScenario;
+        }
     }
 
     public class VeneerAddon
@@ -61,6 +85,8 @@ namespace FlowMatters.Source.Veneer.Addons
         public string path { get; set; }
 
         public string menu { get; set; }
+
+        public string scenario { get; set; }
 
     }
 

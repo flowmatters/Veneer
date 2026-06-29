@@ -56,6 +56,14 @@ namespace FlowMatters.Source.Veneer
         GeoJSONNetwork GetNetworkGeographic();
 
         [OperationContract]
+        [WebInvoke(Method = "GET", UriTemplate = UriTemplates.SchematicSvg)]
+        Stream GetSchematicSvg();
+
+        [OperationContract]
+        [WebInvoke(Method = "GET", ResponseFormat = WebMessageFormat.Json, UriTemplate = UriTemplates.SchematicSvgTags)]
+        SchematicTagMap GetSchematicSvgTags();
+
+        [OperationContract]
         [WebInvoke(Method = "GET", ResponseFormat = WebMessageFormat.Json, UriTemplate = UriTemplates.Node)]
         GeoJSONFeature GetNode(string nodeId);
 
