@@ -2,13 +2,18 @@
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Forms;
 using FlowMatters.Source.Veneer.Addons;
+using System.Windows.Controls;
 using FlowMatters.Source.WebServer;
+using FlowMatters.Source.WebServerPanel;
 using Newtonsoft.Json;
 using RiverSystem;
+using RiverSystem.Forms;
 using RiverSystem.TaskDefinitions;
 using TIME.Core.Metadata;
 using Application = System.Windows.Forms.Application;
@@ -31,12 +36,29 @@ namespace FlowMatters.Source.Veneer
         public static bool DefaultAllowScripts = false;
         public static bool DefaultAllowSsl = false;
 
+        private static WebServerStatusControl _activeInstance;
+        public static WebServerStatusControl ActiveInstance => _activeInstance;
+
         private RiverSystemScenario _scenario;
         private SynchronizationContext _originalContext;
         private Timer _timer;
+        private LogLevel _minimumLogLevel = LogLevel.Info;
+
+        private string _boundScenarioName = "(none)";
+        public string BoundScenarioName
+        {
+            get { return _boundScenarioName; }
+            private set
+            {
+                _boundScenarioName = value;
+                if (BoundScenarioLabel != null)
+                    BoundScenarioLabel.GetBindingExpression(System.Windows.Controls.Label.ContentProperty)?.UpdateTarget();
+            }
+        }
 
         public WebServerStatusControl()
         {
+            _activeInstance = this;
             Port = DefaultPort;
             AllowRemoteConnections = DefaultAllowRemote;
             AllowSsl = DefaultAllowSsl;
@@ -44,6 +66,9 @@ namespace FlowMatters.Source.Veneer
             InitializeComponent();
             _originalContext = SynchronizationContext.Current;
             this.DataContext = this;
+
+            LogLevelCombo.ItemsSource = Enum.GetValues(typeof(LogLevel));
+            LogLevelCombo.SelectedItem = _minimumLogLevel;
 
             _timer = new Timer(1000.0);
             _timer.AutoReset = false;
@@ -54,7 +79,7 @@ namespace FlowMatters.Source.Veneer
         private void _timer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
             if (Scenario == null)
-                ServerLogEvent(this, "No active scenario. Load a project file before opening Web Server Monitoring");
+                ServerLogEvent(this, "No active scenario. Load a project file before opening Web Server Monitoring", LogLevel.Warning);
         }
 
         public RiverSystemScenario Scenario
@@ -65,10 +90,12 @@ namespace FlowMatters.Source.Veneer
                 if (_scenario != null)
                 {
                     StopServer();
-                    ClearMenu();
+                    ReportingMenu.Instance.ClearMenu();
                 }
                 _scenario = value;
-              
+
+                BoundScenarioName = _scenario != null ? _scenario.Name : "(none)";
+
                 if(_scenario != null)
                 {
                     StartServer();
@@ -77,158 +104,11 @@ namespace FlowMatters.Source.Veneer
             }
         }
 
-        private string ConfigurationFilename
-        {
-            get
-            {
-                if (Scenario == null)
-                {
-                    return null;
-                }
-
-                if (Scenario.Project.FullFilename == null)
-                {
-                    return null;
-                }
-
-                var result = Scenario.Project.FullFilename.Replace(".rsproj", ".rsproj.veneer");
-                if (File.Exists(result))
-                {
-                    return result;
-                }
-
-                return null;
-            }
-        }
-
-        private VeneerConfiguration Configuration
-        {
-            get
-            {
-                var fn = ConfigurationFilename;
-                if (fn == null)
-                {
-                    return null;
-                }
-                return JsonConvert.DeserializeObject<VeneerConfiguration>(File.ReadAllText(fn));
-            }
-        }
-
         private void PopulateMenu()
         {
-            Form parent = FindParent();
-            ToolStripMenuItem reportMenu = FindReportMenu(parent);
-        }
-
-        private Form FindParent()
-        {
-            return Application.OpenForms.Cast<Form>().FirstOrDefault(f => f.MainMenuStrip != null);
-        }
-
-        private ToolStripMenuItem FindReportMenu(Form parent)
-        {
-            ToolStripMenuItem result =
-                parent.MainMenuStrip.Items.Cast<ToolStripItem>().
-                        Where(item => item.Text == "Reporting").Cast<ToolStripMenuItem>().FirstOrDefault();
-
-            if (result == null)
-            {
-                result = new ToolStripMenuItem("Reporting");
-                result.DropDownOpening += PopulateReportMenu;
-                parent.MainMenuStrip.Items.Add(result);
-            }
-
-            return result;
-        }
-
-        private void PopulateReportMenu(object sender, EventArgs e)
-        {
-            Form parent = FindParent();
-            ToolStripMenuItem reportMenu = FindReportMenu(parent);
-            reportMenu.DropDownItems.Clear();
-
-            if (_scenario != null)
-            {
-                string projectFolder = _scenario.Project.FileDirectory;
-                if (projectFolder != null)
-                {
-                    foreach (string reportFn in Directory.EnumerateFiles(projectFolder, "*.htm*", SearchOption.TopDirectoryOnly))
-                    {
-                        string fn = reportFn.Replace(projectFolder + "\\", "");
-                        ToolStripItem item = reportMenu.DropDownItems.Add(NiceName(fn));
-                        item.Click += (eventSender, eventArgs) => Launch(fn);
-                    }
-                }
-
-                var config = Configuration;
-                if (config?.addons != null)
-                {
-                    foreach (var addon in config.addons)
-                    {
-                        ToolStripItem item = reportMenu.DropDownItems.Add(addon.name);
-                        switch (addon.type)
-                        {
-                            case "exe":
-                                item.Click += (o, args) => LaunchExeAddon(addon.path);
-                                break;
-
-                        }
-                    }
-                }
-            }
-            ToolStripItem veneer = reportMenu.DropDownItems.Add("");
-            veneer.BackgroundImage = Veneer.Properties.Resources.Logo_RGB;
-            veneer.BackgroundImageLayout = ImageLayout.Zoom;
-            veneer.Click += (eventSender, eventArgs) =>
-            {
-                Process.Start(new ProcessStartInfo("https://www.flowmatters.com.au")
-                { 
-                    UseShellExecute = true,
-                    Verb = "open"
-                });
-            };
-        }
-
-        private void LaunchExeAddon(string addonPath)
-        {
-            var fullPath = Path.Combine(Scenario.Project.FileDirectory, addonPath);
-            var startInfo = new ProcessStartInfo();
-            if (fullPath.EndsWith(".bat"))
-            {
-                startInfo.FileName = "cmd.exe";
-                startInfo.Arguments = "/C " + fullPath;
-            }
-            else
-            {
-                startInfo.FileName = fullPath;
-            }
-
-            startInfo.Environment["VENEER_PORT"] = this.Port.ToString();
-            startInfo.UseShellExecute = false;
-            Process.Start(startInfo);
-        }
-
-        private string NiceName(string reportFn)
-        {
-            return reportFn.Replace('_', ' ').Replace(".html", "").Replace(".htm", "");
-        }
-
-        private void Launch(string p)
-        {
-            int port = SourceRESTfulService.DEFAULT_PORT;
-            string url = string.Format("http://localhost:{0}/doc/{1}", port, p);
-            Process.Start(url);
-        }
-
-        private void ClearMenu()
-        {
-            Form parent = FindParent();
-            ToolStripMenuItem reportMenu =
-                parent.MainMenuStrip.Items.Cast<ToolStripItem>().
-                        Where(item => item.Text == "Reporting").Cast<ToolStripMenuItem>().FirstOrDefault();
-
-            if (reportMenu != null)
-                parent.MainMenuStrip.Items.Remove(reportMenu);
+            Form parent = ReportingMenu.FindMainForm();
+            ReportingMenu.Instance.Control = this;
+            ReportingMenu.Instance.InitialiseRequiredMenus(parent, _scenario);
         }
 
         private AbstractSourceServer _server;
@@ -242,7 +122,7 @@ namespace FlowMatters.Source.Veneer
             set
             {
                 _allowScripts = value;
-                if (_server != null) _server.Service.AllowScript = value;
+                if (_server != null) _server.AllowScript = value;
             }
         }
         public int Port
@@ -275,7 +155,7 @@ namespace FlowMatters.Source.Veneer
             {
                 _allowSsl = value;
                 if (value)
-                    ServerLogEvent(this, "Note: Enabling SSL requires a valid SSL certificate.");
+                    ServerLogEvent(this, "Note: Enabling SSL requires a valid SSL certificate.", LogLevel.Warning);
                 RestartIfRunning();
             }
         }
@@ -288,16 +168,38 @@ namespace FlowMatters.Source.Veneer
             }
         }
 
-        private void StartServer()
+        private async void StartServer()
         {
-            _server = new SourceRESTfulService(Port) {AllowRemoteConnections = AllowRemoteConnections, AllowSsl = AllowSsl};
-            _server.Scenario = Scenario;
-            _server.LogGenerator += ServerLogEvent;
-            _server.Start();
-            _port = _server.Port;
-            PortTxt.GetBindingExpression(TextBox.TextProperty).UpdateTarget();
-            _server.Service.AllowScript = AllowScripts;
-            UpdateButtons();
+            try
+            {
+                _server = new SourceRESTfulService(Port) {AllowRemoteConnections = AllowRemoteConnections, AllowSsl = AllowSsl};
+                _server.Scenario = Scenario;
+                _server.LogGenerator += ServerLogEvent;
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await _server.Start();
+                    }
+                    catch (Exception ex)
+                    {
+                        ServerLogEvent(this, $"Server error: {ex.Message}", LogLevel.Error);
+                    }
+                });
+
+                // Wait for the server to start on the thread pool thread
+                while (!_server.Running)
+                    await Task.Delay(100);
+
+                _port = _server.Port;
+                PortTxt.GetBindingExpression(TextBox.TextProperty).UpdateTarget();
+                _server.AllowScript = AllowScripts;
+                UpdateButtons();
+            }
+            catch (Exception ex)
+            {
+                ServerLogEvent(this, $"Failed to start server: {ex.Message}", LogLevel.Error);
+            }
         }
 
         public bool NotRunning { get { return !Running; } }
@@ -306,26 +208,63 @@ namespace FlowMatters.Source.Veneer
             get { return (_server != null) && _server.Running; }
         }
 
-        void ServerLogEvent(object sender, string msg)
+        void ServerLogEvent(object sender, string msg, LogLevel level = LogLevel.Info)
         {
-            _originalContext.Post( delegate
-                {
-                    LogBox.Text = msg + "\n" + LogBox.Text;                    
-                },null);
+            _originalContext.Post(delegate
+            {
+                if (level < _minimumLogLevel)
+                    return;
+
+                var scrollViewer = GetScrollViewer(LogBox);
+                bool wasAtBottom = scrollViewer == null ||
+                    scrollViewer.VerticalOffset >= scrollViewer.ScrollableHeight - 10;
+
+                LogBox.AppendText(msg + "\n");
+
+                if (wasAtBottom)
+                    LogBox.ScrollToEnd();
+            }, null);
         }
 
-        private void StopServer()
+        private static ScrollViewer GetScrollViewer(DependencyObject depObj)
         {
-            if(Running)
-                _server.Stop();
-            _server = null;
-            UpdateButtons();
+            if (depObj is ScrollViewer sv) return sv;
+            for (int i = 0; i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(depObj); i++)
+            {
+                var child = System.Windows.Media.VisualTreeHelper.GetChild(depObj, i);
+                var result = GetScrollViewer(child);
+                if (result != null) return result;
+            }
+            return null;
+        }
+
+        private void LogLevelCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (LogLevelCombo.SelectedItem is LogLevel selected)
+                _minimumLogLevel = selected;
+        }
+
+        private async void StopServer()
+        {
+            try
+            {
+                if(Running)
+                    await Task.Run(() => _server.Stop());
+                _server = null;
+                UpdateButtons();
+            }
+            catch (Exception ex)
+            {
+                ServerLogEvent(this, $"Failed to stop server: {ex.Message}", LogLevel.Error);
+            }
         }
 
         public void Dispose()
         {
             StopServer();
             UpdateButtons();
+            if (_activeInstance == this)
+                _activeInstance = null;
         }
 
         private void ClearBtn_OnClick(object sender, RoutedEventArgs e)
@@ -359,6 +298,31 @@ namespace FlowMatters.Source.Veneer
             StartBtn.GetBindingExpression(Button.IsEnabledProperty).UpdateTarget();
             StopBtn.GetBindingExpression(Button.IsEnabledProperty).UpdateTarget();
             RestartBtn.GetBindingExpression(Button.IsEnabledProperty).UpdateTarget();
+        }
+
+        public static void Launch()
+        {
+#if V4 && BEFORE_V4_3
+#else
+
+            MainForm.Instance.Invoke(new Action(() =>
+            {
+                // If a Veneer panel already exists, bring it to front instead of creating a duplicate
+                var existingPanel = WebServerStatusPanel.ActivePanel;
+                if (existingPanel != null)
+                {
+                    existingPanel.ActivateWindow();
+                    return;
+                }
+
+                var t = typeof(MenuPluginHelper);
+                var invoker = t.GetMethod("ShowAnalysisWindow", BindingFlags.NonPublic | BindingFlags.Instance);
+                invoker.Invoke(MainForm.Instance.MenuPluginHelper, new[]
+                {
+                    typeof(WebServerStatusPanel)
+                });
+            }));
+#endif
         }
     }
 }

@@ -14,7 +14,10 @@ using System.Linq;
 using System.Net;
 using System.Reflection;
 using System.Text.RegularExpressions;
+using System.Threading;
+using CoreWCF;
 using CoreWCF.Web;
+using ServiceKnownTypeAttribute = System.ServiceModel.ServiceKnownTypeAttribute;
 using FlowMatters.Source.Veneer.DomainActions;
 using FlowMatters.Source.Veneer.ExchangeObjects;
 using FlowMatters.Source.Veneer.ExchangeObjects.DataSources;
@@ -41,9 +44,26 @@ namespace FlowMatters.Source.Veneer
     [System.ServiceModel.ServiceKnownType(typeof(double[][]))]
     [System.ServiceModel.ServiceKnownType(typeof(double[][][]))]
     [System.ServiceModel.ServiceKnownType(typeof(double[][][][]))]
+    [ServiceBehavior(InstanceContextMode = InstanceContextMode.PerCall, ConcurrencyMode = ConcurrencyMode.Multiple, UseSynchronizationContext = false)]
     public class SourceService : ISourceService
     {
-        public Dictionary<int,string[]> RunLogs = new Dictionary<int,string[]>();
+        // Static state shared across PerCall instances
+        private static Dictionary<int,string[]> _runLogs = new Dictionary<int,string[]>();
+        internal static ScenarioInvoker _currentScenarioInvoker;
+        private static readonly object _runLock = new object();
+
+        private static RiverSystemScenario _sharedScenario;
+        private static ServerLogListener _sharedLogGenerator;
+        private static IProjectHandler<RiverSystemProject> _sharedProjectHandler;
+        private static bool _allowScript = false;
+        private static bool _runningInGUI = true;
+        private static List<CustomEndPoint> _customEndpoints = new List<CustomEndPoint>();
+
+        public Dictionary<int,string[]> RunLogs
+        {
+            get { return _runLogs; }
+            set { _runLogs = value; }
+        }
 
         public RiverSystemScenario Scenario { get; set; }
         private ScriptRunner scriptRunner = new ScriptRunner();
@@ -52,14 +72,49 @@ namespace FlowMatters.Source.Veneer
 
         public bool RunningInGUI { get; set; }
 
-        public event ServerLogListener LogGenerator;
+        public event ServerLogListener LogGenerator
+        {
+            add { _sharedLogGenerator += value; }
+            remove { _sharedLogGenerator -= value; }
+        }
 
         public IProjectHandler<RiverSystemProject> ProjectHandler { get; set; }
 
         public SourceService()
         {
-            AllowScript = false;
-            RunningInGUI = true;
+            AllowScript = _allowScript;
+            RunningInGUI = _runningInGUI;
+            Scenario = _sharedScenario;
+            ProjectHandler = _sharedProjectHandler;
+            foreach (var ep in _customEndpoints)
+            {
+                CustomEndPoints.Add(ep);
+            }
+        }
+
+        public static void InitializeSharedState(
+            RiverSystemScenario scenario, IProjectHandler<RiverSystemProject> projectHandler,
+            bool allowScript = false, bool runningInGUI = true,
+            CustomEndPoint[] customEndpoints = null)
+        {
+            _sharedScenario = scenario;
+            _sharedProjectHandler = projectHandler;
+            _allowScript = allowScript;
+            _runningInGUI = runningInGUI;
+            if (customEndpoints != null)
+            {
+                _customEndpoints = new List<CustomEndPoint>(customEndpoints);
+            }
+        }
+
+        public static void UpdateSharedScenario(RiverSystemScenario scenario)
+        {
+            _sharedScenario = scenario;
+        }
+
+        public static void SetLogHandler(ServerLogListener logHandler)
+        {
+            _sharedLogGenerator = logHandler;
         }
 
         public void GetOptions()
@@ -75,8 +130,7 @@ namespace FlowMatters.Source.Veneer
 
         public VeneerStatus GetRoot()
         {
-//            WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Origin", "*");
-            Log("Requested /");
+            Log("Requested /", LogLevel.Debug);
             return new VeneerStatus(Scenario);
         }
 
@@ -94,7 +148,7 @@ namespace FlowMatters.Source.Veneer
             }
             else
             {
-                Log("Shutdown not supported");
+                Log("Shutdown not supported", LogLevel.Warning);
             }
 
             throw new Exception("Shutdown not supported");
@@ -106,6 +160,8 @@ namespace FlowMatters.Source.Veneer
             {
                 throw new InvalidOperationException("Cannot set scenario when running Veneer in Source user interface");
             }
+
+            // TODO Prevent changing during a simulation!
 
             Log($"Setting scenario: {scenario}");
             var scenarios = Scenario.RiverSystemProject.GetRSScenarios();
@@ -121,6 +177,7 @@ namespace FlowMatters.Source.Veneer
                 newScenario = scenarios.First(sc=>sc.ScenarioName==scenario).riverSystemScenario;
             }
             Scenario = newScenario;
+            _sharedScenario = newScenario;
         }
 
         public Stream GetFile(string fn)
@@ -159,15 +216,68 @@ namespace FlowMatters.Source.Veneer
         public GeoJSONNetwork GetNetwork()
         {
             Log($"Requested network at {DateTime.Now:HH:mm:ss.fff}");
-//            WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Origin", "*");
             return new GeoJSONNetwork(Scenario.Network);
         }
 
         public GeoJSONNetwork GetNetworkGeographic()
         {
             Log("Requested network in geographic coordinates");
-            //            WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Origin", "*");
             return NetworkToGeographic.ToGeographic(Scenario.Network,Scenario.GeographicData.Projection as AbstractProjectionInfo);
+        }
+
+        public Stream GetSchematicSvg()
+        {
+            Log("Requested schematic SVG");
+            if (Scenario == null)
+                return WriteJsonError(HttpStatusCode.NotFound, "no scenario loaded");
+
+            var schematic = ScriptHelpers.GetSchematic(Scenario);
+            if (schematic == null || schematic.ExistingFeatureShapeProperties == null ||
+                schematic.ExistingFeatureShapeProperties.Count == 0)
+            {
+                return WriteJsonError(HttpStatusCode.NotFound,
+                    "scenario has no schematic; use /network for geographic coordinates");
+            }
+
+            var resourceBaseUrl = GetResourceBaseUrl();
+            var result = SchematicSvgBuilder.Build(Scenario.Network, schematic, resourceBaseUrl);
+            WebOperationContext.Current.OutgoingResponse.ContentType = "image/svg+xml";
+            return new MemoryStream(System.Text.Encoding.UTF8.GetBytes(result.Svg));
+        }
+
+        public SchematicTagMap GetSchematicSvgTags()
+        {
+            Log("Requested schematic SVG tags");
+            if (Scenario == null)
+            {
+                WebOperationContext.Current.OutgoingResponse.StatusCode = HttpStatusCode.NotFound;
+                return null;
+            }
+
+            var schematic = ScriptHelpers.GetSchematic(Scenario);
+            if (schematic == null || schematic.ExistingFeatureShapeProperties == null ||
+                schematic.ExistingFeatureShapeProperties.Count == 0)
+            {
+                WebOperationContext.Current.OutgoingResponse.StatusCode = HttpStatusCode.NotFound;
+                return null;
+            }
+
+            var result = SchematicSvgBuilder.Build(Scenario.Network, schematic, GetResourceBaseUrl());
+            return result.Sidecar;
+        }
+
+        private static Stream WriteJsonError(HttpStatusCode status, string message)
+        {
+            WebOperationContext.Current.OutgoingResponse.StatusCode = status;
+            WebOperationContext.Current.OutgoingResponse.ContentType = "application/json";
+            var json = "{\"error\":\"" + message.Replace("\"", "\\\"") + "\"}";
+            return new MemoryStream(System.Text.Encoding.UTF8.GetBytes(json));
+        }
+
+        private static string GetResourceBaseUrl()
+        {
+            var uri = WebOperationContext.Current.IncomingRequest.UriTemplateMatch.RequestUri;
+            return uri.GetLeftPart(UriPartial.Authority);
         }
 
         public GeoJSONFeature GetNode(string nodeId)
@@ -179,7 +289,6 @@ namespace FlowMatters.Source.Veneer
                 return null;
             }
 
-            // To match GeoJSONFeature.NodeURL
             var matchingNode = Scenario.Network.nodes[id];
             if (matchingNode == null)
             {
@@ -199,7 +308,6 @@ namespace FlowMatters.Source.Veneer
                 return null;
             }
 
-            // To match GeoJSONFeature.LinkURL
             var matchingLink = Scenario.Network.links[id];
             if (matchingLink == null)
             {
@@ -213,19 +321,22 @@ namespace FlowMatters.Source.Veneer
         public RunLink[] GetRunList()
         {
             Log("Requested run list");
-//            WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Origin", "*");
             var runs = Scenario.Project.ResultManager.AllRuns().ToArray();
             RunLink[] links = new RunLink[runs.Length];
             for(int i = 0; i < runs.Length; i++)
             {
                 var run = runs[i];
+                var meta = run.MetaData;
                 links[i] = new RunLink
                     {
                         RunName = run.Name,
                         RunUrl = "/runs/" + run.RunNumber,
                         DateRun = run.DateRun.ToString(CultureInfo.InvariantCulture),
                         Scenario = run.Scenario.Name,
-                        Status = run.RunResultIndicator.ToString()
+                        Status = run.RunResultIndicator.ToString(),
+                        StartDate = meta.ContainsKey("ConfigurationStartDate") ? meta["ConfigurationStartDate"]?.ToString() : null,
+                        EndDate = meta.ContainsKey("ConfigurationEndDate") ? meta["ConfigurationEndDate"]?.ToString() : null,
+                        TimeStep = meta.ContainsKey("ConfigurationTimeStep") ? meta["ConfigurationTimeStep"]?.ToString() : null
                     };
             }
 
@@ -236,7 +347,18 @@ namespace FlowMatters.Source.Veneer
         public void TriggerRun(RunParameters parameters)
         {
             Log("Triggering a run.");
-            ScenarioInvoker si = new ScenarioInvoker { Scenario = Scenario };
+
+            lock (_runLock)
+            {
+                if (_currentScenarioInvoker?.IsRunning == true)
+                {
+                    throw new WebFaultException<SimulationFault>(
+                        new SimulationFault(new InvalidOperationException("A simulation is already running. Cancel the current run before starting a new one.")),
+                        HttpStatusCode.Conflict);
+                }
+
+                _currentScenarioInvoker = new ScenarioInvoker { Scenario = Scenario };
+            }
 
             ConcurrentQueue<string> messages = new ConcurrentQueue<string>();
             LogAction runLogger = (sender, args) =>
@@ -247,18 +369,22 @@ namespace FlowMatters.Source.Veneer
 
             try
             {
-                si.RunScenario(parameters, RunningInGUI, LogGenerator);
+                _currentScenarioInvoker.RunScenario(parameters, RunningInGUI, _sharedLogGenerator);
             }
             catch (Exception e)
             {
-                Log("Run Failed");
-                Log(e.Message);
-                Log(e.StackTrace);
+                Log("Run Failed", LogLevel.Error);
+                Log(e.Message, LogLevel.Error);
+                Log(e.StackTrace, LogLevel.Error);
                 throw new WebFaultException<SimulationFault>(new SimulationFault(e), HttpStatusCode.InternalServerError);
             }
             finally
             {
                 TIME.Management.Log.MessageRecieved -= runLogger;
+                lock (_runLock)
+                {
+                    _currentScenarioInvoker = null;
+                }
             }
 
             var allRuns = Scenario.Project.ResultManager.AllRuns();
@@ -274,10 +400,85 @@ namespace FlowMatters.Source.Veneer
                                                                      String.Format("runs/{0}", r.RunNumber));
         }
 
+        public void CancelRun()
+        {
+            Log("Cancel run requested.");
+
+            ScenarioInvoker currentInvoker;
+            lock (_runLock)
+            {
+                currentInvoker = _currentScenarioInvoker;
+            }
+
+            if (currentInvoker == null)
+            {
+                Log("No active run to cancel.", LogLevel.Warning);
+                WebOperationContext.Current.OutgoingResponse.StatusCode = HttpStatusCode.NotFound;
+                return;
+            }
+
+            if (!currentInvoker.IsRunning)
+            {
+                Log("No running simulation to cancel.", LogLevel.Warning);
+                WebOperationContext.Current.OutgoingResponse.StatusCode = HttpStatusCode.BadRequest;
+                return;
+            }
+
+            try
+            {
+                currentInvoker.CancelRun();
+                Log("Cancellation request sent to running simulation.", LogLevel.Warning);
+                WebOperationContext.Current.OutgoingResponse.StatusCode = HttpStatusCode.OK;
+            }
+            catch (Exception e)
+            {
+                Log($"Error cancelling run: {e.Message}", LogLevel.Error);
+                throw new WebFaultException<SimulationFault>(new SimulationFault(e), HttpStatusCode.InternalServerError);
+            }
+        }
+
+        public RunStatus GetRunStatus()
+        {
+            Log("Requested run status.", LogLevel.Debug);
+            ScenarioInvoker currentInvoker;
+            lock (_runLock)
+            {
+                currentInvoker = _currentScenarioInvoker;
+            }
+
+            bool isRunning = currentInvoker?.IsRunning ?? false;
+
+            var result = new RunStatus
+            {
+                IsRunning = isRunning,
+                CanCancel = isRunning
+            };
+
+            if (!isRunning) return result;
+
+            result.Scenario = Scenario.Name ?? "Unknown Scenario";
+
+            var config = Scenario.CurrentConfiguration;
+            if (config != null)
+            {
+                result.StartDate = config.StartDate.ToString("yyyy-MM-dd");
+                result.EndDate = config.EndDate.ToString("yyyy-MM-dd");
+
+                result.PercentComplete = currentInvoker.GetPercentComplete();
+                result.CurrentDate = currentInvoker.CurrentSimulationDate.ToString("yyyy-MM-dd HH:mm:ss");
+            }
+            else
+            {
+                result.StartDate = "Not configured";
+                result.EndDate = "Not configured";
+            }
+
+            return result;
+        }
+
         public RunSummary GetRunResults(string runId)
         {
             Log(String.Format("Requested run results ({0})",runId));
-//            WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Origin", "*");
             string msg = "";
             string[] log;
             Run run = RunsForId(runId)[0];
@@ -289,8 +490,6 @@ namespace FlowMatters.Source.Veneer
             else
             {
                 msg = string.Format("run with id={0}", runId);
-//                var idx = int.Parse(runId) - 1;
-//                log = RunLogs[idx];
             }
             if (RunLogs.ContainsKey(run.RunNumber))
             {
@@ -335,7 +534,6 @@ namespace FlowMatters.Source.Veneer
             else
             {
                 id = int.Parse(runId);
-                //RunLogs.Remove(id);
             }
             RunLogs.Remove(id);
 
@@ -445,9 +643,9 @@ namespace FlowMatters.Source.Veneer
                 theFunctions = TimeSeriesFunctions.Functions.Keys.ToArray();
             }
 
-            return TimeSeriesFunctions.TabulateResults(theFunctions, results, 
-                runId == UriTemplates.MatchAll, 
-                networkElement == UriTemplates.MatchAll, 
+            return TimeSeriesFunctions.TabulateResults(theFunctions, results,
+                runId == UriTemplates.MatchAll,
+                networkElement == UriTemplates.MatchAll,
                 recordingElement == UriTemplates.MatchAll,
                 variable == UriTemplates.MatchAll);
         }
@@ -464,6 +662,10 @@ namespace FlowMatters.Source.Veneer
             Log(String.Format("Updating function {0}", functionName));
             functionName = "$" + functionName;
             var function = Enumerable.FirstOrDefault(Scenario.Network.FunctionManager.Functions, f => f.Name == functionName);
+            if (function == null)
+            {
+                function = Enumerable.FirstOrDefault(Scenario.Network.FunctionManager.Functions, f => f.FullName == functionName);
+            }
             if (function != null)
             {
                 Log(String.Format("Setting ${0}={1}", functionName, value.Expression));
@@ -780,7 +982,6 @@ namespace FlowMatters.Source.Veneer
             element = element.ToLower();
             if (element == "networkelement")
             {
-                
                 return Enumerable.ToHashSet(table.Select(row => row.NetworkElementName)).ToArray();
             }
 
@@ -891,11 +1092,6 @@ namespace FlowMatters.Source.Veneer
 
             result = new TimeSeries(dates[0], newTimeStep, values);
 
-            //if (aggregation == "monthly")
-            //    result = result.toMonthly();
-            
-            //if (aggregation == "annual")
-            //    result = result.toAnnual();
             result.name = name;
             if (origUnits != null)
                 result.units = origUnits;
@@ -916,10 +1112,9 @@ namespace FlowMatters.Source.Veneer
 
         private SimpleTimeSeries SimpleTimeSeries(TimeSeries result)
         {
-            //WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Origin", "*");
             return (result == null) ? TimeSeriesNotFound() : new SimpleTimeSeries(result);
         }
-        
+
         private Tuple<TimeSeriesLink,TimeSeries>[] MatchTimeSeries(string runId, string networkElement, string recordingElement, string variable)
         {
             List<Tuple<TimeSeriesLink, TimeSeries>> result = new List<Tuple<TimeSeriesLink, TimeSeries>>();
@@ -928,8 +1123,6 @@ namespace FlowMatters.Source.Veneer
             IEnumerable<Tuple<int,ProjectViewRow>> rows =
                 runs.SelectMany(run=>run.RunParameters.Where(
                     r => MatchesElements(r, networkElement, recordingElement)).Select(row=>new Tuple<int,ProjectViewRow>(run.RunNumber,row)));
-
-//            if (row == null) return null;
 
             foreach (Tuple<int, ProjectViewRow> entry in rows)
             {
@@ -946,9 +1139,6 @@ namespace FlowMatters.Source.Veneer
                     }));
             }
             return result.ToArray();
-            //return row.ElementRecorder.GetResultList().FirstOrDefault(er => 
-            //    (URLSafeString(er.Key.KeyString) == URLSafeString(variable))||
-            //    ((er.Key.KeyString=="")&&(row.ElementName==variable))).Value;            
         }
 
 #if BEFORE_RECORDING_ATTRIBUTES_REFACTOR
@@ -1000,10 +1190,10 @@ namespace FlowMatters.Source.Veneer
             return src.Replace("#","").Replace("/","%2F").Replace(":","");
         }
 
-        protected void Log(string query)
+        protected void Log(string query, LogLevel level = LogLevel.Info)
         {
-            if (LogGenerator != null)
-                LogGenerator(this, query);
+            if (_sharedLogGenerator != null)
+                _sharedLogGenerator(this, query, level);
         }
 
         public string Ping()

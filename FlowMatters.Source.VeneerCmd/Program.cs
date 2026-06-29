@@ -12,6 +12,7 @@ using RiverSystem.PluginManager;
 using CommandLine;
 using FlowMatters.Source.Veneer;
 using FlowMatters.Source.Veneer.RemoteScripting;
+using FlowMatters.Source.WebServer;
 using Newtonsoft.Json;
 using RiverSystem.ApplicationLayer;
 using RiverSystem.ApplicationLayer.Interfaces;
@@ -28,6 +29,7 @@ namespace FlowMatters.Source.VeneerCmd
     {
         private static PluginManager _pluginManager;
         private static IConfiguration _configuration;
+        private static LogLevel _minimumLogLevel = LogLevel.Info;
 
         /// <summary>
         /// List of dynamic search paths for RiverSystem related assemblies. This may change depending on the passed in -d argument.
@@ -46,7 +48,7 @@ namespace FlowMatters.Source.VeneerCmd
 
             // Set up configuration (no RiverSystem dependencies here)
             _configuration = new ConfigurationBuilder()
-                .SetBasePath(Directory.GetCurrentDirectory())
+                .SetBasePath(AppDomain.CurrentDomain.BaseDirectory)
                 .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
                 .Build();
 
@@ -187,6 +189,7 @@ namespace FlowMatters.Source.VeneerCmd
         private static void RunWithRiverSystemDependencies(Options options)
         {
             SynchronizationContext.SetSynchronizationContext(new SynchronizationContext());
+            FlowMatters.Source.Veneer.AutoStart.InitialiseOnLoadAttribute.MarkInitialised();
             Constants.SetLargeDataOptions();
             try
             {
@@ -203,6 +206,11 @@ namespace FlowMatters.Source.VeneerCmd
 
         private static void RunWithOptions(Options options)
         {
+            if (Enum.TryParse<LogLevel>(options.LogLevelString, true, out var parsedLevel))
+                _minimumLogLevel = parsedLevel;
+            else
+                Console.WriteLine($"Unknown log level '{options.LogLevelString}', defaulting to Info.");
+
 // consume Options instance properties
             var fn = (options.ProjectFiles.Count>0)?options.ProjectFiles[0]:null;
             LoadPlugins(options.PluginsToLoad,!options.SkipRegisteredPlugins);
@@ -236,19 +244,17 @@ namespace FlowMatters.Source.VeneerCmd
             _server.LogGenerator += ServerLogEvent;
             _server.AllowRemoteConnections = options.RemoteAccess;
             _server.AllowSsl = options.AllowSsl;
+            _server.AllowScript = options.AllowScripts;
+            _server.RunningInGUI = false;
+            _server.ProjectHandler = projectHandler;
+            _server.CustomEndpoints = customEndpoints;
 
-            AsyncContext.Run(() => _server.Start());
-            _server.Service.AllowScript = options.AllowScripts;
-            _server.Service.RunningInGUI = false;
-            _server.Service.ProjectHandler = projectHandler;
-
-            customEndpoints.ForEachItem(ep=> _server.Service.RegisterEndPoint(ep));
-            if (customEndpoints.Length>0)
+            if (customEndpoints.Length > 0)
             {
                 Console.WriteLine($"Registered {customEndpoints.Length} custom endpoints");
             }
 
-            Show("Server started. Ctrl-C to exit, or POST /shutdown command");
+            AsyncContext.Run(() => _server.Start());
             while (true)
             {
                 Console.ReadLine();
@@ -310,9 +316,10 @@ namespace FlowMatters.Source.VeneerCmd
             return scenario.riverSystemScenario;
         }
 
-        private static void ServerLogEvent(object sender, string msg)
+        private static void ServerLogEvent(object sender, string msg, LogLevel level)
         {
-            Show(msg);
+            if (level >= _minimumLogLevel)
+                Show(msg);
         }
 
         private static IProjectHandler<RiverSystemProject> projectHandler;
@@ -328,6 +335,9 @@ namespace FlowMatters.Source.VeneerCmd
             loader.LoadProject(false);
             Show("Project Loaded");
             var project = loader.ProjectMetaStructure.Project;
+#if V3 || BEFORE_V4_3
+            project.SetFullFilename(fn);
+#endif
             projectHandler = loader;
             return project;
         }
@@ -470,5 +480,8 @@ namespace FlowMatters.Source.VeneerCmd
 
         [Option('d', "source-directory", HelpText = "Path to the Source directory", Default = null)]
         public string SourcePath { get; set; }
+
+        [Option('v', "log-level", HelpText = "Minimum log level: Debug, Info, Warning, Error", Default = "Info")]
+        public string LogLevelString { get; set; }
     }
 }

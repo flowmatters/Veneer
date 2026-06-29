@@ -1,12 +1,14 @@
 ﻿using System.Data;
 using System.IO;
-using System.ServiceModel;
+//using System.ServiceModel;
+using CoreWCF;
 using CoreWCF.Web;
 using FlowMatters.Source.Veneer.ExchangeObjects;
 using FlowMatters.Source.Veneer.ExchangeObjects.DataSources;
 using FlowMatters.Source.Veneer.RemoteScripting;
 using FlowMatters.Source.WebServer;
 using FlowMatters.Source.WebServer.ExchangeObjects;
+using RunStatus = FlowMatters.Source.WebServer.ExchangeObjects.RunStatus;
 
 namespace FlowMatters.Source.Veneer
 {
@@ -52,6 +54,14 @@ namespace FlowMatters.Source.Veneer
         [OperationContract]
         [WebInvoke(Method = "GET", ResponseFormat = WebMessageFormat.Json, UriTemplate = UriTemplates.NetworkGeographic)]
         GeoJSONNetwork GetNetworkGeographic();
+
+        [OperationContract]
+        [WebInvoke(Method = "GET", UriTemplate = UriTemplates.SchematicSvg)]
+        Stream GetSchematicSvg();
+
+        [OperationContract]
+        [WebInvoke(Method = "GET", ResponseFormat = WebMessageFormat.Json, UriTemplate = UriTemplates.SchematicSvgTags)]
+        SchematicTagMap GetSchematicSvgTags();
 
         [OperationContract]
         [WebInvoke(Method = "GET", ResponseFormat = WebMessageFormat.Json, UriTemplate = UriTemplates.Node)]
@@ -208,6 +218,14 @@ namespace FlowMatters.Source.Veneer
         [OperationContract]
         [WebInvoke(Method = "POST", UriTemplate = UriTemplates.CustomEndPoint, ResponseFormat = WebMessageFormat.Json)]
         IronPythonResponse RunCustomEndPoint(string action, string[] parameters);
+
+        [OperationContract]
+        [WebInvoke(Method = "POST", UriTemplate = "/runs/cancel")]
+        void CancelRun();
+
+        [OperationContract]
+        [WebInvoke(Method = "GET", UriTemplate = "/runs/status", ResponseFormat = WebMessageFormat.Json)]
+        RunStatus GetRunStatus();
 
         [OperationContract]
         [WebGet(UriTemplate = "/ping", ResponseFormat = WebMessageFormat.Json)]

@@ -9,6 +9,12 @@ namespace FlowMatters.Source.Veneer.AutoStart
         private static bool _initialised=false;
 
         public static ProjectLoadListener _listener;
+
+        public static void MarkInitialised()
+        {
+            _initialised = true;
+        }
+
         public InitialiseOnLoadAttribute(string path):base(path)
         {
             if (!_initialised)

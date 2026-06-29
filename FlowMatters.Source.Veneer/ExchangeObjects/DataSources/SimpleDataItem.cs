@@ -44,6 +44,7 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects.DataSources
             Details = isi.DataSource.Data.Select(ddi => new SimpleDataDetails(ddi, summary)).ToArray();
 #endif
             ReloadOnRun = isi.DataSource.Data.Any(ddi => ddi.DataInformation.ReloadOnRun);
+            UseName = isi.UseNameForTreeItem;
             var dataFile = isi.DataSource.SourceInformation as FileCentralDataSource;
             if (dataFile != null)
             {
@@ -204,6 +205,7 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects.DataSources
         [DataMember] public bool ReloadOnRun;
         [DataMember] public string Filename;
         [DataMember] public bool FilenameIsRelative;
+        [DataMember] public bool UseName;
 
     }
 }

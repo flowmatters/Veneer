@@ -21,11 +21,14 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="30"/>
             <RowDefinition Height="30"/>
+            <RowDefinition Height="24"/>
             <RowDefinition />
         </Grid.RowDefinitions>
         <Button Name="StartBtn" IsEnabled="{Binding Path=NotRunning}" Grid.Row="0" Grid.Column="0" Content="Start" Click="StartBtn_OnClick"/>
         <Button Name="StopBtn" IsEnabled="{Binding Path=Running}" Grid.Row="0" Grid.Column="1" Content="Stop" Click="StopBtn_OnClick"/>
         <Button Name="RestartBtn" IsEnabled="{Binding Path=Running}" Grid.Row="0" Grid.Column="2" Content="Restart" Click="RestartBtn_OnClick"/>
+        <Label Grid.Row="0" Grid.Column="3" HorizontalAlignment="Right" Content="Log Level:" VerticalAlignment="Center"/>
+        <ComboBox Name="LogLevelCombo" Grid.Row="0" Grid.Column="4" Grid.ColumnSpan="3" VerticalAlignment="Center" SelectionChanged="LogLevelCombo_SelectionChanged"/>
         <Button Name="ClearBtn" Grid.Row="0" Grid.Column="7" Grid.ColumnSpan="2" Content="Clear Log" Click="ClearBtn_OnClick"/>
 
         <Label Grid.Row="1" Grid.Column="0" HorizontalAlignment="Right" Content="Port:"/>
@@ -36,6 +39,10 @@
         <CheckBox Grid.Row="1" IsChecked="{Binding Path=AllowRemoteConnections}"  Grid.Column="6" VerticalAlignment="Center"/>
         <Label Grid.Row="1" Grid.Column="7" HorizontalAlignment="Right" Content="Allow Scripts:"/>
         <CheckBox Grid.Row="1" IsChecked="{Binding Path=AllowScripts}"  Grid.Column="8" VerticalAlignment="Center"/>
-        <TextBox Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="9" Name="LogBox" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" FontSize="10pt" Margin="2,0,-2,0" IsReadOnly="True" VerticalScrollBarVisibility="Auto"></TextBox>
+        <Label Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="9"
+               Name="BoundScenarioLabel"
+               HorizontalAlignment="Left" VerticalAlignment="Center"
+               Content="{Binding Path=BoundScenarioName, StringFormat='Bound to: {0}'}"/>
+        <TextBox Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="9" Name="LogBox" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" FontSize="10pt" Margin="2,0,-2,0" IsReadOnly="True" VerticalScrollBarVisibility="Auto"></TextBox>
     </Grid>
 </UserControl>

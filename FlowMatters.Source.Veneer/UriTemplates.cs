@@ -39,6 +39,10 @@ namespace FlowMatters.Source.Veneer
 
         public const string NetworkGeographic = "/network/geographic";
 
+        public const string SchematicSvg = "/network/schematic.svg";
+
+        public const string SchematicSvgTags = "/network/schematic.svg/tags";
+
         public const string Nodes = "/network/nodes";
 
         public const string Links = "/network/links";

@@ -4,7 +4,7 @@
     <OutputType>Library</OutputType>
     <NoWarn>1591,1587</NoWarn>
     <RootPath>$(MSBuildThisFileDirectory)..\..\</RootPath>
-    <ReferencePath>$(RootPath)Output;$(RootPath)3rdParty</ReferencePath>
+    <ReferencePath>$(RootPath)Output;$(RootPath)3rdParty;$(RootPath)\Veneer\References;$(RootPath)\Veneer\References\Plugins</ReferencePath>
     <OutputPath>$(RootPath)Output\Plugins\CommunityPlugins\Veneer</OutputPath>
     <ExcludeEWaterPdbPathMap>true</ExcludeEWaterPdbPathMap>
     <UseWindowsForms>true</UseWindowsForms>
@@ -41,6 +41,9 @@
     </Reference>
     <Reference Include="RiverSystem">
       <HintPath>..\..\Output\RiverSystem.dll</HintPath>
+    </Reference>
+    <Reference Include="RiverSystem.PluginManager">
+      <HintPath>..\..\Output\RiverSystem.PluginManager.dll</HintPath>
     </Reference>
     <Reference Include="RiverSystem.Api">
       <HintPath>..\..\Output\RiverSystem.Api.dll</HintPath>
@@ -87,7 +90,7 @@
     <Reference Include="NetronGraphLib">
       <HintPath>..\..\Output\NetronGraphLib.dll</HintPath>
     </Reference>
-    <PackageReference Include="CoreWCF.WebHttp" Version="1.5.2" />
+    <PackageReference Include="CoreWCF.WebHttp" Version="1.7.0" />
     <PackageReference Include="IronPython" Version="3.4.2" />
     <PackageReference Include="IronPython.Interpreter" Version="2.7.4" />
     <PackageReference Include="IronPython.StdLib" Version="2.7.5" />
@@ -641,5 +644,13 @@
   </ItemGroup>
   <ItemGroup>
     <Resource Include="Resources\Icon_Only_RGB_for_LI.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\NodeIcons\circle.svg" />
+    <EmbeddedResource Include="Resources\NodeIcons\triangle.svg" />
+    <EmbeddedResource Include="Resources\NodeIcons\diamond.svg" />
+    <EmbeddedResource Include="Resources\NodeIcons\hexagon.svg" />
+    <EmbeddedResource Include="Resources\NodeIcons\plus.svg" />
+    <EmbeddedResource Include="Resources\NodeIcons\trapezoid.svg" />
   </ItemGroup>
 </Project>
