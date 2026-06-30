@@ -80,7 +80,8 @@ An empty object `{}` runs with the scenario's configured settings.
 | `Number` | number (int) | Run number |
 | `Status` | string | Run result indicator |
 | `StartDate` / `EndDate` / `TimeStep` | string | Configuration metadata |
-| `RunLog` | string[] | Captured log (placeholder for non-Veneer runs) |
+| `RunLog` | string[] | Captured log; each line is `[Level] timestep <sim-time>: message` (the `timestep <sim-time>` part is present only when the entry has a simulation timestep). Placeholder text for non-Veneer runs. |
+| `LastStackTrace` | string \| null | Stack trace of the last log entry that carried one during the run; `null` if none (e.g. a clean run, or a non-Veneer run). |
 | `Results` | [TimeSeriesLink](#timeserieslink)[] | Recorded outputs |
 
 ### TimeSeriesLink
