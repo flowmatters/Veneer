@@ -48,7 +48,7 @@ namespace FlowMatters.Source.Veneer
     public class SourceService : ISourceService
     {
         // Static state shared across PerCall instances
-        private static Dictionary<int,string[]> _runLogs = new Dictionary<int,string[]>();
+        private static Dictionary<int,CapturedRunLog> _runLogs = new Dictionary<int,CapturedRunLog>();
         internal static ScenarioInvoker _currentScenarioInvoker;
         private static readonly object _runLock = new object();
 
@@ -59,7 +59,7 @@ namespace FlowMatters.Source.Veneer
         private static bool _runningInGUI = true;
         private static List<CustomEndPoint> _customEndpoints = new List<CustomEndPoint>();
 
-        public Dictionary<int,string[]> RunLogs
+        public Dictionary<int,CapturedRunLog> RunLogs
         {
             get { return _runLogs; }
             set { _runLogs = value; }
@@ -361,9 +361,20 @@ namespace FlowMatters.Source.Veneer
             }
 
             ConcurrentQueue<string> messages = new ConcurrentQueue<string>();
+            object stackTraceLock = new object();
+            string lastStackTrace = null;
             LogAction runLogger = (sender, args) =>
             {
-                messages.Enqueue(args.Entry.Message);
+                messages.Enqueue(RunLogFormatter.Format(args.Entry));
+                var stackTrace = args.Entry.StackTrace;
+                if (!string.IsNullOrEmpty(stackTrace))
+                {
+                    // MessageRecieved can fire from multiple threads; guard so "last" is well-defined.
+                    lock (stackTraceLock)
+                    {
+                        lastStackTrace = stackTrace;
+                    }
+                }
             };
             TIME.Management.Log.MessageRecieved += runLogger;
 
@@ -411,7 +422,11 @@ namespace FlowMatters.Source.Veneer
                     HttpStatusCode.InternalServerError);
             }
 
-            RunLogs[newRun.RunNumber] = messages.ToArray();
+            RunLogs[newRun.RunNumber] = new CapturedRunLog
+            {
+                Messages = messages.ToArray(),
+                LastStackTrace = lastStackTrace
+            };
 
             WebOperationContext.Current.OutgoingResponse.StatusCode = HttpStatusCode.Redirect;
             WebOperationContext.Current.OutgoingResponse.Headers.Add("Location",
@@ -501,6 +516,7 @@ namespace FlowMatters.Source.Veneer
             Log(String.Format("Requested run results ({0})",runId));
             string msg = "";
             string[] log;
+            string lastStackTrace = null;
             Run run = RunsForId(runId)[0];
 
             if (runId.ToLower() == "latest")
@@ -513,7 +529,9 @@ namespace FlowMatters.Source.Veneer
             }
             if (RunLogs.ContainsKey(run.RunNumber))
             {
-                log = RunLogs[run.RunNumber];
+                var captured = RunLogs[run.RunNumber];
+                log = captured.Messages;
+                lastStackTrace = captured.LastStackTrace;
             }
             else
             {
@@ -533,6 +551,7 @@ namespace FlowMatters.Source.Veneer
             }
             var result = new RunSummary(run);
             result.RunLog = log;
+            result.LastStackTrace = lastStackTrace;
             return result;
         }
 
