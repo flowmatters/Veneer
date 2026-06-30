@@ -86,7 +86,8 @@ public static class RunLogFormatter
 
 ### 3. Capturing level + timestep + last stack trace (`TriggerRun`)
 
-- `RunLogs` changes from `Dictionary<int,string[]>` to `Dictionary<int,CapturedRunLog>`.
+- `RunLogs` changes from `Dictionary<int,string[]>` to `Dictionary<int,CapturedRunLog>`
+  (the public property and its `_runLogs` backing field both change type).
 - New small container (alongside `RunLogFormatter` or as a nested/standalone type):
 
   ```csharp
