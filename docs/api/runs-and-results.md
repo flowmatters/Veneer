@@ -101,7 +101,8 @@ Full summary for one run, including the list of recorded time series and the run
   "StartDate": "1990-01-01",
   "EndDate": "2000-12-31",
   "TimeStep": "Daily",
-  "RunLog": ["Run started", "..."],
+  "RunLog": ["[Information] Run started", "[Error] timestep 1990-06-01: Data file not found"],
+  "LastStackTrace": null,
   "Results": [
     {
       "RunNumber": 1,
