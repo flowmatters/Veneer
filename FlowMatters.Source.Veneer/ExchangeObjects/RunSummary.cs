@@ -24,6 +24,7 @@ namespace FlowMatters.Source.WebServer.ExchangeObjects
             Results = BuildResultsArray(r.RunParameters.GetRowsForScenario(r.Scenario.id).ToArray());
             Status = r.RunResultIndicator.ToString();
             RunLog = new string[0];
+            LastStackTrace = null;
 
             var meta = r.MetaData;
             if (meta != null)
@@ -132,6 +133,7 @@ namespace FlowMatters.Source.WebServer.ExchangeObjects
         public string Status;
 
         [DataMember] public string[] RunLog;
+        [DataMember] public string LastStackTrace;
 
         [DataMember]
         public string StartDate;

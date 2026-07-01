@@ -55,7 +55,7 @@ namespace FlowMatters.Source.WebServer
     public class SourceService //: ISourceService
     {
         // Make these static to maintain state across instances
-        private static Dictionary<int,string[]> _runLogs = new Dictionary<int,string[]>();
+        private static Dictionary<int,CapturedRunLog> _runLogs = new Dictionary<int,CapturedRunLog>();
         internal static ScenarioInvoker _currentScenarioInvoker; // Track current running scenario invoker
         private static readonly object _runLock = new object(); // Thread safety for run operations
 
@@ -66,7 +66,7 @@ namespace FlowMatters.Source.WebServer
         private static bool _runningInGUI = true;
         private static CustomEndPoint[] _customEndpoints = null;
 
-        public Dictionary<int,string[]> RunLogs
+        public Dictionary<int,CapturedRunLog> RunLogs
         {
             get { return _runLogs; }
             set { _runLogs = value; }
@@ -375,9 +375,20 @@ namespace FlowMatters.Source.WebServer
             }
 
             ConcurrentQueue<string> messages = new ConcurrentQueue<string>();
+            object stackTraceLock = new object();
+            string lastStackTrace = null;
             LogAction runLogger = (sender, args) =>
             {
-                messages.Enqueue(args.Entry.Message);
+                messages.Enqueue(RunLogFormatter.Format(args.Entry));
+                var stackTrace = args.Entry.StackTrace;
+                if (!string.IsNullOrEmpty(stackTrace))
+                {
+                    // MessageRecieved can fire from multiple threads; guard so "last" is well-defined.
+                    lock (stackTraceLock)
+                    {
+                        lastStackTrace = stackTrace;
+                    }
+                }
             };
             TIME.Management.Log.MessageRecieved += runLogger;
 
@@ -425,7 +436,11 @@ namespace FlowMatters.Source.WebServer
                     HttpStatusCode.InternalServerError);
             }
 
-            RunLogs[newRun.RunNumber] = messages.ToArray();
+            RunLogs[newRun.RunNumber] = new CapturedRunLog
+            {
+                Messages = messages.ToArray(),
+                LastStackTrace = lastStackTrace
+            };
 
             WebOperationContext.Current.OutgoingResponse.StatusCode = HttpStatusCode.Redirect;
             WebOperationContext.Current.OutgoingResponse.Headers.Add("Location",
@@ -532,6 +547,7 @@ namespace FlowMatters.Source.WebServer
 //            WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Origin", "*");
             string msg = "";
             string[] log;
+            string lastStackTrace = null;
             Run run = RunsForId(runId)[0];
 
             if (runId.ToLower() == "latest")
@@ -546,7 +562,9 @@ namespace FlowMatters.Source.WebServer
             }
             if (RunLogs.ContainsKey(run.RunNumber))
             {
-                log = RunLogs[run.RunNumber];
+                var captured = RunLogs[run.RunNumber];
+                log = captured.Messages;
+                lastStackTrace = captured.LastStackTrace;
             }
             else
             {
@@ -566,6 +584,7 @@ namespace FlowMatters.Source.WebServer
             }
             var result = new RunSummary(run);
             result.RunLog = log;
+            result.LastStackTrace = lastStackTrace;
             return result;
         }
 
