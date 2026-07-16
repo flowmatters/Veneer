@@ -84,28 +84,32 @@ namespace FlowMatters.Source.Veneer
                 return;
             }
 
-            if (parameters != null)
-                ApplyRunParameters(parameters);
-
-            if (!IsRunnable()) throw new Exception("Scenario not runnable");
-
-            Scenario.RunManager.UpdateEvent = new EventHandler<JobRunEventArgs>(JobRunner_Update);
-
             ScenarioRunWindow runWindow = null;
             var startOfRun = DateTime.Now;
 
-            if (showWindow)
-            {
-                MainForm.Instance.Invoke(new Action(() =>
-                {
-                    runWindow = new ScenarioRunWindow(Scenario);
-                    runWindow.Show();
-                }));
-                ProjectManager.Instance.SaveAuditLogMessage("Run started at " + DateTime.Now);
-            }
+            // Records each configuration property overridden by this run's parameters, keyed by
+            // parameter name, so the pre-run values can be restored once the run finishes.
+            var originalConfiguration = new Dictionary<string, object>();
 
             try
             {
+                if (parameters != null)
+                    ApplyRunParameters(parameters, originalConfiguration);
+
+                if (!IsRunnable()) throw new Exception("Scenario not runnable");
+
+                Scenario.RunManager.UpdateEvent = new EventHandler<JobRunEventArgs>(JobRunner_Update);
+
+                if (showWindow)
+                {
+                    MainForm.Instance.Invoke(new Action(() =>
+                    {
+                        runWindow = new ScenarioRunWindow(Scenario);
+                        runWindow.Show();
+                    }));
+                    ProjectManager.Instance.SaveAuditLogMessage("Run started at " + DateTime.Now);
+                }
+
                 _runningTask = Task.Factory.StartNew(() => Scenario.RunManager.Execute(), _cancellationTokenSource.Token);
 
                 while (!_runningTask.IsCompleted)
@@ -145,6 +149,12 @@ namespace FlowMatters.Source.Veneer
                     _cancellationTokenSource = null;
                     _runningTask = null;
                 }
+
+                // Run parameters apply to this run only. Restore the scenario configuration to its
+                // pre-run state (on success, failure, or cancellation) so a subsequent run that
+                // omits parameters is unaffected, and so a run never silently mutates — or, if the
+                // project is later saved, persists — the scenario's configuration.
+                RevertRunParameters(originalConfiguration, logger);
 
                 if (showWindow && runWindow != null)
                 {
@@ -218,15 +228,21 @@ namespace FlowMatters.Source.Veneer
         //    }
         //}
 
-        private void ApplyRunParameters(RunParameters parameters)
+        private void ApplyRunParameters(RunParameters parameters, Dictionary<string, object> originalValues)
         {
             HashSet<string> skipKeys = new HashSet<string>(new [] { RUN_NAME_KEY});
 
             RunningConfiguration configuration = Scenario.CurrentConfiguration;
-            Type configType = configuration.GetType();
             foreach (var entry in parameters.Params.Where(kvp=>!skipKeys.Contains(kvp.Key)))
             {
                 var ri = ReflectedItem.NewItem(entry.Key, configuration);
+
+                // Capture the pre-run value (in its native type) before overwriting it, so the
+                // configuration can be restored once the run completes. Guard against duplicate
+                // keys so the first-seen (true pre-run) value is the one preserved.
+                if (!originalValues.ContainsKey(entry.Key))
+                    originalValues[entry.Key] = ri.itemValue;
+
                 var val = entry.Value;
 
                 if (ri.itemType == typeof (DateTime))
@@ -237,6 +253,28 @@ namespace FlowMatters.Source.Veneer
                     val = TimeStep.FromName((string) entry.Value);
 
                 ri.itemValue = val;
+            }
+        }
+
+        private void RevertRunParameters(Dictionary<string, object> originalValues, ServerLogListener logger)
+        {
+            if (originalValues == null || originalValues.Count == 0)
+                return;
+
+            RunningConfiguration configuration = Scenario.CurrentConfiguration;
+            foreach (var entry in originalValues)
+            {
+                try
+                {
+                    // The captured value is already the property's native type, so it can be
+                    // assigned straight back without the conversions applied on the way in.
+                    var ri = ReflectedItem.NewItem(entry.Key, configuration);
+                    ri.itemValue = entry.Value;
+                }
+                catch (Exception ex)
+                {
+                    logger?.Invoke(this, $"Warning: could not restore run parameter '{entry.Key}' to its pre-run value: {ex.Message}", LogLevel.Warning);
+                }
             }
         }
 
