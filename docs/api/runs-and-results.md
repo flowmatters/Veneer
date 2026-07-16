@@ -17,6 +17,17 @@ Runs the current scenario. The body is a flat JSON object of run parameters.
   Common keys: `Start`, `End` (dates), `InputSet` (name), `ForecastLength`. Keys are passed
   through to Source, so the accepted set depends on the model/version. An empty object `{}`
   runs with the scenario's configured dates.
+- **Parameters apply to this run only.** Any values supplied are applied to the scenario
+  configuration for the duration of the run and then **restored to their pre-run values**
+  once the run finishes — on success, failure, or cancellation. A subsequent run that omits a
+  parameter therefore uses the scenario's own configured value, not the value from a previous
+  request, and a run never mutates (or, if the project is later saved, persists) the scenario
+  configuration.
+
+  > **Behaviour change (protocol `20260716`).** Earlier versions applied run parameters
+  > *permanently* to the scenario configuration, so a value sent on one run persisted to later
+  > runs and into the saved project. Runs are now self-contained. To change the scenario's
+  > configured dates durably, edit the configuration in the Source GUI.
 - **Success**: **`302 Found`** with a `Location` response header pointing at the new run
   (e.g. `Location: .../runs/5`). The body is empty. Follow the header (or call
   `GET /runs/{n}`) to fetch results.

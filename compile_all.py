@@ -29,8 +29,8 @@ is writable by you and ISN'T the installed location of Source (which is tied to 
 Eg <solutionpath>\\References
 
 2: The projects should all output to a common directory. If there is just one project, or one project that
-depends on your others, then this can be a bin\Debug folder. If there are multiple, independent projects,
-then this should be a separate directory, eg: <solutionpath>\Output
+depends on your others, then this can be a bin\\Debug folder. If there are multiple, independent projects,
+then this should be a separate directory, eg: <solutionpath>\\Output
 
 For usage information, run with -help:
 
