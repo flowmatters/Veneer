@@ -30,6 +30,12 @@ Compiled
 Builds
 Packages
 
+# Machine-specific custom-build lists for compile_all.py (absolute dev paths).
+# Keep <sln>.ignore tracked (portable version patterns); never commit <sln>.include*
+# — a committed one with non-existent paths would crash the CI build.
+*.sln.include
+*.sln.include_later
+
 *.dat
 
 *.class

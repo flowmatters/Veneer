@@ -2,6 +2,7 @@
 using System.IO;
 using System.Reflection;
 using System.Windows.Forms;
+using FlowMatters.Source.Veneer.Addons;
 using FlowMatters.Source.WebServerPanel;
 using RiverSystem;
 using RiverSystem.ApplicationLayer.Consumer.Forms;
@@ -171,6 +172,8 @@ namespace FlowMatters.Source.Veneer.AutoStart
 
         private void ScenarioLoaded()
         {
+            ApplyDefaultsFromEnvironmentAndConfig();
+
             var startOnLoad = !String.IsNullOrEmpty(Environment.GetEnvironmentVariable("VENEER_START_ON_LOAD"));
             if (startOnLoad)
             {
@@ -182,6 +185,25 @@ namespace FlowMatters.Source.Veneer.AutoStart
             }
         }
 
+        private void ApplyDefaultsFromEnvironmentAndConfig()
+        {
+            var port = WebServerStatusControl.DefaultPort;
+
+            var config = VeneerConfiguration.Load(MainForm.Instance.CurrentScenario);
+            if (config?.options != null && config.options.defaultPort > 0)
+            {
+                port = config.options.defaultPort;
+            }
+
+            var envPort = Environment.GetEnvironmentVariable("VENEER_PORT");
+            if (!String.IsNullOrEmpty(envPort) && Int32.TryParse(envPort, out var parsedPort) && parsedPort > 0)
+            {
+                port = parsedPort;
+            }
+
+            WebServerStatusControl.DefaultPort = port;
+        }
+
         private void PopulateReportingMenu()
         {
             ReportingMenu.Instance.InitialiseRequiredMenus(MainForm.Instance, MainForm.Instance.CurrentScenario);
@@ -189,20 +211,10 @@ namespace FlowMatters.Source.Veneer.AutoStart
 
         private void StartVeneer()
         {
-            var veneerPort = 9876;
-            var veneerPortVar = Environment.GetEnvironmentVariable("VENEER_PORT");
-            if (!String.IsNullOrEmpty(veneerPortVar))
-            {
-                veneerPort = Int32.Parse(veneerPortVar);
-            }
-
-            var remoteConnections = !String.IsNullOrEmpty(Environment.GetEnvironmentVariable("VENEER_ALLOW_REMOTE"));
-            var allowScripts = !String.IsNullOrEmpty(Environment.GetEnvironmentVariable("VENEER_ALLOW_SCRIPTS"));
-
-            //StartVeneer(veneerPort, remoteConnections, allowScripts);
-            WebServerStatusControl.DefaultPort = veneerPort;
-            WebServerStatusControl.DefaultAllowRemote = remoteConnections;
-            WebServerStatusControl.DefaultAllowScripts = allowScripts;
+            WebServerStatusControl.DefaultAllowRemote =
+                !String.IsNullOrEmpty(Environment.GetEnvironmentVariable("VENEER_ALLOW_REMOTE"));
+            WebServerStatusControl.DefaultAllowScripts =
+                !String.IsNullOrEmpty(Environment.GetEnvironmentVariable("VENEER_ALLOW_SCRIPTS"));
 
             WebServerStatusControl.Launch();
         }
