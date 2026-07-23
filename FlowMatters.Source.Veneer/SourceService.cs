@@ -748,6 +748,10 @@ namespace FlowMatters.Source.Veneer
                 fv.FullName = fn.FullName;
                 fv.Units = fn.ResultUnit.SIUnits;
                 fv.InitialValue = fn.InitialValue;
+                // Additive (SIFT A2): expose the function's time of evaluation as the flags-enum
+                // comma form. EvaluationTimes is the CLR property (confirmed via veneer-py's
+                // set_time_of_evaluation write path).
+                fv.TimeOfEvaluation = fn.EvaluationTimes.ToString();
                 result[i] = fv;
             }
             return result;

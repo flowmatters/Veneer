@@ -24,7 +24,8 @@ All functions in the scenario.
     "FullName": "$Demand",
     "Expression": "$BaseDemand * 1.1",
     "Units": "ML/d",
-    "InitialValue": 0.0
+    "InitialValue": 0.0,
+    "TimeOfEvaluation": "StartOfTimeStep"
   }
 ]
 ```
@@ -70,7 +71,9 @@ All variables (the inputs to functions).
     "VeneerDebugInfo": null,
     "TimeSeries": "/variables/BaseDemand/TimeSeries",
     "PiecewiseFunction": null,
-    "TimeSeriesDataSources": { "Baseline": "/dataSources/Demands/Baseline/BaseDemand" }
+    "TimeSeriesDataSources": { "Baseline": "/dataSources/Demands/Baseline/BaseDemand" },
+    "TimeOfEvaluation": null,
+    "DateRange": null
   }
 ]
 ```
@@ -78,6 +81,8 @@ All variables (the inputs to functions).
 `TimeSeries` / `PiecewiseFunction` are URLs to the relevant sub-resource when the variable is
 of that kind (otherwise `null`). `VeneerSupported` flags variable types the API can read/write;
 `TimeSeriesDataSources` maps each input set to the data-source URL feeding the variable.
+`TimeOfEvaluation` and `DateRange` are populated for variable kinds that carry them (modelled
+variables) and `null` otherwise.
 
 ---
 

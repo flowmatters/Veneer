@@ -189,6 +189,7 @@ series (e.g. via `__all__`).
 | `Expression` | string | The only field applied on `PUT` |
 | `Units` | string | |
 | `InitialValue` | number | |
+| `TimeOfEvaluation` | string | Flags-enum comma form, e.g. `"EndOfTimeStep, StartOfTimeStep"`. Read-only (ignored on `PUT`) |
 
 ### VariableSummary
 `VariableSummary.cs` · `GET /variables` (array), `GET /variables/{name}`
@@ -204,6 +205,8 @@ series (e.g. via `__all__`).
 | `TimeSeries` | string \| null | URL to the variable's `/TimeSeries`, if applicable |
 | `PiecewiseFunction` | string \| null | URL to the variable's `/Piecewise`, if applicable |
 | `TimeSeriesDataSources` | object (map string→string) | Input set → data source URL |
+| `TimeOfEvaluation` | string \| null | Time-of-evaluation flags for kinds that carry it; else `null` |
+| `DateRange` | string \| null | Modelled-variable date-range setting (e.g. `"current time step"`); else `null` |
 
 ### SimplePiecewise
 `ExchangeObjects/SimplePiecewise.cs` · `GET`/`PUT /variables/{name}/Piecewise`

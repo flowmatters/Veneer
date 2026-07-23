@@ -25,7 +25,15 @@ namespace FlowMatters.Source.Veneer
             FullName = v.FullName;
             ID = v.id;
             VariableType = v.GetType().Name;
- 
+
+            // Additive (SIFT A2): expose time-of-evaluation and (for modelled variables) the
+            // date-range setting. Read defensively via reflection so variable kinds that lack
+            // these members serialize unchanged (null). The exact CLR property names are
+            // provisional (pinned against a live model during rollout — see spec §2.10); extra
+            // candidates below are tried in order and the first match wins.
+            TimeOfEvaluation = ReflectString(v, "EvaluationTimes", "TimeOfEvaluation");
+            DateRange = ReflectString(v, "DateRange", "DateRangeOption", "DateRangeSetting");
+
             if (v is BilinearVariable)
             {
                 VeneerSupported = false;
@@ -106,6 +114,25 @@ namespace FlowMatters.Source.Veneer
             return key + '=' + val + ';';
         }
 
+        // Returns the string form of the first present property among `names`, else null.
+        // Used to expose provisional, version-dependent members (ToE, DateRange) without a
+        // hard compile-time dependency on property names that vary across RiverSystem builds.
+        private static string ReflectString(object target, params string[] names)
+        {
+            if (target == null) return null;
+            Type type = target.GetType();
+            foreach (string name in names)
+            {
+                var prop = type.GetProperty(name);
+                if (prop != null)
+                {
+                    object val = prop.GetValue(target, null);
+                    return val?.ToString();
+                }
+            }
+            return null;
+        }
+
         [DataMember] public string Name;
         [DataMember] public string FullName;
         [DataMember] public string VariableType;
@@ -115,6 +142,8 @@ namespace FlowMatters.Source.Veneer
         [DataMember] public string TimeSeries;
         [DataMember] public string PiecewiseFunction;
         [DataMember] public Dictionary<string,string> TimeSeriesDataSources;
+        [DataMember] public string TimeOfEvaluation;   // additive (SIFT A2); null when absent
+        [DataMember] public string DateRange;          // additive (SIFT A2); null when absent
 
         public SimpleTimeSeries TimeSeriesData;
         public SimplePiecewise PiecewiseFunctionData { get; set; }
