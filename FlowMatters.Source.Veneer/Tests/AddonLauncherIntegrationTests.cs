@@ -106,10 +106,10 @@ namespace FlowMatters.Source.Veneer.Tests
                         "no output captured. Log was:\n" + log.Dump());
 
             var line = log.Lines.First(x => x.Contains("ARG1="));
-            Assert.That(line, Does.Contain("ARG1=[arg with space]"), "argument quoting failed");
-            Assert.That(line, Does.Contain("ARG2=[9876]"), "%VENEER_PORT% was not expanded in args");
-            Assert.That(line, Does.Contain("LABEL=[nightly]"), "addon env did not reach the child");
-            Assert.That(line, Does.Contain("PORT=[9876]"), "VENEER_PORT was not injected");
+            AddonAssert.Contains(line, "ARG1=[arg with space]", "argument quoting failed");
+            AddonAssert.Contains(line, "ARG2=[9876]", "%VENEER_PORT% was not expanded in args");
+            AddonAssert.Contains(line, "LABEL=[nightly]", "addon env did not reach the child");
+            AddonAssert.Contains(line, "PORT=[9876]", "VENEER_PORT was not injected");
         }
 
         [Test]
@@ -165,8 +165,8 @@ namespace FlowMatters.Source.Veneer.Tests
                         "no failure was reported. Log was:\n" + log.Dump());
 
             var failure = log.Lines.First(x => x.Contains("exit code 7"));
-            Assert.That(failure, Does.Contain("at line 2"),
-                        "the failure was not attributed to the failing line");
+            AddonAssert.Contains(failure, "at line 2",
+                                 "the failure was not attributed to the failing line");
             Assert.That(log.Lines.Any(x => x.Contains("THIRD_SHOULD_NOT_RUN")), Is.False,
                         "execution continued past the failing line");
         }
@@ -180,7 +180,7 @@ namespace FlowMatters.Source.Veneer.Tests
             AddonLauncher.Launch(addon, Context(), log);
 
             Assert.That(log.Lines.Length, Is.EqualTo(1), log.Dump());
-            Assert.That(log.Lines[0], Does.Contain("neither 'path' nor 'script'"));
+            AddonAssert.Contains(log.Lines[0], "neither 'path' nor 'script'");
         }
 
         [Test]
@@ -193,7 +193,7 @@ namespace FlowMatters.Source.Veneer.Tests
             Assert.DoesNotThrow(() => AddonLauncher.Launch(addon, context, log),
                                 "Launch runs on the menu Click handler and must never throw");
             Assert.That(log.Lines.Length, Is.EqualTo(1), log.Dump());
-            Assert.That(log.Lines[0], Does.Contain("no project directory"));
+            AddonAssert.Contains(log.Lines[0], "no project directory");
         }
     }
 }

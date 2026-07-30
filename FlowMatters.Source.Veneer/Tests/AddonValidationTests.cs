@@ -28,7 +28,7 @@ namespace FlowMatters.Source.Veneer.Tests
                 name = "a", type = "script",
                 path = "tools/x.bat", script = new[] { "echo hi" }
             };
-            Assert.That(VeneerAddon.Validate(addon), Does.Contain("both"));
+            AddonAssert.Contains(VeneerAddon.Validate(addon), "both");
         }
 
         [Test]
@@ -56,8 +56,8 @@ namespace FlowMatters.Source.Veneer.Tests
         public void ExeWithNoPath_IsInvalid()
         {
             var addon = new VeneerAddon { name = "a", type = "exe" };
-            Assert.That(VeneerAddon.Validate(addon), Does.Contain("neither"),
-                        "an exe addon with no path would otherwise only fail when clicked");
+            AddonAssert.Contains(VeneerAddon.Validate(addon), "neither",
+                                 "an exe addon with no path would otherwise only fail when clicked");
         }
 
         [Test]
@@ -71,8 +71,8 @@ namespace FlowMatters.Source.Veneer.Tests
         public void ScriptTypeWithNoLines_ReportsTheScriptReasonNotTheNeitherReason()
         {
             var addon = new VeneerAddon { name = "a", type = "script" };
-            Assert.That(VeneerAddon.Validate(addon), Does.Contain("no 'script' lines"),
-                        "the more specific reason must win over the catch-all");
+            AddonAssert.Contains(VeneerAddon.Validate(addon), "no 'script' lines",
+                                 "the more specific reason must win over the catch-all");
         }
 
         [Test]
