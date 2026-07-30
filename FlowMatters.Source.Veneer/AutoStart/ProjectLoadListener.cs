@@ -162,10 +162,10 @@ namespace FlowMatters.Source.Veneer.AutoStart
             }
             else
             {
-                ReportingMenu.Instance.ClearMenu();
+                VeneerMenu.Instance.ClearMenu();
                 if (newScenario != null)
                 {
-                    ReportingMenu.Instance.InitialiseRequiredMenus(MainForm.Instance, newScenario);
+                    VeneerMenu.Instance.InitialiseRequiredMenus(MainForm.Instance, newScenario);
                 }
             }
         }
@@ -206,7 +206,7 @@ namespace FlowMatters.Source.Veneer.AutoStart
 
         private void PopulateReportingMenu()
         {
-            ReportingMenu.Instance.InitialiseRequiredMenus(MainForm.Instance, MainForm.Instance.CurrentScenario);
+            VeneerMenu.Instance.InitialiseRequiredMenus(MainForm.Instance, MainForm.Instance.CurrentScenario);
         }
 
         private void StartVeneer()

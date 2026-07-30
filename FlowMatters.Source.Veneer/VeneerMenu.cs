@@ -16,22 +16,22 @@ using RiverSystem.Forms;
 
 namespace FlowMatters.Source.Veneer
 {
-    internal class ReportingMenu
+    internal class VeneerMenu
     {
         const string DEFAULT_MENU = "Reporting";
 
-        private ReportingMenu()
+        private VeneerMenu()
         {
         }
 
-        private static ReportingMenu _instance;
-        public static ReportingMenu Instance
+        private static VeneerMenu _instance;
+        public static VeneerMenu Instance
         {
             get
             {
                 if (_instance == null)
                 {
-                    _instance = new ReportingMenu();
+                    _instance = new VeneerMenu();
                 }
                 return _instance;
             }
@@ -64,7 +64,7 @@ namespace FlowMatters.Source.Veneer
 
         private void PopulateReportMenu(string mnu)
         {
-            Form parent = ReportingMenu.FindMainForm();
+            Form parent = VeneerMenu.FindMainForm();
             ToolStripMenuItem reportMenu = FindOrCreateReportMenu(parent, mnu);
             reportMenu.DropDownItems.Clear();
 
@@ -211,7 +211,7 @@ namespace FlowMatters.Source.Veneer
 
         public void ClearMenu()
         {
-            Form parent = ReportingMenu.FindMainForm();
+            Form parent = VeneerMenu.FindMainForm();
             foreach (var mnu in RequiredMenus())
             {
                 ToolStripMenuItem reportMenu =

@@ -99,7 +99,7 @@ namespace FlowMatters.Source.Veneer
             if (previous != null)
             {
                 await StopServer();
-                ReportingMenu.Instance.ClearMenu();
+                VeneerMenu.Instance.ClearMenu();
             }
             if (next != null)
             {
@@ -110,9 +110,9 @@ namespace FlowMatters.Source.Veneer
 
         private void PopulateMenu()
         {
-            Form parent = ReportingMenu.FindMainForm();
-            ReportingMenu.Instance.Control = this;
-            ReportingMenu.Instance.InitialiseRequiredMenus(parent, _scenario);
+            Form parent = VeneerMenu.FindMainForm();
+            VeneerMenu.Instance.Control = this;
+            VeneerMenu.Instance.InitialiseRequiredMenus(parent, _scenario);
         }
 
         private AbstractSourceServer _server;
