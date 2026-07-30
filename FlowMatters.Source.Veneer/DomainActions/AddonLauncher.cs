@@ -10,17 +10,52 @@ namespace FlowMatters.Source.Veneer.DomainActions
 {
     internal static class AddonLauncher
     {
+        /// <summary>
+        /// Entry point. Launch runs on the WinForms menu Click handler, so nothing
+        /// here may throw: an escaping exception becomes an unhandled-exception
+        /// dialog in Source rather than a logged addon failure.
+        /// </summary>
         public static void Launch(VeneerAddon addon, AddonContext context, IAddonLog log)
         {
-            var env = AddonEnvironment.BuildEffective(context, addon.env);
-
-            if (addon.script != null && addon.script.Length > 0)
+            // Re-validate even though VeneerMenu disables invalid entries. Without
+            // this, a null path reaches Path.Combine(dir, null) and throws
+            // ArgumentNullException outside every guard below.
+            var invalid = VeneerAddon.Validate(addon);
+            if (invalid != null)
             {
-                LaunchScript(addon, context, env, log);
+                log.Write(string.Format("Addon '{0}' {1}", addon.name, invalid),
+                          AddonLogLevel.Error);
                 return;
             }
 
-            LaunchExe(addon, context, env, log);
+            // Path.Combine throws ArgumentNullException on a null segment, and an
+            // empty project directory would leave a *relative* FileName, which
+            // Windows resolves against the parent's cwd and PATH -- so an addon
+            // named e.g. python.exe could silently launch something off PATH.
+            if (string.IsNullOrEmpty(context.ProjectDirectory))
+            {
+                log.Write(string.Format(
+                    "Addon '{0}' cannot run: no project directory is available. " +
+                    "Load a project before launching addons.", addon.name),
+                    AddonLogLevel.Error);
+                return;
+            }
+
+            try
+            {
+                var env = AddonEnvironment.BuildEffective(context, addon.env);
+
+                if (addon.script != null && addon.script.Length > 0)
+                    LaunchScript(addon, context, env, log);
+                else
+                    LaunchExe(addon, context, env, log);
+            }
+            catch (Exception ex)
+            {
+                log.Write(string.Format("Addon '{0}' could not be launched: {1}",
+                                        addon.name, ex.Message),
+                          AddonLogLevel.Error);
+            }
         }
 
         private static void LaunchScript(VeneerAddon addon, AddonContext context,
@@ -121,8 +156,6 @@ namespace FlowMatters.Source.Veneer.DomainActions
             try
             {
                 process.Start();
-                process.BeginOutputReadLine();
-                process.BeginErrorReadLine();
             }
             catch (Exception ex)
             {
@@ -130,6 +163,23 @@ namespace FlowMatters.Source.Veneer.DomainActions
                           AddonLogLevel.Error);
                 process.Dispose();
                 return;
+            }
+
+            // Separate guard, deliberately. If a Begin*ReadLine throws, the child
+            // IS already running -- disposing and returning here would orphan it:
+            // unmonitored, exit code never reported, and its pipes closed under it.
+            // Log the loss of output and fall through to the watcher so it is still
+            // waited on and disposed.
+            try
+            {
+                process.BeginOutputReadLine();
+                process.BeginErrorReadLine();
+            }
+            catch (Exception ex)
+            {
+                log.Write(string.Format(
+                    "Addon '{0}' started but its output could not be captured: {1}",
+                    addon.name, ex.Message), AddonLogLevel.Warning);
             }
 
             // Must be guarded. If cmd exits before every line is written -- a script
@@ -158,6 +208,15 @@ namespace FlowMatters.Source.Veneer.DomainActions
 
             Task.Run(() =>
             {
+                // MUST stay the parameterless overload. It waits for EOF on both
+                // redirected streams as well as process exit, which is the only
+                // reason Flush() and CurrentStep can be read here without locking:
+                // every Accept() on the pump thread has already returned. In .NET 5+
+                // WaitForExit(int) does NOT wait for the output pumps, so adding a
+                // timeout here would silently introduce a data race on the filter's
+                // state and could report the wrong step number. Use
+                // WaitForExitAsync() if a timeout is ever needed -- it preserves the
+                // guarantee and frees this threadpool thread.
                 process.WaitForExit();
 
                 if (filter != null)
