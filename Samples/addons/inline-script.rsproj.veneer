@@ -1,0 +1,15 @@
+{
+  "addons": [
+    {
+      "name": "Nightly run",
+      "type": "script",
+      "env": { "RUN_LABEL": "nightly" },
+      "script": [
+        "cd %VENEER_PROJECT_DIR%",
+        "python calibrate.py --run %RUN_LABEL%",
+        "python report.py"
+      ],
+      "menu": "Veneer|Calibration"
+    }
+  ]
+}
