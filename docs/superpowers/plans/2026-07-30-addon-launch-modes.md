@@ -27,6 +27,12 @@ and is not yours to commit.
 If a commit step's file list looks incomplete for what you changed, add the
 specific paths you touched — never widen the pattern.
 
+**`CLAUDE.md` and `branch-porting-guide.md` are deliberately UNTRACKED and must
+stay that way.** Editing them is fine and expected; **committing them is not**.
+Task 1 originally staged them and thereby added them to the repo as new files
+(+83 and +209 lines) inside a commit labelled "pure rename" — that was reverted
+at the user's request. Never include either path in a `git add`.
+
 ## READ THIS SECOND — the build is currently broken
 
 **The working tree does not compile right now.** This is pre-existing and unrelated to this feature — the errors are all `CS0234` in files this plan does not touch (`ProjectLoadListener.cs`, `ScenarioInvoker.cs`, `GeoJSONFeature.cs`, and others), caused by five missing Source assemblies.
@@ -203,9 +209,11 @@ and would provoke an unplanned rename.
 Run: `"C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MsBuild.exe" FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj -nologo -v:m -clp:ErrorsOnly`
 Expected: exit 0, no errors.
 
-- [ ] **Step 6: Update the two docs**
+- [ ] **Step 6: Update the two docs — edit only, do NOT stage**
 
-`CLAUDE.md:44` — change the bullet to `**`VeneerMenu`**`. `branch-porting-guide.md:207` — change `ReportingMenu.cs` to `VeneerMenu.cs`. Leave historical files under `docs/superpowers/specs/` and `plans/` untouched; they record what was true when written.
+`CLAUDE.md:44` — change the bullet to `**`VeneerMenu`**`. `branch-porting-guide.md:207` — change `ReportingMenu.cs` to `VeneerMenu.cs`. **Both files are untracked and must stay untracked** — make the edits, but never `git add` them. Leave historical files under `docs/superpowers/specs/` and `plans/` untouched; they record what was true when written.
+
+The legacy branch has one extra file needing this rename that `master` does not: its `FlowMatters.Source.Veneer.csproj` around line 299 contains `<Compile Include="ReportingMenu.cs" />`, because the legacy csproj is non-SDK-style and enumerates its sources. Master's SDK-style csproj has no such entry.
 
 - [ ] **Step 7: Commit**
 
@@ -1554,9 +1562,13 @@ Add a short section to the samples directory or `CLAUDE.md` covering the three s
 - [ ] **Step 3: Commit**
 
 ```bash
-git add Samples/addons CLAUDE.md
+git add Samples/addons
 git commit -m "docs: add addon launch mode samples and author-facing limitations"
 ```
+
+**Do not stage `CLAUDE.md`** — it is deliberately untracked (see the git-safety
+section at the top). Edit it if useful, but the author-facing limitations belong
+in a file under `Samples/addons/` so they can actually be committed.
 
 ---
 
