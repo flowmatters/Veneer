@@ -102,5 +102,20 @@ namespace FlowMatters.Source.Veneer.Tests
             var kept = Run(filter, new[] { @"C:\x>@echo off", "##VENEER:other:7" });
             Assert.That(kept, Is.EqualTo(new[] { "##VENEER:other:7" }));
         }
+
+        [Test]
+        public void Filter_AppliesStateEvenWhenTheResultIsIgnored()
+        {
+            var filter = new ScriptOutputFilter(Nonce);
+
+            // Result deliberately discarded. Accept must not be a lazy iterator:
+            // if it were, the sentinel would go unseen and the guard below would
+            // be buffered and flushed instead of dropped.
+            filter.Accept(@"C:\x>@echo off");
+
+            var kept = Run(filter, new[] { AddonScript.Guard, "real output" });
+            Assert.That(kept, Is.EqualTo(new[] { "real output" }),
+                        "Accept must apply its state transition on the call, not on enumeration");
+        }
     }
 }

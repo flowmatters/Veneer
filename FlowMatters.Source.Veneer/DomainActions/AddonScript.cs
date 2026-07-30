@@ -59,8 +59,16 @@ namespace FlowMatters.Source.Veneer.DomainActions
             _markerOutput = new Regex(@"^##VENEER:" + n + @":(\d+)$");
         }
 
+        /// <summary>
+        /// Deliberately eager rather than a yield iterator. State transitions
+        /// (sentinel detection, pre-sentinel buffering, CurrentStep) must happen
+        /// on the call itself: a caller that invoked this and ignored the result
+        /// would otherwise apply no transition at all, so the sentinel would never
+        /// be seen and every line would end up flushed as though cmd had failed.
+        /// </summary>
         public IEnumerable<string> Accept(string rawLine)
         {
+            var none = new string[0];
             var line = (rawLine ?? string.Empty).TrimEnd('\r', '\n');
 
             if (!_sentinelSeen)
@@ -74,21 +82,21 @@ namespace FlowMatters.Source.Veneer.DomainActions
                 {
                     _preSentinel.Add(line);
                 }
-                yield break;
+                return none;
             }
 
-            if (line == AddonScript.Guard) yield break;
-            if (line == AddonScript.Terminator) yield break;
-            if (_markerEcho.IsMatch(line)) yield break;
+            if (line == AddonScript.Guard) return none;
+            if (line == AddonScript.Terminator) return none;
+            if (_markerEcho.IsMatch(line)) return none;
 
             var output = _markerOutput.Match(line);
             if (output.Success)
             {
                 CurrentStep = int.Parse(output.Groups[1].Value);
-                yield break;
+                return none;
             }
 
-            yield return line;
+            return new[] { line };
         }
 
         /// <summary>
