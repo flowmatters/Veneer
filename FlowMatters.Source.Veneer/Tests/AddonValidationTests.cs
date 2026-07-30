@@ -53,6 +53,29 @@ namespace FlowMatters.Source.Veneer.Tests
         }
 
         [Test]
+        public void ExeWithNoPath_IsInvalid()
+        {
+            var addon = new VeneerAddon { name = "a", type = "exe" };
+            Assert.That(VeneerAddon.Validate(addon), Does.Contain("neither"),
+                        "an exe addon with no path would otherwise only fail when clicked");
+        }
+
+        [Test]
+        public void ExeWithEmptyPath_IsInvalid()
+        {
+            var addon = new VeneerAddon { name = "a", type = "exe", path = "" };
+            Assert.That(VeneerAddon.Validate(addon), Is.Not.Null);
+        }
+
+        [Test]
+        public void ScriptTypeWithNoLines_ReportsTheScriptReasonNotTheNeitherReason()
+        {
+            var addon = new VeneerAddon { name = "a", type = "script" };
+            Assert.That(VeneerAddon.Validate(addon), Does.Contain("no 'script' lines"),
+                        "the more specific reason must win over the catch-all");
+        }
+
+        [Test]
         public void ExeWithArgsAndEnv_IsValid()
         {
             var addon = new VeneerAddon

@@ -111,6 +111,12 @@ namespace FlowMatters.Source.Veneer.Addons
             if (string.Equals(addon.type, "script", StringComparison.OrdinalIgnoreCase) && !hasScript)
                 return "is type 'script' but has no 'script' lines";
 
+            // Without this, an 'exe' addon with no path passes validation and only
+            // fails when the user clicks it. Catching it at menu-build time is the
+            // whole point of rendering a disabled item with an explanatory tooltip.
+            if (!hasScript && string.IsNullOrEmpty(addon.path))
+                return "has neither 'path' nor 'script'; there is nothing to run";
+
             return null;
         }
     }
