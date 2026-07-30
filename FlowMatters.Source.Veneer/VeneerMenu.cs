@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using FlowMatters.Source.Veneer.Addons;
+using FlowMatters.Source.Veneer.DomainActions;
 using FlowMatters.Source.WebServer;
 using FlowMatters.Source.WebServerPanel;
 using RiverSystem;
@@ -98,14 +99,36 @@ namespace FlowMatters.Source.Veneer
                         }
 
                         ToolStripItem item = targetMenu.DropDownItems.Add(addon.name);
-                        switch (addon.type)
-                        {
-                            case "exe":
-                                item.Click += (o, args) => LaunchExeAddon(addon.path);
-                                break;
 
+                        string invalid = VeneerAddon.Validate(addon);
+                        if (invalid != null)
+                        {
+                            item.Enabled = false;
+                            item.ToolTipText = $"Invalid addon: {invalid}";
+                            LogOnce($"Veneer addon '{addon.name}' {invalid}");
+                        }
+                        else
+                        {
+                            switch (addon.type)
+                            {
+                                case "exe":
+                                case "script":
+                                    item.Click += (o, args) => LaunchAddon(addon);
+                                    break;
+
+                                // Previously absent, so an unrecognised type silently
+                                // produced a menu item that did nothing when clicked.
+                                default:
+                                    item.Enabled = false;
+                                    item.ToolTipText = $"Unknown addon type '{addon.type}'";
+                                    LogOnce($"Veneer addon '{addon.name}' has unknown type '{addon.type}'");
+                                    break;
+                            }
                         }
 
+                        // Runs after the above and may overwrite ToolTipText for an
+                        // addon that is both invalid and scenario-filtered. Harmless:
+                        // this block only ever disables.
                         if (!VeneerConfiguration.AddonAppliesTo(addon, config, currentScenario))
                         {
                             var filter = VeneerConfiguration.EffectiveFilter(addon, config);
@@ -173,28 +196,68 @@ namespace FlowMatters.Source.Veneer
             return FindOrCreateNestedMenu(subMenu, menuPath, startIndex + 1);
         }
 
-        private void LaunchExeAddon(string addonPath)
+        private static readonly HashSet<string> _loggedProblems = new HashSet<string>();
+
+        /// <summary>
+        /// VeneerConfiguration.Load runs on every menu open (four call sites), so a
+        /// malformed entry would otherwise log on every drop-down. Cleared by
+        /// ClearMenu so a project change re-reports.
+        /// </summary>
+        private void LogOnce(string message)
+        {
+            if (_loggedProblems.Add(message))
+                TIME.Management.Log.WriteError(this, message);
+        }
+
+        internal void ClearLoggedProblems()
+        {
+            _loggedProblems.Clear();
+        }
+
+        private void LaunchAddon(VeneerAddon addon)
         {
             if (Control == null)
             {
                 WebServerStatusControl.Launch();
             }
 
-            var fullPath = Path.Combine(Scenario.Project.FileDirectory, addonPath);
-            var startInfo = new ProcessStartInfo();
-            if (fullPath.EndsWith(".bat"))
+            var context = new AddonContext
             {
-                startInfo.FileName = "cmd.exe";
-                startInfo.Arguments = "/C " + fullPath;
-            }
-            else
+                ProjectDirectory = Scenario.Project.FileDirectory,
+                ProjectFile = Scenario.Project.FullFilename,
+                // The configured port, not a promise the server is listening --
+                // Port is set independently of Running, and addons may be launched
+                // with the server stopped.
+                Port = Control.Port
+            };
+
+            AddonLauncher.Launch(addon, context, new ControlAddonLog(Control));
+        }
+
+        /// <summary>
+        /// Bridges IAddonLog to the Veneer log panel, and sends errors to Source's
+        /// log as well so they survive the panel being closed or cleared.
+        /// </summary>
+        private sealed class ControlAddonLog : IAddonLog
+        {
+            private readonly WebServerStatusControl _control;
+
+            public ControlAddonLog(WebServerStatusControl control)
             {
-                startInfo.FileName = fullPath;
+                _control = control;
             }
 
-            startInfo.Environment["VENEER_PORT"] = this.Control.Port.ToString();
-            startInfo.UseShellExecute = false;
-            Process.Start(startInfo);
+            public void Write(string message, AddonLogLevel level)
+            {
+                var mapped = level == AddonLogLevel.Error   ? LogLevel.Error
+                           : level == AddonLogLevel.Warning ? LogLevel.Warning
+                           : LogLevel.Debug;
+
+                _control.LogAddonMessage(message, mapped);
+
+                if (level == AddonLogLevel.Error)
+                    TIME.Management.Log.WriteError(this, message);
+            }
         }
 
         private string NiceName(string reportFn)
@@ -211,6 +274,9 @@ namespace FlowMatters.Source.Veneer
 
         public void ClearMenu()
         {
+            // A project change should re-report addon config problems.
+            ClearLoggedProblems();
+
             Form parent = VeneerMenu.FindMainForm();
             foreach (var mnu in RequiredMenus())
             {
