@@ -102,6 +102,21 @@ Expected: a results summary listing each version from the uncommented lines of `
 
 If it fails, stop and report — do not proceed. A likely cause is a Source path in `Veneer.sln.include` that no longer exists; comment out the offending line and retry. (All uncommented paths were present at the time of writing.)
 
+**Recorded result (2026-07-30):** `build.bat` reported *11 successful builds out of 11 versions*. But it does **not** leave `..\Output` usable for a `master` build. `compile_all.py` splits the 11 versions into a COREWCF group (4 × Source 6.x, built on `master` in this repo) and a WCF group (7 × Source ≤5.6x, built on `legacy_ci` in `C:\src\projects\Veneer-legacy`), and it clears and restages `..\Output` per version. The WCF group runs **last**, so `..\Output` ends up holding the final legacy version's net48 reference set — still missing `RiverSystem.Forms.dll`, `RiverSystem.Forms.Core.dll`, `RiverSystem.Controls.UI.dll`, `TIME.UI.dll` and `TIME.Winforms.UI.dll`.
+
+To get the fast inner loop working, restage a Source 6.x reference set over `..\Output` afterwards — the same two copies `compile_all.py` does per version (`copy_references`):
+
+```powershell
+$s='C:\Geospatial\Source\Source_6.10.0.14373'; $o='C:\src\projects\Output'
+Get-ChildItem $s -File | Where-Object { $_.Extension -in '.dll','.exe' } |
+  ForEach-Object { Copy-Item $_.FullName (Join-Path $o $_.Name) -Force }
+New-Item -ItemType Directory -Force (Join-Path $o 'Plugins') | Out-Null
+Get-ChildItem "$s\Plugins" -File | Where-Object { $_.Extension -in '.dll','.exe' } |
+  ForEach-Object { Copy-Item $_.FullName (Join-Path $o "Plugins\$($_.Name)") -Force }
+```
+
+If a later `master` build suddenly fails with `CS0234` on `RiverSystem.Forms` / `TIME.UI`, someone has re-run `build.bat`; re-run the snippet above.
+
 - [ ] **Step 3: Confirm a plain single-version build now works**
 
 With `..\Output` complete, the csproj's `HintPath` references resolve and a direct build should succeed. This is the fast inner loop for the rest of the plan — `build.bat` is far too slow to run per test.
@@ -132,7 +147,15 @@ Expected: `Passed: 12` or similar, zero failures.
 
 - [ ] **Step 5: Record the working command**
 
-Edit this plan file, replacing every later occurrence of `<TEST-CMD>` with the invocation that worked. Commit.
+**Recorded result (verified 2026-07-30):** `dotnet test` works — 13 passed, 0 failed, exit code 0. The vstest fallback was not needed. Every later `Run:` step in this plan uses this base command:
+
+```
+dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo
+```
+
+To filter to a fixture, append `--filter "FullyQualifiedName~<FixtureName>"`. Note it emits many `MSB3277` reference-version warnings; these are pre-existing noise, not failures.
+
+Commit.
 
 ```bash
 git add docs/superpowers/plans/2026-07-30-addon-launch-modes.md
@@ -363,7 +386,7 @@ namespace FlowMatters.Source.Veneer.Tests
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `<TEST-CMD>` filtered to `AddonCommandLineTests`
+Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo` filtered to `AddonCommandLineTests`
 Expected: build failure — `AddonCommandLine` does not exist.
 
 - [ ] **Step 3: Write the implementation**
@@ -461,7 +484,7 @@ namespace FlowMatters.Source.Veneer.DomainActions
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `<TEST-CMD>` filtered to `AddonCommandLineTests`
+Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo` filtered to `AddonCommandLineTests`
 Expected: all pass, zero failures.
 
 - [ ] **Step 5: Verify the composed `.bat` line actually works against real cmd**
@@ -582,7 +605,7 @@ namespace FlowMatters.Source.Veneer.Tests
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `<TEST-CMD>` filtered to `AddonEnvironmentTests`
+Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo` filtered to `AddonEnvironmentTests`
 Expected: build failure — `AddonEnvironment` does not exist.
 
 - [ ] **Step 3: Write the implementation**
@@ -649,7 +672,7 @@ namespace FlowMatters.Source.Veneer.DomainActions
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `<TEST-CMD>` filtered to `AddonEnvironmentTests`
+Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo` filtered to `AddonEnvironmentTests`
 Expected: all pass.
 
 - [ ] **Step 5: Commit**
@@ -782,7 +805,7 @@ namespace FlowMatters.Source.Veneer.Tests
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `<TEST-CMD>` filtered to `AddonScriptTests`
+Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo` filtered to `AddonScriptTests`
 Expected: build failure — `AddonScript` does not exist.
 
 - [ ] **Step 3: Write the implementation**
@@ -896,7 +919,7 @@ namespace FlowMatters.Source.Veneer.DomainActions
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `<TEST-CMD>` filtered to `AddonScriptTests`
+Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo` filtered to `AddonScriptTests`
 Expected: all pass.
 
 - [ ] **Step 5: Commit**
@@ -969,7 +992,7 @@ namespace FlowMatters.Source.Veneer.Tests
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `<TEST-CMD>` filtered to `AddonValidationTests`
+Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo` filtered to `AddonValidationTests`
 Expected: build failure — the new members do not exist.
 
 - [ ] **Step 3: Add the fields and validation**
@@ -1021,7 +1044,7 @@ Replace the `VeneerAddon` class in `Addons/VeneerConfiguration.cs` (currently li
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `<TEST-CMD>` filtered to `AddonValidationTests`
+Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo` filtered to `AddonValidationTests`
 Expected: all pass.
 
 - [ ] **Step 5: Commit**
@@ -1469,7 +1492,7 @@ not mistaken for a bug.
 
 - [ ] **Step 7: Run the whole test suite**
 
-Run: `<TEST-CMD>` with no filter
+Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo` with no filter
 Expected: all pass, including the two pre-existing Schematic fixtures.
 
 - [ ] **Step 8: Commit**
