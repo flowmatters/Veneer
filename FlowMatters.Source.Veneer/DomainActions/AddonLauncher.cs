@@ -58,10 +58,43 @@ namespace FlowMatters.Source.Veneer.DomainActions
             }
         }
 
+        /// <summary>
+        /// One cmd.exe per launch, script lines written to its redirected stdin.
+        /// Nothing is written to disk, so a blocked temp directory cannot stop it,
+        /// and because it is a single shell session set/cd/&amp;&amp; persist across lines.
+        /// </summary>
         private static void LaunchScript(VeneerAddon addon, AddonContext context,
                                          IDictionary<string, string> env, IAddonLog log)
         {
-            throw new NotImplementedException("Task 9");
+            // Default "D" format: interpolated into the filter's regexes, so it must
+            // contain no metacharacters. "B"/"P" would inject braces or parens.
+            var nonce = Guid.NewGuid().ToString();
+            var filter = new ScriptOutputFilter(nonce);
+
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = "cmd.exe",
+                // /V:OFF makes ! immune to a machine-wide DelayedExpansion registry
+                // setting; /D skips AutoRun, which could otherwise cd or set
+                // variables under the script's feet in a policy-managed deployment.
+                Arguments = "/D /V:OFF",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardInput = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                WorkingDirectory = ResolveWorkingDirectory(addon, context, env)
+            };
+            ApplyEnvironment(startInfo, env);
+
+            // Fed through Run's callback rather than after it returns, so the
+            // completion watcher starts only once every line is written -- a script
+            // whose first line fails cannot have its Process disposed mid-write.
+            Run(startInfo, addon, log, filter, stdin =>
+            {
+                foreach (var line in AddonScript.Generate(addon.script, nonce))
+                    stdin.WriteLine(line);
+            });
         }
 
         private static string ResolveWorkingDirectory(VeneerAddon addon, AddonContext context,
