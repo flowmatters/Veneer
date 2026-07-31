@@ -12,6 +12,39 @@
 
 ---
 
+## Execution status (2026-07-31)
+
+| Task | State | Commit |
+|---|---|---|
+| 0 Starting state | done | baseline 66 passing, anchors 22/338/275 confirmed |
+| 1 `MenuLayout` parsing | done | `8eccfce` — 20 cases, red then green |
+| 2 `TopLevelMenus` | done | `bb6d597` — 15 cases, suite at 101 |
+| 3 Wire `VeneerMenu` | done | `f98822a` — **the reported bug is fixed here** |
+| 4 Tracked menus + logo | done | `c2954f0` |
+| 5 HTML reports | done | `26938ca` |
+| 6 Documentation | done | `04c4917` |
+| 7 Manual verification | **OUTSTANDING** | Step 1 (build) done, exit 0. Steps 2-8 need the Source GUI. |
+| 8 `legacy_ci` port | done, partially verified | `91fd68a` on `legacy_ci` |
+
+**Task 7 is the gap.** Steps 2-8 require driving Source's GUI and have not been
+run. Nothing in Tasks 3-5 has unit coverage — they are WinForms and RiverSystem
+code — so **the menu-bar behaviour has not been observed, only reasoned about.**
+A verification kit (four `.veneer` fixtures, a `noop.bat`, and a step-by-step
+README) was prepared under the session scratchpad at
+`menu-ordering-verification/`.
+
+**Task 8's caveat.** The port is committed but the branch **does not build in
+this environment** — pristine `legacy_ci` at HEAD fails with the same `MC1000`
+WPF markup-compiler error as the ported tree, so the breakage is pre-existing
+and unrelated to this work. Verified instead: the identical code passes 101
+tests on `master`, and `MenuLayout.cs` compiles clean under
+`csc /langversion:7.3 /warnaserror`. The 35 `MenuLayoutTests` have **not** been
+run on `legacy_ci`.
+
+Both `master` and `legacy_ci` have unpushed commits.
+
+---
+
 ## Prerequisites — read before Task 0
 
 ### The build and test command are already known-good
