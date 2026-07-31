@@ -157,7 +157,8 @@ namespace FlowMatters.Source.Veneer
                 ToolStripItem veneer = reportMenu.DropDownItems.Add("");
                 veneer.BackgroundImage = Veneer.Properties.Resources.Logo_RGB;
                 veneer.BackgroundImageLayout = ImageLayout.Zoom;
-                veneer.Click += (eventSender, eventArgs) => Process.Start("http://www.flowmatters.com.au");
+                veneer.Click += (eventSender, eventArgs) =>
+                    OpenLink("http://www.flowmatters.com.au", "the Veneer home page");
             }
         }
 
@@ -261,9 +262,29 @@ namespace FlowMatters.Source.Veneer
 
         private void Launch(string p)
         {
-            int port = SourceRESTfulService.DEFAULT_PORT;
+            // Was SourceRESTfulService.DEFAULT_PORT -- the compile-time constant
+            // 9876 -- so report links pointed there no matter where the server
+            // was actually listening.
+            int port = Control != null ? Control.Port : WebServerStatusControl.DefaultPort;
             string url = string.Format("http://localhost:{0}/doc/{1}", port, p);
-            Process.Start(url);
+            OpenLink(url, string.Format("report '{0}'", p));
+        }
+
+        /// <summary>
+        /// Click handlers must not throw -- an escaping exception becomes an
+        /// unhandled-exception dialog in Source. Failures go straight to Source's
+        /// log rather than through LogOnce, which de-duplicates by message and is
+        /// cleared only on project change: right for menu-build spam, wrong for a
+        /// click, where clicking a broken link twice should report twice.
+        /// </summary>
+        private void OpenLink(string url, string description)
+        {
+            string error;
+            if (!ShellLink.TryOpen(url, out error))
+            {
+                TIME.Management.Log.WriteError(
+                    this, string.Format("Veneer could not open {0}: {1}", description, error));
+            }
         }
 
         public void ClearMenu()
