@@ -61,13 +61,17 @@ The `menu` field is a pipe-delimited path. The first segment names a top-level e
 
 | `menu` value             | Result |
 |--------------------------|--------|
-| absent / empty           | Item appears under the default `Reporting` menu. |
+| absent / empty / whitespace / `"\|"` | Item appears under the default `Reporting` menu. |
 | `"Reporting"`            | Same as default. |
-| `"Models"`               | A new top-level `Models` menu is created next to `Reporting`; the item appears in it. |
+| `"Models"`               | A new top-level `Models` menu is created; the item appears in it. Its position in the menu bar follows the order menus first appear in the file — see below. |
 | `"Models|Calibration"`   | Item appears under `Models → Calibration`. |
 | `"Models|Calibration|Daily"` | Item appears under `Models → Calibration → Daily`. Arbitrary nesting depth is supported. |
 
-Top-level menus are created up-front based on every `menu` value in the file, so menu-bar layout is stable regardless of which scenario is currently active.
+Top-level menus are created up-front based on every `menu` value in the file, so menu-bar layout is stable regardless of which scenario is currently active — an addon that is greyed out by a scenario filter still contributes its menu, in its usual position.
+
+They appear in the menu bar **in the order they first appear in the file**. An addon with no `menu` counts as targeting `Reporting` for this purpose, so a menuless addon at the top of the file puts `Reporting` first. `Reporting` is appended after all file-specified menus when no addon targets it — which happens when it exists only to hold discovered HTML reports.
+
+Naming a menu that Source itself already owns (`Tools`, `File`, and so on) is **not supported**: Veneer binds to the existing menu wherever Source placed it, and addons under that name are not populated.
 
 ### Launching exe addons
 
@@ -82,7 +86,7 @@ Click handlers are wired regardless of whether the item is enabled — disabled 
 
 ### HTML reports (separate from addons)
 
-Independent of the `addons` block, any `*.htm` / `*.html` file in the project directory is automatically added to the `Reporting` menu. Clicking opens it via Veneer's `/doc/<filename>` HTTP endpoint. Filenames are prettified for display by replacing underscores with spaces and stripping the extension. This requires no `.veneer` file at all.
+Independent of the `addons` block, any `*.htm` / `*.html` file in the project directory is automatically added to the `Reporting` menu — and to that menu only, below any addons the file placed there. Clicking opens it via Veneer's `/doc/<filename>` HTTP endpoint. Filenames are prettified for display by replacing underscores with spaces and stripping the extension. This requires no `.veneer` file at all.
 
 ## Scenario scoping
 
@@ -146,7 +150,7 @@ Server-level defaults applied to Veneer's in-Source web-server control. These ar
 
 ## Veneer logo entry
 
-Veneer adds a clickable logo as the last item of the *first* top-level menu it owns. This is purely cosmetic and not configurable.
+Veneer adds a clickable logo as the last item of the *last* top-level menu it owns. This is purely cosmetic and not configurable.
 
 ## Compatibility
 
