@@ -47,13 +47,28 @@ Each entry in `addons` describes one launchable tool that appears as a menu item
 }
 ```
 
-| Field      | Type   | Required | Purpose |
-|------------|--------|----------|---------|
-| `name`     | string | yes      | Text shown on the menu item. |
-| `type`     | string | yes      | Addon kind. Currently only `"exe"` is implemented; other values are silently ignored. |
-| `path`     | string | yes      | Path to the executable or batch file, relative to the directory containing the `.rsproj`. |
-| `menu`     | string | no       | Where the item appears in the menu bar. Defaults to `Reporting`. See **Menu paths** below. |
-| `scenario` | string | no       | Per-addon scenario filter. Overrides `targetScenario`. See **Scenario scoping** below. |
+| Field              | Type             | Required       | Purpose |
+|--------------------|------------------|----------------|---------|
+| `name`             | string           | yes            | Text shown on the menu item. |
+| `type`             | string           | yes            | `"exe"`, `"script"` or `"url"`. An unrecognised value renders a **disabled** menu item with a tooltip. |
+| `path`             | string           | for `"exe"`    | Program or batch file, relative to the directory containing the `.rsproj` unless rooted. |
+| `script`           | array of strings | for `"script"` | Command lines, run in one `cmd.exe` session. |
+| `url`              | string           | for `"url"`    | Link to open. Must begin with `http://`, `https://` or `mailto:`. |
+| `args`             | array of strings | no             | Arguments for an `"exe"`. Veneer quotes each element — do not add your own quotes. |
+| `env`              | object           | no             | Environment variables for the launched program. Overrides the injected variables below. |
+| `workingDirectory` | string           | no             | Relative to the project directory, and defaults to it. |
+| `menu`             | string           | no             | Where the item appears in the menu bar. Defaults to `Reporting`. See **Menu paths** below. |
+| `scenario`         | string           | no             | Per-addon scenario filter. Overrides `targetScenario`. See **Scenario scoping** below. |
+
+`path`, `script` and `url` are three ways of saying what an entry does, and an entry must use **exactly one**. Specifying two renders a disabled item with a tooltip naming the pair that conflicted.
+
+### Injected variables
+
+`%VENEER_PORT%`, `%VENEER_PROJECT_DIR%` and `%VENEER_PROJECT_FILE%` expand inside `path`, `args`, `workingDirectory`, `url`, `env` values and script lines.
+
+An unknown `%VAR%` is left as literal text rather than blanked, so a typo is visible rather than silently producing a truncated argument — or, for a `url`, a malformed address in the browser.
+
+`VENEER_PORT` is the *configured* port, not a promise that the server is listening.
 
 ### Menu paths
 
@@ -77,16 +92,33 @@ Naming a menu that Source itself already owns (`Tools`, `File`, and so on) is **
 
 When the user clicks an enabled addon, Veneer:
 
-1. Resolves the addon's `path` against the project directory.
-2. If the path ends in `.bat`, launches it via `cmd.exe /C <path>`. Otherwise, launches the executable directly.
-3. Sets the `VENEER_PORT` environment variable on the child process to the port the Veneer HTTP server is listening on, so the addon can call back into Veneer's REST API.
-4. Starts the Veneer HTTP server first if it isn't already running.
+1. Expands `%VAR%` references in `path`, `args` and `workingDirectory`.
+2. Resolves the addon's `path` against the project directory unless it is already rooted.
+3. If the path ends in `.bat` or `.cmd`, launches it via `cmd.exe /D /V:OFF /C`, quoting the path and each argument. Otherwise, launches the executable directly with no shell involved.
+4. Sets `VENEER_PORT`, `VENEER_PROJECT_DIR` and `VENEER_PROJECT_FILE` on the child process, plus anything in `env`.
+5. Opens the Veneer panel if it is closed, because that is where addon output is written. `type: "url"` addons do not, since they produce no output.
 
 Click handlers are wired regardless of whether the item is enabled — disabled menu items never fire them, so this is safe.
 
+### Linking to a page — `type: "url"`
+
+```json
+{ "name": "Model wiki", "type": "url", "url": "https://wiki.example.org/catchment", "menu": "Help" }
+```
+
+The URL must begin with `http://`, `https://` or `mailto:`. Anything else renders a disabled menu item with a tooltip.
+
+`file://` is **deliberately excluded**. It would admit `file://server/share/tool.exe`, and without it `type: "url"` cannot launch a local program by any spelling. For a document on a network share, serve it over HTTP or use an `exe` addon.
+
+**The scheme must be written literally.** `"url": "https://%HOST%/help"` is fine — the variable may appear anywhere after the scheme — but `"url": "%HELP_URL%"` is rejected, because the entry is validated when the menu is built, before any variable is expanded.
+
+The link opens in whatever application the machine has registered for it. A `mailto:` link on a machine with no mail client will fail, and the failure is logged.
+
 ### HTML reports (separate from addons)
 
-Independent of the `addons` block, any `*.htm` / `*.html` file in the project directory is automatically added to the `Reporting` menu — and to that menu only, below any addons the file placed there. Clicking opens it via Veneer's `/doc/<filename>` HTTP endpoint. Filenames are prettified for display by replacing underscores with spaces and stripping the extension. This requires no `.veneer` file at all.
+Independent of the `addons` block, any `*.htm` / `*.html` file in the project directory is automatically added to the `Reporting` menu — and to that menu only, below any addons the file placed there. Clicking opens it via Veneer's `/doc/<filename>` HTTP endpoint on the configured port. Filenames are prettified for display by replacing underscores with spaces and stripping the extension. This requires no `.veneer` file at all.
+
+Worked examples, the limitations of `type: "script"`, where addon output goes, and how to diagnose a greyed-out item are in [`Samples/addons/README.md`](../Samples/addons/README.md).
 
 ## Scenario scoping
 

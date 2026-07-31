@@ -2,7 +2,7 @@
 
 A `.veneer` file sits beside a Source project as `<project>.rsproj.veneer` and
 registers entries in Source's menu bar. This directory has worked examples of the
-two launch modes.
+three launch modes.
 
 ## `type: "exe"` — run a program
 
@@ -56,9 +56,41 @@ configurable. The failing line number is reported in the log.
 
 `path` and `script` are mutually exclusive; an entry with both is rejected.
 
+## `type: "url"` — open a link
+
+```json
+{
+  "name": "Project wiki",
+  "type": "url",
+  "url": "https://wiki.example.org/catchment",
+  "menu": "Help"
+}
+```
+
+See `link-menu.rsproj.veneer` for a menu of three links.
+
+The URL must begin with `http://`, `https://` or `mailto:`. Anything else is
+rejected and the item is greyed out.
+
+`file://` is **deliberately excluded**: it would admit
+`file://server/share/tool.exe`, and without it `type: "url"` cannot launch a
+local program by any spelling. For a document on a network share, serve it over
+HTTP or ship an `exe` addon.
+
+**The scheme must be written literally.** `https://%HOST%/help` is fine — a
+variable may appear anywhere after the scheme — but `%HELP_URL%` is rejected,
+because entries are validated when the menu is built, before anything is
+expanded.
+
+`path`, `script` and `url` are mutually exclusive; use exactly one.
+
+Unlike the other two modes this does **not** open the Veneer panel — a link
+produces no output to route there. It also does not need the server running,
+unless of course the link points at it.
+
 ## Injected variables
 
-Available in `path`, `args`, `workingDirectory`, `env` values and script lines:
+Available in `path`, `args`, `workingDirectory`, `url`, `env` values and script lines:
 
 | Variable | Value |
 |---|---|
@@ -107,6 +139,13 @@ see `cd %VENEER_PROJECT_DIR%` rather than the resolved path.
 ## Diagnosing a menu item that does nothing
 
 An entry that is greyed out has a tooltip explaining why, and the same reason is
-written to Source's log once. Causes: a scenario filter that does not match the
-active scenario, an unrecognised `type`, both `path` and `script` present,
-`type: "script"` with no lines, or neither `path` nor `script`.
+written to Source's log once. Causes:
+
+- a scenario filter that does not match the active scenario
+- an unrecognised `type`
+- more than one of `path`, `script` and `url` present
+- `type: "script"` with no lines
+- `type: "url"` with no `url`
+- a `url` outside the `http://` / `https://` / `mailto:` allowlist
+- a `url` on an entry whose `type` is not `"url"`
+- none of `path`, `script` or `url` — there is nothing to launch
