@@ -76,18 +76,6 @@ namespace FlowMatters.Source.Veneer
 
             if (Scenario != null)
             {
-                string projectFolder = Scenario.Project.FileDirectory;
-                if (projectFolder != null)
-                {
-                    foreach (string reportFn in Directory.EnumerateFiles(projectFolder, "*.htm*",
-                                 SearchOption.TopDirectoryOnly))
-                    {
-                        string fn = reportFn.Replace(projectFolder + "\\", "");
-                        ToolStripItem item = reportMenu.DropDownItems.Add(NiceName(fn));
-                        item.Click += (eventSender, eventArgs) => Launch(fn);
-                    }
-                }
-
                 var config = VeneerConfiguration.Load(Scenario);
                 var currentScenario = MainForm.Instance.CurrentScenario;
                 if (config?.addons != null)
@@ -144,6 +132,13 @@ namespace FlowMatters.Source.Veneer
                                 $"Veneer addon '{addon.name}' disabled: requires scenario '{filter}', current is '{currentScenario?.Name ?? "none"}'");
                         }
                     }
+                }
+
+                // Auto-discovered reports belong to Reporting only, and sit below the
+                // addons that the .veneer file specified explicitly.
+                if (mnu == MenuLayout.DEFAULT_MENU)
+                {
+                    AddHtmlReports(reportMenu);
                 }
 
                 if (config?.options!= null)
@@ -246,6 +241,16 @@ namespace FlowMatters.Source.Veneer
 
                 if (level == AddonLogLevel.Error)
                     TIME.Management.Log.WriteError(this, message);
+            }
+        }
+
+        private void AddHtmlReports(ToolStripMenuItem reportMenu)
+        {
+            foreach (string reportFn in HtmlReportFiles())
+            {
+                string fn = Path.GetFileName(reportFn);
+                ToolStripItem item = reportMenu.DropDownItems.Add(NiceName(fn));
+                item.Click += (eventSender, eventArgs) => Launch(fn);
             }
         }
 
