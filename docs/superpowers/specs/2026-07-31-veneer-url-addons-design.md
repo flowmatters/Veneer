@@ -88,7 +88,7 @@ rather than failing on click.
 | 1 | `url` alongside `path` or `script` | specifies `url` together with `path` or `script`; they are mutually exclusive |
 | 2 | `url` present but `type` is not `url` | specifies `url` but type is not `url` |
 | 3 | `type: "url"` with no `url` | is type `url` but has no `url` |
-| 4 | `url` without an allowed scheme | has a `url` that is not `http://`, `https://` or `mailto:` |
+| 4 | `url` **present** and without an allowed scheme | has a `url` that is not `http://`, `https://` or `mailto:` |
 
 The existing rule "has neither `path` nor `script`; there is nothing to run" is
 widened to mention `url`, so a valid URL addon no longer trips it.
@@ -103,7 +103,14 @@ Three details that would otherwise be left to the implementer to guess:
 - **Rules 2 and 3 compare `type` with `OrdinalIgnoreCase`**, matching the
   existing `script` rule.
 - **`url` is treated as present when non-null and non-empty** (`IsNullOrEmpty`),
-  consistent with how `path` is tested.
+  consistent with how `path` is tested. Rule 4 is guarded on that presence test —
+  unguarded it would fire on every `exe` addon, all of which have no `url`.
+- **Rule 3 takes precedence over the widened catch-all.** `{"type": "url"}` with
+  nothing else satisfies both, and must report "is type `url` but has no `url`",
+  not "has neither `path`, `script` nor `url`". This is the same precedence the
+  existing test `ScriptTypeWithNoLines_ReportsTheScriptReasonNotTheNeitherReason`
+  pins for `script`: the specific type reason wins over the generic one. It falls
+  out of rule order, since the catch-all is last in the method.
 
 ### A pre-existing case-sensitivity asymmetry
 
@@ -163,6 +170,15 @@ is the failure the trim exists to prevent. `AddonUrl` therefore exposes a
 `Normalise(string)` returning the trimmed value, and both `HasAllowedScheme` and
 `AddonLauncher.LaunchUrl` go through it — one definition of what the URL *is*.
 
+Two details:
+
+- **`Normalise` returns null for null**, and `HasAllowedScheme` guards null
+  before comparing, so `HasAllowedScheme(null)` is `false` rather than a throw.
+- **`Normalise` runs again after expansion**, not only before validation:
+  `Normalise(Expand(Normalise(url)))`. A variable whose *value* carries
+  whitespace — `%HELP_BASE%` set to `" https://x "` — would otherwise reintroduce
+  exactly the leading space the first trim removed.
+
 ### The scheme must be written literally
 
 Validation runs before expansion, so `"url": "%HELP_URL%"` is **rejected**.
@@ -201,8 +217,9 @@ the concrete risk is a null `url` reaching `Normalise`.
 `LaunchAddon` calls `WebServerStatusControl.Launch()` when `Control` is null, to
 obtain `Control.Port`. For a wiki link that side effect is unwanted, so
 `AddonContext.Port` instead comes from `Control?.Port` falling back to
-`WebServerStatusControl.DefaultPort`. This matches what `Launch` already does for
-HTML reports, which reads a static rather than opening the panel.
+`WebServerStatusControl.DefaultPort`. `Launch` sets the same precedent of reading
+a value rather than opening the panel — though it reads the *wrong* value today,
+which is the port bug fixed below. Both methods end up on the same expression.
 
 That has a consequence: `ControlAddonLog` dereferences its control
 (`VeneerMenu.cs:240`), so with the panel closed there is no usable sink. A second
