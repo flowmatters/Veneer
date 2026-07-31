@@ -19,8 +19,6 @@ namespace FlowMatters.Source.Veneer
 {
     internal class VeneerMenu
     {
-        const string DEFAULT_MENU = "Reporting";
-
         private VeneerMenu()
         {
         }
@@ -47,7 +45,7 @@ namespace FlowMatters.Source.Veneer
             return Application.OpenForms.Cast<Form>().FirstOrDefault(f => f.MainMenuStrip != null);
         }
 
-        public ToolStripMenuItem FindOrCreateReportMenu(Form parent, string mnu = DEFAULT_MENU)
+        public ToolStripMenuItem FindOrCreateReportMenu(Form parent, string mnu = MenuLayout.DEFAULT_MENU)
         {
             ToolStripMenuItem result =
                 parent.MainMenuStrip.Items.Cast<ToolStripItem>().Where(item => item.Text == mnu)
@@ -87,10 +85,10 @@ namespace FlowMatters.Source.Veneer
                 var currentScenario = MainForm.Instance.CurrentScenario;
                 if (config?.addons != null)
                 {
-                    var addonsForMenu = config.addons.Where(a => GetTopLevelMenu(a.menu) == mnu);
+                    var addonsForMenu = config.addons.Where(a => MenuLayout.TopLevelMenu(a.menu) == mnu);
                     foreach (var addon in addonsForMenu)
                     {
-                        var menuPath = SplitMenuPath(addon.menu);
+                        var menuPath = MenuLayout.SplitMenuPath(addon.menu);
                         ToolStripMenuItem targetMenu = reportMenu;
 
                         if (menuPath.Length > 1)
@@ -159,22 +157,6 @@ namespace FlowMatters.Source.Veneer
                 veneer.BackgroundImageLayout = ImageLayout.Zoom;
                 veneer.Click += (eventSender, eventArgs) => Process.Start("http://www.flowmatters.com.au");
             }
-        }
-
-        private string[] SplitMenuPath(string menuPath)
-        {
-            if (string.IsNullOrEmpty(menuPath))
-                return new[] { DEFAULT_MENU };
-
-            return menuPath.Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries)
-                .Select(s => s.Trim())
-                .ToArray();
-        }
-
-        private string GetTopLevelMenu(string menuPath)
-        {
-            var parts = SplitMenuPath(menuPath);
-            return parts.Length > 0 ? parts[0] : DEFAULT_MENU;
         }
 
         private ToolStripMenuItem FindOrCreateNestedMenu(ToolStripMenuItem parentMenu, string[] menuPath, int startIndex = 1)
@@ -301,63 +283,17 @@ namespace FlowMatters.Source.Veneer
 
         private List<string> RequiredMenus()
         {
-            var result = new List<string>();
             var config = VeneerConfiguration.Load(Scenario);
-
-            // Get all addon menus
-            var addonMenus = new HashSet<string>();
-            if (config?.addons != null)
-            {
-                foreach (var menuPath in config.addons.Select(a => a.menu ?? DEFAULT_MENU))
-                {
-                    addonMenus.Add(GetTopLevelMenu(menuPath));
-                }
-            }
-
-            // Determine if we have menus other than the default
-            var hasOtherMenus = addonMenus.Any(m => m != DEFAULT_MENU);
-
-            // Include default menu if it has content OR if there are no other menus
-            if (HasMenuContent(DEFAULT_MENU) || !hasOtherMenus)
-            {
-                result.Add(DEFAULT_MENU);
-            }
-
-            // Add other addon menus in a consistent order
-            foreach (var menu in addonMenus.OrderBy(m => m))
-            {
-                if (menu != DEFAULT_MENU)
-                {
-                    result.Add(menu);
-                }
-            }
-
-            return result;
+            return MenuLayout.TopLevelMenus(config?.addons, HtmlReportFiles().Any());
         }
 
-        private bool HasMenuContent(string menuName)
+        private IEnumerable<string> HtmlReportFiles()
         {
-            if (Scenario == null)
-                return false;
+            var projectFolder = Scenario?.Project?.FileDirectory;
+            if (projectFolder == null)
+                return Enumerable.Empty<string>();
 
-            // Check for HTML reports
-            string projectFolder = Scenario.Project.FileDirectory;
-            if (projectFolder != null)
-            {
-                var htmlFiles = Directory.EnumerateFiles(projectFolder, "*.htm*", SearchOption.TopDirectoryOnly);
-                if (htmlFiles.Any())
-                    return true;
-            }
-
-            // Check for addons in this menu
-            var config = VeneerConfiguration.Load(Scenario);
-            if (config?.addons != null)
-            {
-                if (config.addons.Any(a => GetTopLevelMenu(a.menu) == menuName))
-                    return true;
-            }
-
-            return false;
+            return Directory.EnumerateFiles(projectFolder, "*.htm*", SearchOption.TopDirectoryOnly);
         }
 
     }
