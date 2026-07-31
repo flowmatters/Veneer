@@ -96,6 +96,8 @@ namespace FlowMatters.Source.Veneer.Addons
 
         public string[] script { get; set; }
 
+        public string url { get; set; }
+
         /// <summary>
         /// Returns null when valid, otherwise a human-readable reason. Used to
         /// render a disabled menu item with a tooltip rather than silently
@@ -104,9 +106,31 @@ namespace FlowMatters.Source.Veneer.Addons
         public static string Validate(VeneerAddon addon)
         {
             bool hasScript = addon.script != null && addon.script.Length > 0;
+            bool hasUrl = !string.IsNullOrEmpty(addon.url);
+            bool isUrlType = string.Equals(addon.type, "url", StringComparison.OrdinalIgnoreCase);
+
+            // Mutual exclusion first, so an entry wrong in two ways reports the
+            // structural problem rather than something downstream of it. Tests
+            // script != null rather than hasScript, matching the path/script rule
+            // below: an empty array must not mean "absent" for one rule and
+            // "present" for another in the same method.
+            if (hasUrl && (!string.IsNullOrEmpty(addon.path) || addon.script != null))
+                return "specifies 'url' together with 'path' or 'script'; they are mutually exclusive";
 
             if (!string.IsNullOrEmpty(addon.path) && addon.script != null)
                 return "specifies both 'path' and 'script'; they are mutually exclusive";
+
+            // Without this, {"type":"exe","url":"..."} passes validation,
+            // dispatches to LaunchExe, and fails inside Path.Combine(dir, null)
+            // as an opaque ArgumentNullException rather than a schema error.
+            if (hasUrl && !isUrlType)
+                return "specifies 'url' but type is not 'url'";
+
+            if (isUrlType && !hasUrl)
+                return "is type 'url' but has no 'url'";
+
+            if (hasUrl && !AddonUrl.HasAllowedScheme(addon.url))
+                return "has a 'url' that is not http://, https:// or mailto:";
 
             if (string.Equals(addon.type, "script", StringComparison.OrdinalIgnoreCase) && !hasScript)
                 return "is type 'script' but has no 'script' lines";
@@ -114,8 +138,9 @@ namespace FlowMatters.Source.Veneer.Addons
             // Without this, an 'exe' addon with no path passes validation and only
             // fails when the user clicks it. Catching it at menu-build time is the
             // whole point of rendering a disabled item with an explanatory tooltip.
-            if (!hasScript && string.IsNullOrEmpty(addon.path))
-                return "has neither 'path' nor 'script'; there is nothing to run";
+            // Last, so the specific type reasons above win over this catch-all.
+            if (!hasScript && !hasUrl && string.IsNullOrEmpty(addon.path))
+                return "has neither 'path', 'script' nor 'url'; there is nothing to launch";
 
             return null;
         }

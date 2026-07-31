@@ -86,5 +86,96 @@ namespace FlowMatters.Source.Veneer.Tests
             };
             Assert.That(VeneerAddon.Validate(addon), Is.Null);
         }
+
+        [Test]
+        public void UrlAddon_IsValid()
+        {
+            var addon = new VeneerAddon { name = "a", type = "url", url = "https://wiki.example.org" };
+            Assert.That(VeneerAddon.Validate(addon), Is.Null);
+        }
+
+        [Test]
+        public void UrlWithPath_IsInvalid()
+        {
+            var addon = new VeneerAddon
+            {
+                name = "a", type = "url",
+                url = "https://wiki.example.org", path = "tools/x.bat"
+            };
+            AddonAssert.Contains(VeneerAddon.Validate(addon), "mutually exclusive");
+        }
+
+        [Test]
+        public void UrlWithScript_IsInvalid()
+        {
+            var addon = new VeneerAddon
+            {
+                name = "a", type = "url",
+                url = "https://wiki.example.org", script = new[] { "echo hi" }
+            };
+            AddonAssert.Contains(VeneerAddon.Validate(addon), "mutually exclusive");
+        }
+
+        [Test]
+        public void UrlWithEmptyScriptArray_IsInvalid()
+        {
+            // The exclusion rule tests script != null, matching the existing
+            // path/script rule -- an empty array must not mean "absent" for one
+            // rule and "present" for another in the same method.
+            var addon = new VeneerAddon
+            {
+                name = "a", type = "url",
+                url = "https://wiki.example.org", script = new string[0]
+            };
+            AddonAssert.Contains(VeneerAddon.Validate(addon), "mutually exclusive");
+        }
+
+        [Test]
+        public void UrlOnANonUrlType_IsInvalid()
+        {
+            // Without this rule the entry passes validation, dispatches to
+            // LaunchExe, and dies in Path.Combine(dir, null).
+            var addon = new VeneerAddon { name = "a", type = "exe", url = "https://wiki.example.org" };
+            AddonAssert.Contains(VeneerAddon.Validate(addon), "type is not 'url'");
+        }
+
+        [Test]
+        public void UrlTypeWithNoUrl_IsInvalid()
+        {
+            var addon = new VeneerAddon { name = "a", type = "url" };
+            Assert.That(VeneerAddon.Validate(addon), Is.Not.Null);
+        }
+
+        [Test]
+        public void UrlTypeWithNoUrl_ReportsTheUrlReasonNotTheNeitherReason()
+        {
+            var addon = new VeneerAddon { name = "a", type = "url" };
+            AddonAssert.Contains(VeneerAddon.Validate(addon), "no 'url'",
+                                 "the more specific reason must win over the catch-all");
+        }
+
+        [Test]
+        public void UrlWithDisallowedScheme_IsInvalid()
+        {
+            var addon = new VeneerAddon { name = "a", type = "url", url = "file://server/share/x.pdf" };
+            AddonAssert.Contains(VeneerAddon.Validate(addon), "mailto:");
+        }
+
+        [Test]
+        public void UrlTypeIsMatchedCaseInsensitivelyByValidate()
+        {
+            // Validate compares case-insensitively but VeneerMenu's switch does
+            // not, so "URL" validates and then renders as an unknown type. That
+            // asymmetry pre-dates this feature and is recorded, not fixed.
+            var addon = new VeneerAddon { name = "a", type = "URL", url = "https://wiki.example.org" };
+            Assert.That(VeneerAddon.Validate(addon), Is.Null);
+        }
+
+        [Test]
+        public void NeitherPathScriptNorUrl_IsInvalid()
+        {
+            var addon = new VeneerAddon { name = "a", type = "exe" };
+            AddonAssert.Contains(VeneerAddon.Validate(addon), "neither");
+        }
     }
 }

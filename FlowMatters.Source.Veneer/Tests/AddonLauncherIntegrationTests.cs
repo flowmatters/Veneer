@@ -180,7 +180,7 @@ namespace FlowMatters.Source.Veneer.Tests
             AddonLauncher.Launch(addon, Context(), log);
 
             Assert.That(log.Lines.Length, Is.EqualTo(1), log.Dump());
-            AddonAssert.Contains(log.Lines[0], "neither 'path' nor 'script'");
+            AddonAssert.Contains(log.Lines[0], "neither 'path', 'script' nor 'url'");
         }
 
         [Test]
