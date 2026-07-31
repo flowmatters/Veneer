@@ -40,6 +40,12 @@ namespace FlowMatters.Source.Veneer
 
         public WebServerStatusControl Control { get; set; }
 
+        /// <summary>Top-level menus this project requires, in bar order.</summary>
+        private List<string> _menuLayout = new List<string>();
+
+        /// <summary>Menu items Veneer itself added to the main menu strip.</summary>
+        private readonly List<ToolStripMenuItem> _createdMenus = new List<ToolStripMenuItem>();
+
         public static Form FindMainForm()
         {
             return Application.OpenForms.Cast<Form>().FirstOrDefault(f => f.MainMenuStrip != null);
@@ -56,6 +62,7 @@ namespace FlowMatters.Source.Veneer
                 result = new ToolStripMenuItem(mnu);
                 result.DropDownOpening += (sender, args) => PopulateReportMenu(mnu);
                 parent.MainMenuStrip.Items.Add(result);
+                _createdMenus.Add(result);
             }
 
             return result;
@@ -148,9 +155,9 @@ namespace FlowMatters.Source.Veneer
                 }
             }
 
-            // Only add Veneer logo to the first menu
-            var requiredMenus = RequiredMenus();
-            if (requiredMenus.Count > 0 && requiredMenus[0] == mnu)
+            // Only add the Veneer logo to the last menu in the layout
+            var layout = _menuLayout.Count > 0 ? _menuLayout : RequiredMenus();
+            if (layout.Count > 0 && layout[layout.Count - 1] == mnu)
             {
                 ToolStripItem veneer = reportMenu.DropDownItems.Add("");
                 veneer.BackgroundImage = Veneer.Properties.Resources.Logo_RGB;
@@ -259,23 +266,26 @@ namespace FlowMatters.Source.Veneer
             // A project change should re-report addon config problems.
             ClearLoggedProblems();
 
-            Form parent = VeneerMenu.FindMainForm();
-            foreach (var mnu in RequiredMenus())
+            foreach (var menu in _createdMenus)
             {
-                ToolStripMenuItem reportMenu =
-                    parent.MainMenuStrip.Items.Cast<ToolStripItem>().
-                        Where(item => item.Text == mnu).Cast<ToolStripMenuItem>().FirstOrDefault();
-
-                if (reportMenu != null)
-                    parent.MainMenuStrip.Items.Remove(reportMenu);
+                // Owner is the ToolStrip the item currently lives on, so this removes
+                // the item from wherever it actually is rather than from a menu strip
+                // we look up by hand. Only menus Veneer created are ever in this list,
+                // so a .veneer file naming an existing Source menu can no longer make
+                // us delete Source's own menu.
+                if (menu.Owner != null)
+                    menu.Owner.Items.Remove(menu);
             }
+
+            _createdMenus.Clear();
+            _menuLayout.Clear();
         }
 
         public void InitialiseRequiredMenus(Form parent, RiverSystemScenario scenario)
         {
             Scenario = scenario;
-            var menus = RequiredMenus();
-            foreach (var mnu in menus)
+            _menuLayout = RequiredMenus();
+            foreach (var mnu in _menuLayout)
             {
                 FindOrCreateReportMenu(parent, mnu);
             }
