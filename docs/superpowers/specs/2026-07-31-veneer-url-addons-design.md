@@ -336,14 +336,49 @@ should fail on `master` before this work.
 
 ## Documentation
 
-- `docs/veneer-file-format.md` — `url` in the addon field table; a
-  `type: "url"` section covering the allowlist, the literal-scheme rule and
-  `%VAR%` expansion; a note that `file://` is deliberately excluded.
-- `docs/veneer-file-format.md:53` — the `type` row currently reads *"Currently
-  only `"exe"` is implemented; other values are silently ignored."* Both halves
-  are already wrong: `script` shipped, and an unrecognised type now renders a
-  disabled item with a tooltip rather than being ignored. Correcting it belongs
-  with this change, since it is the row the new type is being added to.
+### `docs/veneer-file-format.md` is brought up to the full schema
+
+The reference doc has fallen behind. Its addon field table lists five fields;
+the schema has nine, and this change makes ten. Documenting only `url` would
+leave it just as wrong, so the whole table is reconciled.
+
+**Missing rows to add:**
+
+| Field | Note |
+|---|---|
+| `args` | array only; Veneer quotes each element, so authors must not add their own quotes |
+| `env` | environment variables for the child process; wins over injected variables |
+| `workingDirectory` | relative to the project directory, defaulting to it |
+| `script` | array of command lines, `type: "script"` |
+| `url` | this change |
+
+**Existing rows to correct:**
+
+- **`type` (line 53)** — reads *"Currently only `"exe"` is implemented; other
+  values are silently ignored."* Both halves are wrong: `script` shipped, and an
+  unrecognised type now renders a **disabled item with a tooltip**. It becomes
+  `"exe"`, `"script"` or `"url"`, with the unknown-type behaviour stated.
+- **`path` (line 54)** — marked Required `yes`. It is required for `type: "exe"`
+  and unused for `script` and `url`. The Required column becomes conditional, and
+  the mutual-exclusion rules are stated: `path`, `script` and `url` are three ways
+  of saying what an entry does, and an entry may use exactly one.
+
+**New content:** a short `type: "url"` section (allowlist, the literal-scheme
+rule, `%VAR%` expansion, and why `file://` is excluded), and the injected
+variables `VENEER_PORT` / `VENEER_PROJECT_DIR` / `VENEER_PROJECT_FILE`, which the
+reference does not mention at all.
+
+**Deliberately not duplicated.** `Samples/addons/README.md` already covers the
+`cmd.exe`-over-stdin limitations, the output/logging model, and how to diagnose a
+greyed-out item. That stays the how-to guide; `veneer-file-format.md` stays the
+schema reference and **cross-links** to it. Copying the narrative across would
+create two documents to keep in sync, which is the failure mode that produced
+this gap in the first place.
+
+Verification for this task is a field-by-field diff of the table against
+`VeneerAddon`'s properties — every property has a row, every row has a property.
+
+### Other documentation
 - `Samples/addons/` — a `link-menu.rsproj.veneer`, following
   `exe-with-args.rsproj.veneer` and `inline-script.rsproj.veneer`, and a line in
   that directory's README.
@@ -381,6 +416,8 @@ unrelated to any of this. Plan for verification by inspection plus a C# 7.3
 | `LaunchAddon` panel behaviour | unchanged; only the URL path avoids opening the panel | stop force-opening it for every type |
 | Existing broken sites | fixed, sharing `ShellLink` | left for separate work |
 | Report port | fixed to the configured port | left hard-coded at 9876 |
+| Reference doc scope | reconcile the whole addon field table with the schema | document `url` only, leaving four fields undocumented |
+| Doc duplication | reference doc cross-links to `Samples/addons/README.md` | copy the limitations and output sections into both |
 
 ## Risks
 
