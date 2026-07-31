@@ -59,6 +59,54 @@ namespace FlowMatters.Source.Veneer.DomainActions
         }
 
         /// <summary>
+        /// Separate entry point from Launch, not a branch inside it. Launch opens
+        /// with a hard ProjectDirectory guard and builds a full child-process
+        /// environment; a URL needs neither, and a wiki link routed through Launch
+        /// would fail with "no project directory is available".
+        /// </summary>
+        public static void LaunchUrl(VeneerAddon addon, AddonContext context, IAddonLog log)
+        {
+            // Re-validated for the same reason Launch re-validates: VeneerMenu
+            // disables invalid entries, but this is a public entry point and must
+            // not assume its caller did. Here the concrete risk is a null url.
+            var invalid = VeneerAddon.Validate(addon);
+            if (invalid != null)
+            {
+                log.Write(string.Format("Addon '{0}' {1}", addon.name, invalid),
+                          AddonLogLevel.Error);
+                return;
+            }
+
+            try
+            {
+                var env = AddonEnvironment.BuildEffective(context, addon.env);
+
+                // Normalised again after expansion: a variable whose value carries
+                // whitespace would otherwise reintroduce the leading space the
+                // validation-time trim removed.
+                var url = AddonUrl.Normalise(
+                    AddonEnvironment.Expand(AddonUrl.Normalise(addon.url), env));
+
+                // No scheme re-check. None of the allowed prefixes contains a '%',
+                // and Expand only replaces %NAME% spans, so expansion cannot alter
+                // the scheme Validate already accepted.
+                string error;
+                if (!ShellLink.TryOpen(url, out error))
+                {
+                    log.Write(string.Format("Addon '{0}' could not open {1}: {2}",
+                                            addon.name, url, error),
+                              AddonLogLevel.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                log.Write(string.Format("Addon '{0}' could not be launched: {1}",
+                                        addon.name, ex.Message),
+                          AddonLogLevel.Error);
+            }
+        }
+
+        /// <summary>
         /// One cmd.exe per launch, script lines written to its redirected stdin.
         /// Nothing is written to disk, so a blocked temp directory cannot stop it,
         /// and because it is a single shell session set/cd/&amp;&amp; persist across lines.
