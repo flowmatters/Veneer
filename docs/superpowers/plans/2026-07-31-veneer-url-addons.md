@@ -12,6 +12,43 @@
 
 ---
 
+## Execution status (2026-07-31)
+
+| Task | State | Commit |
+|---|---|---|
+| 0 Starting state | done | baseline 101, anchors 105/262/264 confirmed |
+| 1 `AddonUrl` | done | `ee97265` — 23 cases, red then green |
+| 2 `url` field + validation | done | `5bde4ce` — 10 cases, suite at 134 |
+| 3 `ShellLink` | done | `65e498a` |
+| 4 Existing links + port | done | `0e296ad` — **the regression fix** |
+| 5 `LaunchUrl` | done | `9522fa6` |
+| 6 Menu dispatch | done | `6d97b20` |
+| 7 Docs + sample | done | `f930b1e` — field table verified against `VeneerAddon` both directions |
+| 8 Manual verification | **OUTSTANDING** | needs the Source GUI |
+| 9 `legacy_ci` port | done, partially verified | `a3eb58b` on `legacy_ci` |
+
+**One surprise during execution.** Widening the "nothing to run" message broke
+`AddonLauncherIntegrationTests.cs:183`, which pinned the old wording. Neither the
+plan nor its reviewer caught it — both traced only `AddonValidationTests`. Fixed
+by updating the assertion to the new phrase, in the Task 2 commit.
+
+**Task 8 is the gap.** `ShellLink` launches a browser and the rest is WinForms, so
+none of Tasks 3-6 has unit coverage: **the link behaviour has not been observed,
+only reasoned about.** Step 2 matters most — it confirms the regression exists
+before verifying the fix, because the `UseShellExecute` diagnosis was inferred
+from the runtime default and never seen to fail in Source.
+
+**Task 9's caveat.** The port is committed but `legacy_ci` **does not build** in
+this environment — pristine HEAD fails with the same `MC1000` WPF
+markup-compiler error as the ported tree, so it is pre-existing and unrelated.
+Verified instead: the identical code passes 134 tests on `master`, and both
+`AddonUrl.cs` and `ShellLink.cs` compile clean under
+`csc /langversion:7.3 /warnaserror`. The 33 new tests have **not** been run there.
+
+Both `master` and `legacy_ci` have unpushed commits.
+
+---
+
 ## Prerequisites
 
 ### Build and test command
