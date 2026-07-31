@@ -27,12 +27,16 @@ the top-level bar is affected.
 
 ### Line reference convention
 
-Line numbers cite `FlowMatters.Source.Veneer/VeneerMenu.cs`. The
-`ReportingMenu` → `VeneerMenu` rename landed at commit `6f2794e` and was
-line-preserving — the only diff is the identifier — so every line number below
-resolves against the current file. Sections of this spec that quote code quote it
-as at `6f2794e`; later commits on the addon-launch-modes branch of work change
-some of it, which the Sequencing section addresses.
+Line numbers cite `FlowMatters.Source.Veneer/VeneerMenu.cs` **as at commit
+`6f2794e`**, the `ReportingMenu` → `VeneerMenu` rename, which was line-preserving
+— the only diff is the identifier.
+
+They have since drifted. Addon-launch-modes commit `4be978d` added ~66 net lines
+to the same file, shifting everything below `PopulateReportMenu`, and further
+commits on that work continue to land. **Treat every line number here as an
+identifier of intent, not a location**: the method names and quoted code are
+stable, the numbers are not. The implementation plan anchors its edits on method
+names for exactly this reason.
 
 ## Scope
 
