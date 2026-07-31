@@ -10,7 +10,7 @@ namespace FlowMatters.Source.Veneer
 
         public const string TimeSeriesBase = RunResults + Recordable;
 
-        public const string TimeSeriesQuery = "?from={fromDate}&to={toDate}&precision={precision}";
+        public const string TimeSeriesQuery = "?from={fromDate}&to={toDate}&precision={precision}&content={content}";
 
         public const string TimeStepOptions = "&timestep={aggregation}&aggfn={aggfn}";
 

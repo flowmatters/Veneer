@@ -616,22 +616,37 @@ namespace FlowMatters.Source.Veneer
 
         public TimeSeriesResponse GetTimeSeries(string runId, string networkElement, string recordingElement,
                                               string variable,string fromDate, string toDate,string precision,
-                                              string aggregation, string aggfn)
+                                              string content, string aggregation, string aggfn)
         {
             Log(String.Format("Requested time series {0}/{1}/{2}/{3}",runId,networkElement,recordingElement,variable));
-            return GetTimeSeriesInternal(runId, networkElement, recordingElement, variable, aggregation, aggfn, fromDate, toDate,precision);
+            return GetTimeSeriesInternal(runId, networkElement, recordingElement, variable, aggregation, aggfn, fromDate, toDate,precision,content);
         }
 
         public TimeSeriesResponse GetAggregatedTimeSeries(string runId, string networkElement, string recordingElement,
-                                              string variable, string aggregation, string fromDate, string toDate, string precision)
+                                              string variable, string aggregation, string fromDate, string toDate, string precision,
+                                              string content)
         {
             Log(String.Format("Requested {4} time series {0}/{1}/{2}/{3}", runId, networkElement, recordingElement, variable,aggregation));
-            return GetTimeSeriesInternal(runId, networkElement, recordingElement, variable, aggregation,"sum" , fromDate,toDate,precision);
+            return GetTimeSeriesInternal(runId, networkElement, recordingElement, variable, aggregation,"sum" , fromDate,toDate,precision,content);
         }
 
         private TimeSeriesResponse GetTimeSeriesInternal(string runId, string networkElement, string recordingElement,
-            string variable, string aggregation,string aggregationFunction, string fromDate, string toDate, string precision)
+            string variable, string aggregation,string aggregationFunction, string fromDate, string toDate, string precision,
+            string content)
         {
+            // ?content= modes. Both force the MultipleTimeSeries shape regardless of match count,
+            // so a single-series fetch is compact and carries its own locator fields.
+            var headersOnly = string.Equals(content, "headers", StringComparison.OrdinalIgnoreCase);
+            var forceMultiple = headersOnly ||
+                                string.Equals(content, "full", StringComparison.OrdinalIgnoreCase);
+
+            if (content != null && !forceMultiple)
+            {
+                // An unrecognised mode is a 400, never a silent fall-through to full.
+                WebOperationContext.Current.OutgoingResponse.StatusCode = HttpStatusCode.BadRequest;
+                return null;
+            }
+
             Tuple<TimeSeriesLink, TimeSeries>[] result = MatchTimeSeries(runId, networkElement, recordingElement, variable);
 
             if (fromDate != null || toDate != null)
@@ -653,9 +668,9 @@ namespace FlowMatters.Source.Veneer
                 result = TransformTimeSeriesCollection(result, ts => ts.Round(decimalPlaces) as TimeSeries);
             }
 
-            if (result.Length == 1)
+            if (result.Length == 1 && !forceMultiple)
                 return SimpleTimeSeries(result[0].Item2);
-            return CreateMultipleTimeSeries(result);
+            return CreateMultipleTimeSeries(result, !headersOnly);
         }
 
         private Tuple<TimeSeriesLink, TimeSeries>[] TransformTimeSeriesCollection(
@@ -703,11 +718,12 @@ namespace FlowMatters.Source.Veneer
                 variable == UriTemplates.MatchAll);
         }
 
-        private TimeSeriesResponse CreateMultipleTimeSeries(Tuple<TimeSeriesLink, TimeSeries>[] result)
+        private TimeSeriesResponse CreateMultipleTimeSeries(Tuple<TimeSeriesLink, TimeSeries>[] result,
+            bool includeValues = true)
         {
             if (result.Length == 0)
                 return TimeSeriesNotFound();
-            return new MultipleTimeSeries(result);
+            return new MultipleTimeSeries(result, includeValues);
         }
 
         public void SetFunction(string functionName, FunctionValue value)

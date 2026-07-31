@@ -75,6 +75,13 @@ etc.) are strings. Run-status dates use `yyyy-MM-dd`, and the live simulation da
 The `precision` query parameter on time series requests is an integer number of decimal
 places to round values to. Omit it for full precision.
 
+### `content`
+
+The `content` query parameter on time series requests selects the response *shape*
+independently of the match count: `full` forces the multi-series form even for one match, and
+`headers` returns those entries without their `Values`. Omit it for the legacy behaviour. See
+[runs-and-results.md](runs-and-results.md#the-content-query-parameter).
+
 ## Addressing network elements
 
 Several endpoints (time series, recorders) take a **network element** name. Two special

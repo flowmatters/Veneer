@@ -214,7 +214,7 @@ also accepts a `@@`-delimited functional unit (see
 ### `GET …/variable/{variable}` — raw / windowed series
 
 ```
-GET /runs/{runId}/location/{ne}/element/{re}/variable/{v}?from={from}&to={to}&precision={p}&timestep={agg}&aggfn={fn}
+GET /runs/{runId}/location/{ne}/element/{re}/variable/{v}?from={from}&to={to}&precision={p}&content={c}&timestep={agg}&aggfn={fn}
 ```
 
 | Query param | Meaning | Default |
@@ -222,6 +222,7 @@ GET /runs/{runId}/location/{ne}/element/{re}/variable/{v}?from={from}&to={to}&pr
 | `from` | start [partial date](overview.md#partial-dates-query-parameters) | series start |
 | `to` | end partial date | series end |
 | `precision` | decimal places to round to | full precision |
+| `content` | response shape — `full` or `headers` (see below) | omitted (legacy shape) |
 | `timestep` | aggregation period (`annual`/`month`/`day`) | none (raw) |
 | `aggfn` | aggregation function when `timestep` is set (`sum`, else averaged) | `sum` |
 
@@ -249,11 +250,60 @@ GET /runs/{runId}/location/{ne}/element/{re}/variable/{v}?from={from}&to={to}&pr
 }
 ```
 
+#### The `content` query parameter
+
+Added in protocol `20260727`. It selects the response *shape* independently of how many series
+the path happens to match — useful for discovering what a run contains without downloading
+values, and for fetching one series in a compact, self-describing form.
+
+| `content` | Response |
+|-----------|----------|
+| *(omitted)* | Legacy behaviour: `SimpleTimeSeries` for exactly one match, `MultipleTimeSeries` otherwise |
+| `full` | Always a [`MultipleTimeSeries`](schemas.md#multipletimeseries) of [`SlimTimeSeries`](schemas.md#slimtimeseries) — *including* for a single match |
+| `headers` | Always a `MultipleTimeSeries` of [`TimeSeriesFullSummary`](schemas.md#timeseriesfullsummary) — the same entries **without** the `Values` array |
+
+- Any other value (including an empty one) is a **`400 Bad Request`** with a `null` body; the
+  parameter never silently falls back to `full`.
+- `content=full` differs from omitting the parameter in exactly one respect: it suppresses the
+  single-match `SimpleTimeSeries` branch. That makes a lone series ~4× smaller (bare `double[]`
+  instead of one `{Date, Value}` object per timestep) and attributable, since `SimpleTimeSeries`
+  carries none of the locator fields (`RecordingVariable`, `SingleURL`, …).
+- `content=headers` is the cheap way to enumerate a run: every locator field, the summary stats,
+  and the invariant-culture `StartDate`/`EndDate`/`TimeStep` that define the date axis, with no
+  values. (`RunSummary.StartDate` on `GET /runs/{n}` is *not* invariant-culture — prefer these.)
+- The parameter is honoured identically on the `/aggregated/{aggregation}` route below.
+
+```http
+GET /runs/1/location/__all__/element/__all__/variable/__all__?content=headers HTTP/1.1
+```
+
+```json
+{
+  "TimeSeries": [
+    {
+      "Name": "Downstream Flow",
+      "Units": "m^3/s",
+      "TimeStep": "Daily",
+      "StartDate": "03/01/2026 00:00:00",
+      "EndDate": "10/30/2026 00:00:00",
+      "NoDataValue": -9999.0,
+      "Min": 0.0, "Max": 812.4, "Mean": 14.2, "Sum": 56123.5,
+      "RunNumber": 1,
+      "SingleURL": "/runs/1/location/Gauge%20A/element/Downstream%20Flow/variable/Flow",
+      "NetworkElement": "Gauge A",
+      "RecordingElement": "Downstream Flow",
+      "RecordingVariable": "Flow",
+      "FunctionalUnit": null
+    }
+  ]
+}
+```
+
 ### `GET …/variable/{variable}/aggregated/{aggregation}` — aggregated series
 
 Same as above, but `{aggregation}` (`annual`/`month`/`day`) is a **path** segment and the
 aggregation function is fixed to **`sum`** (you cannot override it with `aggfn` here). Accepts
-`from`, `to`, `precision` query params.
+`from`, `to`, `precision` and `content` query params.
 
 - **Response**: `TimeSeriesResponse` (as above)
 - **veneer-py**: used by `v.retrieve_multiple_time_series(..., timestep='monthly')` and by the
@@ -284,3 +334,9 @@ GET /runs/1/location/__all__/element/Downstream%20Flow/variable/Flow/tabulated/m
 Time series (and tables) can be requested as CSV by sending `Accept: text/csv`. veneer-py's
 bulk retriever uses this to store compact mirrors. The CSV layout is the date column plus one
 value column per series.
+
+> **Not currently served on the CoreWCF (`master`) build.** `Formatting/TimeSeriesResponseFormatter.cs`
+> is registered by `ReplyFormatSwitchBehaviour` but is not reached under CoreWCF's
+> `WebHttpBinding`: measured against Source 6.10, `Accept: text/csv` on a time series route
+> returns `Content-Type: application/json` and a JSON `MultipleTimeSeries` body. Clients should
+> not rely on CSV here; use `?content=full` for a compact values response instead.

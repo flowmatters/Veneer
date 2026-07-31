@@ -155,25 +155,35 @@ Returned for a single-match time series GET; also the request/response body for
 | `Date` | string |
 | `Value` | number |
 
-### SlimTimeSeries
-`ExchangeObjects/SlimTimeSeries.cs` — a compact form: values only (no per-event dates), plus
-locator metadata. Used in bulk/`__all__` retrieval.
+### TimeSeriesFullSummary
+`ExchangeObjects/TimeSeriesResponse.cs` — the meta fields plus locators, with **no values**.
+Returned as the element type of a `MultipleTimeSeries` when
+[`?content=headers`](runs-and-results.md#the-content-query-parameter) is requested.
 
 | Field | Type | Notes |
 |-------|------|-------|
 | *(all meta fields)* | | |
-| `Values` | number[] | Values in series order |
 | `RunNumber` | number (int) | |
 | `SingleURL` | string | URL of the individual series |
 | `NetworkElement` / `RecordingElement` / `RecordingVariable` / `FunctionalUnit` | string | Locators |
 
-### MultipleTimeSeries
-`ExchangeObjects/MultipleTimeSeries.cs` — wrapper returned when a request matches several
-series (e.g. via `__all__`).
+### SlimTimeSeries
+`ExchangeObjects/SlimTimeSeries.cs` — extends `TimeSeriesFullSummary` with the values only (no
+per-event dates). Used in bulk/`__all__` retrieval and for `?content=full`.
 
 | Field | Type | Notes |
 |-------|------|-------|
-| `TimeSeries` | TimeSeriesReponseMeta[] | Each element is a `SlimTimeSeries`/full-summary entry |
+| *(all `TimeSeriesFullSummary` fields)* | | |
+| `Values` | number[] | Values in series order |
+
+### MultipleTimeSeries
+`ExchangeObjects/MultipleTimeSeries.cs` — wrapper returned when a request matches several
+series (e.g. via `__all__`), or whenever
+[`?content=`](runs-and-results.md#the-content-query-parameter) is supplied.
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `TimeSeries` | TimeSeriesReponseMeta[] | `SlimTimeSeries` entries normally; `TimeSeriesFullSummary` (no `Values`) under `?content=headers` |
 
 ---
 

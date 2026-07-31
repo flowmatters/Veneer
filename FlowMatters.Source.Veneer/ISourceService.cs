@@ -92,14 +92,14 @@ namespace FlowMatters.Source.Veneer
         [WebInvoke(Method = "GET", ResponseFormat = WebMessageFormat.Json, UriTemplate = UriTemplates.TimeSeries)]
         TimeSeriesResponse GetTimeSeries(string runId, string networkElement, string recordingElement,
                                                 string variable, string fromDate, string toDate, string precision,
-                                                string aggregation, string aggfn);
+                                                string content, string aggregation, string aggfn);
 
         [OperationContract]
         [WebInvoke(Method = "GET", ResponseFormat = WebMessageFormat.Json,
                    UriTemplate = UriTemplates.AggregatedTimeSeries)]
         TimeSeriesResponse GetAggregatedTimeSeries(string runId, string networkElement, string recordingElement,
                                                    string variable, string aggregation, string fromDate, string toDate,
-                                                   string precision);
+                                                   string precision, string content);
 
         [OperationContract]
         [WebInvoke(Method = "GET", ResponseFormat = WebMessageFormat.Json, UriTemplate = UriTemplates.TabulatedResults)]
