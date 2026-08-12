@@ -10,6 +10,14 @@ namespace FlowMatters.Source.Veneer.AutoStart
 
         public static ProjectLoadListener _listener;
 
+        static InitialiseOnLoadAttribute()
+        {
+            // Earliest Veneer code to run inside Source: this type is touched when Source
+            // scans plugin attributes, well before a project is loaded. VeneerCmd installs
+            // the guard directly instead, and reaches here later via MarkInitialised().
+            LogDispatchGuard.Install();
+        }
+
         public static void MarkInitialised()
         {
             _initialised = true;

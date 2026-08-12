@@ -30,6 +30,11 @@ namespace FlowMatters.Source.VeneerCmd
 
         static void Main(string[] args)
         {
+            // Before anything logs: LoadPlugins and LoadProject both write to
+            // TIME.Management.Log, and any message written before this call can still
+            // hit the dispatch race that kills the process.
+            FlowMatters.Source.Veneer.LogDispatchGuard.Install();
+
             SynchronizationContext.SetSynchronizationContext(new SynchronizationContext());
             FlowMatters.Source.Veneer.AutoStart.InitialiseOnLoadAttribute.MarkInitialised();
             Constants.SetLargeDataOptions();

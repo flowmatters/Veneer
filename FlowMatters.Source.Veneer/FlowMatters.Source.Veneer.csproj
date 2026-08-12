@@ -309,6 +309,7 @@
     <Compile Include="RemoteScripting\IronPythonResponse.cs" />
     <Compile Include="RemoteScripting\IronPythonScript.cs" />
     <Compile Include="ISourceService.cs" />
+    <Compile Include="LogDispatchGuard.cs" />
     <Compile Include="ProcessRequests\ParseDataRequests.cs" />
     <Compile Include="RemoteScripting\ScriptHelpers.cs" />
     <Compile Include="RemoteScripting\ScriptRunner.cs" />
