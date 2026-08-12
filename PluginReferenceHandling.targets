@@ -78,22 +78,20 @@
     </ItemGroup>
 
     <ItemGroup>
+      <!-- Make sure all ReferenceCopyLocalPaths have a DestinationSubDirectory -->
       <ReferenceCopyLocalPaths
           Update="@(ReferenceCopyLocalPaths)"
           Condition="'%(ReferenceCopyLocalPaths.DestinationSubDirectory)' == ''"
           DestinationSubDirectory=""/>
-        <!-- <DestinationSubDirectory></DestinationSubDirectory>
-      </ReferenceCopyLocalPaths> -->
+      <!-- Make sure all ReferenceCopyLocalPaths have a DestinationSubPath -->
       <ReferenceCopyLocalPaths
           Update="@(ReferenceCopyLocalPaths)"
           Condition="'%(ReferenceCopyLocalPaths.DestinationSubPath)' == ''"
-          DestinationSubPath="%(ReferenceCopyLocalPaths.FileName)%(ReferenceCopyLocalPaths.Extension)" />
-        <!-- <DestinationSubPath>%(ReferenceCopyLocalPaths.FileName)%(ReferenceCopyLocalPaths.Extension)</DestinationSubPath>
-      </ReferenceCopyLocalPaths> -->
+          DestinationSubPath="%(ReferenceCopyLocalPaths.DestinationSubDirectory)%(ReferenceCopyLocalPaths.FileName)%(ReferenceCopyLocalPaths.Extension)" />
       <_ReferenceCopyLocalPathsExclusions
           Include="@(ReferenceCopyLocalPaths)"
           Exclude="@(_AllowedCopyLocalPaths)"
-          Condition="Exists('$(_RootOutDir)%(ReferenceCopyLocalPaths.DestinationSubDirectory)%(ReferenceCopyLocalPaths.DestinationSubPath)')" />
+          Condition="Exists('$(_RootOutDir)%(ReferenceCopyLocalPaths.DestinationSubPath)')" />
       <_ReferenceCopyLocalPathsWithoutExclusions Include="@(ReferenceCopyLocalPaths)" Exclude="@(_ReferenceCopyLocalPathsExclusions)" />
     </ItemGroup>
 

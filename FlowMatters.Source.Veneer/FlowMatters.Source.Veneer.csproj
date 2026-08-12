@@ -7,66 +7,56 @@
     <ImportWindowsDesktopTargets>true</ImportWindowsDesktopTargets>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="RiverSystem.ApplicationLayer.Interfaces" />
-    <Reference Include="RiverSystem.Persistence" />
-    <Reference Include="RiverSystem.PreProcessing" />
-    <Reference Include="RiverSystem.ScenarioExplorer" />
-    <Reference Include="RiverSystem" />
-    <Reference Include="RiverSystem.PluginManager" />
-    <Reference Include="RiverSystem.Api" />
-    <Reference Include="RiverSystem.ApplicationLayer.Consumer" />
-    <Reference Include="RiverSystem.ApplicationLayer.Consumer.Forms" />
-    <Reference Include="RiverSystem.Controls" />
-    <Reference Include="RiverSystem.Controls.UI" />
-    <Reference Include="RiverSystem.Forms.Core" />
-    <Reference Include="RiverSystem.Forms" />
-    <Reference Include="RiverSystem.Simulation" />
-    <Reference Include="TIME" />
-    <Reference Include="TIME.UI" />
-    <Reference Include="TIME.ScenarioManagement" />
-    <Reference Include="TIME.Tools" />
-    <Reference Include="TIME.Winforms" />
-    <Reference Include="TIME.Winforms.UI" />
-    <Reference Include="NetronGraphLib" />
+    <Reference Include="RiverSystem.ApplicationLayer.Interfaces" Private="False" />
+    <Reference Include="RiverSystem.Persistence" Private="False" />
+    <Reference Include="RiverSystem.PreProcessing" Private="False" />
+    <Reference Include="RiverSystem.ScenarioExplorer" Private="False" />
+    <Reference Include="RiverSystem" Private="False" />
+    <Reference Include="RiverSystem.PluginManager" Private="False" />
+    <Reference Include="RiverSystem.Api" Private="False" />
+    <Reference Include="RiverSystem.ApplicationLayer.Consumer" Private="False" />
+    <Reference Include="RiverSystem.ApplicationLayer.Consumer.Forms" Private="False" />
+    <Reference Include="RiverSystem.Controls" Private="False" />
+    <Reference Include="RiverSystem.Controls.UI" Private="False" />
+    <Reference Include="RiverSystem.Forms.Core" Private="False" />
+    <Reference Include="RiverSystem.Forms" Private="False" />
+    <Reference Include="RiverSystem.Simulation" Private="False" />
+    <Reference Include="TIME" Private="False" />
+    <Reference Include="TIME.UI" Private="False" />
+    <Reference Include="TIME.ScenarioManagement" Private="False" />
+    <Reference Include="TIME.Tools" Private="False" />
+    <Reference Include="TIME.Winforms" Private="False" />
+    <Reference Include="TIME.Winforms.UI" Private="False" />
+    <Reference Include="NetronGraphLib" Private="False" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="CoreWCF.WebHttp" />
     <PackageReference Include="IronPython" />
     <PackageReference Include="IronPython.Interpreter" />
     <PackageReference Include="IronPython.StdLib" />
-    <PackageReference Include="Microsoft.CSharp" />
     <PackageReference Include="Newtonsoft.Json" />
-    <PackageReference Include="System.Data.DataSetExtensions" />
     <PackageReference Include="System.Configuration.ConfigurationManager" />
     <PackageReference Include="System.ServiceModel.Primitives" />
     <PackageReference Include="System.ServiceModel.Http" />
-    <PackageReference Include="System.ServiceModel.Duplex" />
-    <PackageReference Include="System.ServiceModel.NetTcp" />
-    <PackageReference Include="System.ServiceModel.Security" />
-    <PackageReference Include="System.ServiceModel.Federation" />
-    <!-- Required to match RiverSystem.Controls.UI-->
     <PackageReference Include="System.Drawing.Common" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" />
-    <PackageReference Include="NUnit" />
-    <PackageReference Include="NUnit3TestAdapter" />
-    <PackageReference Include="NUnit.Analyzers">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
-    <PackageReference Include="coverlet.collector">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    <!-- Exclude all assets from Mono.Unix (pulled in by IronPython but only used on Unix systems) -->
+    <PackageReference Include="Mono.Unix">
+      <ExcludeAssets>All</ExcludeAssets>
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
-    <None Include="Lib\**\*" />
-    <!-- <AppDesigner Include="Properties\" /> -->
-  </ItemGroup>
-  <ItemGroup>
-    <Resource Include="Logo_RGB.png" />
     <Resource Include="Resources\*.*" />
+    <EmbeddedResource Include="Resources\NodeIcons\*.*" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\NodeIcons\*.*" />
+    <Compile Update="Properties\Resources.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+    <EmbeddedResource Update="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
   </ItemGroup>
 </Project>

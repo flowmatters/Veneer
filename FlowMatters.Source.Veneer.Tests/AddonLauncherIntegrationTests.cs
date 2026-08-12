@@ -1,11 +1,6 @@
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
-using System.Linq;
 using FlowMatters.Source.Veneer.Addons;
 using FlowMatters.Source.Veneer.DomainActions;
-using NUnit.Framework;
+using System.Diagnostics;
 
 namespace FlowMatters.Source.Veneer.Tests
 {
@@ -94,7 +89,9 @@ namespace FlowMatters.Source.Veneer.Tests
 
             var addon = new VeneerAddon
             {
-                name = "show", type = "exe", path = "show.bat",
+                name = "show",
+                type = "exe",
+                path = "show.bat",
                 args = new[] { "arg with space", "%VENEER_PORT%" },
                 env = new Dictionary<string, string> { { "RUN_LABEL", "nightly" } }
             };
@@ -117,7 +114,8 @@ namespace FlowMatters.Source.Veneer.Tests
         {
             var addon = new VeneerAddon
             {
-                name = "nightly", type = "script",
+                name = "nightly",
+                type = "script",
                 script = new[]
                 {
                     "set STAGE=one",
@@ -149,7 +147,8 @@ namespace FlowMatters.Source.Veneer.Tests
         {
             var addon = new VeneerAddon
             {
-                name = "failing", type = "script",
+                name = "failing",
+                type = "script",
                 script = new[]
                 {
                     "echo first line ran",

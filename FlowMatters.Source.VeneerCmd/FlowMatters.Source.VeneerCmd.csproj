@@ -2,35 +2,33 @@
   <PropertyGroup>
     <TargetFramework>net8.0-windows</TargetFramework>
     <OutputType>Exe</OutputType>
-    <UseWindowsForms>true</UseWindowsForms>
-    <UseWPF>true</UseWPF>
-    <ImportWindowsDesktopTargets>true</ImportWindowsDesktopTargets>
   </PropertyGroup>
   <ItemGroup>
+    <!-- Don't copy local and only include "compile" assets -->
+    <ProjectReference Include="..\FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj">
+      <Private>False</Private>
+      <CopyLocalSatelliteAssemblies>False</CopyLocalSatelliteAssemblies>
+      <ExcludeAssets>runtime</ExcludeAssets>
+      <IncludeAssets>compile</IncludeAssets>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="RiverSystem" Private="False" />
+    <Reference Include="RiverSystem.ApplicationLayer" Private="False" />
+    <Reference Include="RiverSystem.ApplicationLayer.Interfaces" Private="False" />
+    <Reference Include="RiverSystem.Persistence" Private="False" />
+    <Reference Include="RiverSystem.PluginManager" Private="False" />
+    <Reference Include="TIME" Private="False" />
+    <Reference Include="TIME.ScenarioManagement" Private="False" />
+    <Reference Include="TIME.Tools" Private="False" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="CommandLineParser" />
-    <PackageReference Include="FirebirdSql.Data.FirebirdClient" />
-    <PackageReference Include="Microsoft.Extensions.Configuration" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Json" />
-    <PackageReference Include="Newtonsoft.Json" />
     <PackageReference Include="Nito.AsyncEx" />
-    <PackageReference Include="System.Text.Encoding.CodePages" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <Reference Include="RiverSystem" />
-    <Reference Include="RiverSystem.ApplicationLayer" />
-    <Reference Include="RiverSystem.ApplicationLayer.Interfaces" />
-    <Reference Include="RiverSystem.Persistence" />
-    <Reference Include="RiverSystem.PluginManager" />
-    <Reference Include="TIME" />
-    <Reference Include="TIME.ScenarioManagement" />
-    <Reference Include="TIME.Tools" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Update="appsettings.json">
+     <None Update="appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
+    </None> 
   </ItemGroup>
 </Project>

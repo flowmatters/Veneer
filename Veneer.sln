@@ -21,6 +21,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		Veneer.targets = Veneer.targets
 	EndProjectSection
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FlowMatters.Source.Veneer.Tests", "FlowMatters.Source.Veneer.Tests\FlowMatters.Source.Veneer.Tests.csproj", "{4189A8E9-F0B5-421A-84FA-4053F8490A76}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -35,6 +37,10 @@ Global
 		{2D61D0F4-DCF5-4F41-9994-94F97C7AD1B9}.Debug|x64.Build.0 = Debug|x64
 		{2D61D0F4-DCF5-4F41-9994-94F97C7AD1B9}.Release|x64.ActiveCfg = Release|x64
 		{2D61D0F4-DCF5-4F41-9994-94F97C7AD1B9}.Release|x64.Build.0 = Release|x64
+		{4189A8E9-F0B5-421A-84FA-4053F8490A76}.Debug|x64.ActiveCfg = Debug|x64
+		{4189A8E9-F0B5-421A-84FA-4053F8490A76}.Debug|x64.Build.0 = Debug|x64
+		{4189A8E9-F0B5-421A-84FA-4053F8490A76}.Release|x64.ActiveCfg = Release|x64
+		{4189A8E9-F0B5-421A-84FA-4053F8490A76}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

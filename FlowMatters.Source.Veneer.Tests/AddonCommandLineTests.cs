@@ -1,30 +1,29 @@
 using FlowMatters.Source.Veneer.DomainActions;
-using NUnit.Framework;
 
 namespace FlowMatters.Source.Veneer.Tests
 {
     [TestFixture]
     public class AddonCommandLineTests
     {
-        [TestCase("plain",        "plain")]
-        [TestCase("has space",    "\"has space\"")]
-        [TestCase("",             "\"\"")]
-        [TestCase("a&b",          "a&b")]
-        [TestCase("a|b",          "a|b")]
+        [TestCase("plain", "plain")]
+        [TestCase("has space", "\"has space\"")]
+        [TestCase("", "\"\"")]
+        [TestCase("a&b", "a&b")]
+        [TestCase("a|b", "a|b")]
         public void QuoteArgument_QuotesOnWhitespaceOnly(string input, string expected)
         {
             Assert.That(AddonCommandLine.QuoteArgument(input), Is.EqualTo(expected));
         }
 
-        [TestCase("plain",     "plain")]
+        [TestCase("plain", "plain")]
         [TestCase("has space", "\"has space\"")]
-        [TestCase("",          "\"\"")]
-        [TestCase("a&b",       "\"a&b\"")]
-        [TestCase("a|b",       "\"a|b\"")]
-        [TestCase("a<b",       "\"a<b\"")]
-        [TestCase("a>b",       "\"a>b\"")]
-        [TestCase("a^b",       "\"a^b\"")]
-        [TestCase("a(b)c",     "\"a(b)c\"")]
+        [TestCase("", "\"\"")]
+        [TestCase("a&b", "\"a&b\"")]
+        [TestCase("a|b", "\"a|b\"")]
+        [TestCase("a<b", "\"a<b\"")]
+        [TestCase("a>b", "\"a>b\"")]
+        [TestCase("a^b", "\"a^b\"")]
+        [TestCase("a(b)c", "\"a(b)c\"")]
         public void QuoteArgumentForCmd_AlsoQuotesOnMetacharacters(string input, string expected)
         {
             Assert.That(AddonCommandLine.QuoteArgumentForCmd(input), Is.EqualTo(expected));
