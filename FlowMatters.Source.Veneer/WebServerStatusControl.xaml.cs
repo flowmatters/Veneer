@@ -87,20 +87,24 @@ namespace FlowMatters.Source.Veneer
             get { return _scenario; }
             set
             {
-                if (_scenario != null)
-                {
-                    StopServer();
-                    ReportingMenu.Instance.ClearMenu();
-                }
+                var previous = _scenario;
                 _scenario = value;
-
                 BoundScenarioName = _scenario != null ? _scenario.Name : "(none)";
+                _ = ChangeScenarioAsync(previous, value);
+            }
+        }
 
-                if(_scenario != null)
-                {
-                    StartServer();
-                    PopulateMenu();
-                }
+        private async Task ChangeScenarioAsync(RiverSystemScenario previous, RiverSystemScenario next)
+        {
+            if (previous != null)
+            {
+                await StopServer();
+                ReportingMenu.Instance.ClearMenu();
+            }
+            if (next != null)
+            {
+                await StartServer();
+                PopulateMenu();
             }
         }
 
@@ -160,26 +164,30 @@ namespace FlowMatters.Source.Veneer
             }
         }
 
-        private void RestartIfRunning()
+        private async void RestartIfRunning()
         {
             if (Running)
             {
-                RestartServer();
+                await RestartServer();
             }
         }
 
-        private async void StartServer()
+        private async Task StartServer()
         {
             try
             {
-                _server = new SourceRESTfulService(Port) {AllowRemoteConnections = AllowRemoteConnections, AllowSsl = AllowSsl};
-                _server.Scenario = Scenario;
-                _server.LogGenerator += ServerLogEvent;
+                if (_server != null)
+                    return;
+
+                var server = new SourceRESTfulService(Port) {AllowRemoteConnections = AllowRemoteConnections, AllowSsl = AllowSsl};
+                server.Scenario = Scenario;
+                server.LogGenerator += ServerLogEvent;
+                _server = server;
                 _ = Task.Run(async () =>
                 {
                     try
                     {
-                        await _server.Start();
+                        await server.Start();
                     }
                     catch (Exception ex)
                     {
@@ -188,12 +196,12 @@ namespace FlowMatters.Source.Veneer
                 });
 
                 // Wait for the server to start on the thread pool thread
-                while (!_server.Running)
+                while (!server.Running)
                     await Task.Delay(100);
 
-                _port = _server.Port;
+                _port = server.Port;
                 PortTxt.GetBindingExpression(TextBox.TextProperty).UpdateTarget();
-                _server.AllowScript = AllowScripts;
+                server.AllowScript = AllowScripts;
                 UpdateButtons();
             }
             catch (Exception ex)
@@ -244,14 +252,19 @@ namespace FlowMatters.Source.Veneer
                 _minimumLogLevel = selected;
         }
 
-        private async void StopServer()
+        private async Task StopServer()
         {
             try
             {
-                if(Running)
-                    await Task.Run(() => _server.Stop());
+                var server = _server;
+                if (server == null)
+                    return;
+
                 _server = null;
                 UpdateButtons();
+
+                if (server.Running)
+                    await Task.Run(() => server.Stop());
             }
             catch (Exception ex)
             {
@@ -261,7 +274,7 @@ namespace FlowMatters.Source.Veneer
 
         public void Dispose()
         {
-            StopServer();
+            _ = StopServer();
             UpdateButtons();
             if (_activeInstance == this)
                 _activeInstance = null;
@@ -272,25 +285,25 @@ namespace FlowMatters.Source.Veneer
             LogBox.Clear();
         }
 
-        private void StartBtn_OnClick(object sender, RoutedEventArgs e)
+        private async void StartBtn_OnClick(object sender, RoutedEventArgs e)
         {
-            StartServer();
+            await StartServer();
         }
 
-        private void StopBtn_OnClick(object sender, RoutedEventArgs e)
+        private async void StopBtn_OnClick(object sender, RoutedEventArgs e)
         {
-            StopServer();
+            await StopServer();
         }
 
-        private void RestartBtn_OnClick(object sender, RoutedEventArgs e)
+        private async void RestartBtn_OnClick(object sender, RoutedEventArgs e)
         {
-            RestartServer();
+            await RestartServer();
         }
 
-        private void RestartServer()
+        private async Task RestartServer()
         {
-            StopServer();
-            StartServer();
+            await StopServer();
+            await StartServer();
         }
 
         private void UpdateButtons()

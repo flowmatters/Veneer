@@ -69,6 +69,17 @@ namespace FlowMatters.Source.WebServer
             coordinates = new[] {cTemp[0], cTemp[1]};
         }
 
+        public GeoJSONGeometry(LateralLink link, bool useSchematicLocation)
+        {
+            // Lateral/conveyance links don't carry their own polyline — emit a straight
+            // line between the left and right endpoint node locations.
+            type = GeoJSONGeometryType.LineString;
+            var cTemp = new double[2][];
+            cTemp[0] = GeoJSONPoint(link.LeftNode.location);
+            cTemp[1] = GeoJSONPoint(link.RightNode.location);
+            coordinates = new[] { cTemp[0], cTemp[1] };
+        }
+
         public GeoJSONGeometry(PointF from, PointF to)
         {
             type = GeoJSONGeometryType.LineString;

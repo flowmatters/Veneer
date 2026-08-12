@@ -46,6 +46,24 @@ namespace FlowMatters.Source.Veneer.DomainActions
             return All.FirstOrDefault(inputSet => SourceService.URLSafeString(inputSet.Name) == urlSafeInputSetName);
         }
 
+        public void Delete(InputSet inputSet)
+        {
+            if (inputSet == null)
+                return;
+
+            var manager = ParameterSetManager();
+            var inputSetParameterSet = manager.ParameterSets.FirstOrDefault(x => x.InputSet == inputSet);
+            if (inputSetParameterSet != null)
+                manager.ParameterSets.Remove(inputSetParameterSet);
+
+            Scenario.Network.InputSets.Remove(inputSet);
+        }
+
+        public void Delete(string urlSafeInputSetName)
+        {
+            Delete(Find(urlSafeInputSetName));
+        }
+
         public string[] Instructions(InputSet inputSet)
         {
             ParameterSet parameterSet =

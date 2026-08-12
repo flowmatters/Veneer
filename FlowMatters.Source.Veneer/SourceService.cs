@@ -48,7 +48,7 @@ namespace FlowMatters.Source.Veneer
     public class SourceService : ISourceService
     {
         // Static state shared across PerCall instances
-        private static Dictionary<int,string[]> _runLogs = new Dictionary<int,string[]>();
+        private static Dictionary<int,CapturedRunLog> _runLogs = new Dictionary<int,CapturedRunLog>();
         internal static ScenarioInvoker _currentScenarioInvoker;
         private static readonly object _runLock = new object();
 
@@ -59,7 +59,21 @@ namespace FlowMatters.Source.Veneer
         private static bool _runningInGUI = true;
         private static List<CustomEndPoint> _customEndpoints = new List<CustomEndPoint>();
 
-        public Dictionary<int,string[]> RunLogs
+        // TIME.Management.Log.OnMessageRecieved null-checks MessageRecieved on the logging
+        // thread but re-reads the field inside the work item it queues to the thread pool.
+        // If the last subscriber detaches between those two points (TriggerRun's finally
+        // block racing a message logged near run completion), the queued work item invokes
+        // a null delegate: a NullReferenceException on a thread-pool thread, which
+        // terminates the process. A permanent no-op subscriber keeps the field non-null,
+        // so a message that loses the race is dropped instead of fatal.
+        private static readonly LogAction _logDispatchKeepAlive = (sender, args) => { };
+
+        static SourceService()
+        {
+            TIME.Management.Log.MessageRecieved += _logDispatchKeepAlive;
+        }
+
+        public Dictionary<int,CapturedRunLog> RunLogs
         {
             get { return _runLogs; }
             set { _runLogs = value; }
@@ -361,11 +375,29 @@ namespace FlowMatters.Source.Veneer
             }
 
             ConcurrentQueue<string> messages = new ConcurrentQueue<string>();
+            object stackTraceLock = new object();
+            string lastStackTrace = null;
             LogAction runLogger = (sender, args) =>
             {
-                messages.Enqueue(args.Entry.Message);
+                messages.Enqueue(RunLogFormatter.Format(args.Entry));
+                var stackTrace = args.Entry.StackTrace;
+                if (!string.IsNullOrEmpty(stackTrace))
+                {
+                    // MessageRecieved can fire from multiple threads; guard so "last" is well-defined.
+                    lock (stackTraceLock)
+                    {
+                        lastStackTrace = stackTrace;
+                    }
+                }
             };
             TIME.Management.Log.MessageRecieved += runLogger;
+
+            // Snapshot the existing runs so we can detect whether this invocation actually
+            // produced a new one. RunManager.Execute() can return without throwing yet abort the
+            // simulation internally (e.g. a data file fails to load), reporting the cause only
+            // through the log stream captured above.
+            var runNumbersBefore = new HashSet<int>(
+                Scenario.Project.ResultManager.AllRuns().Select(run => run.RunNumber));
 
             try
             {
@@ -376,7 +408,9 @@ namespace FlowMatters.Source.Veneer
                 Log("Run Failed", LogLevel.Error);
                 Log(e.Message, LogLevel.Error);
                 Log(e.StackTrace, LogLevel.Error);
-                throw new WebFaultException<SimulationFault>(new SimulationFault(e), HttpStatusCode.InternalServerError);
+                throw new WebFaultException<SimulationFault>(
+                    new SimulationFault(e) { Log = messages.ToArray() },
+                    HttpStatusCode.InternalServerError);
             }
             finally
             {
@@ -388,16 +422,31 @@ namespace FlowMatters.Source.Veneer
             }
 
             var allRuns = Scenario.Project.ResultManager.AllRuns();
-            var last = allRuns.Last();
+            var newRun = allRuns.LastOrDefault(run => !runNumbersBefore.Contains(run.RunNumber));
 
-            RunLogs[last.RunNumber] = messages.ToArray();
-            Run r = RunsForId("latest")[0];
+            if (newRun == null)
+            {
+                // The run completed without throwing but added no result. Surface the captured log
+                // (which holds the real diagnostic) instead of returning an opaque error.
+                Log("Run completed without producing a result.", LogLevel.Error);
+                throw new WebFaultException<SimulationFault>(
+                    new SimulationFault(
+                        "The simulation finished without producing a run. See the log for the cause (e.g. missing or unreadable input data).",
+                        messages.ToArray()),
+                    HttpStatusCode.InternalServerError);
+            }
+
+            RunLogs[newRun.RunNumber] = new CapturedRunLog
+            {
+                Messages = messages.ToArray(),
+                LastStackTrace = lastStackTrace
+            };
 
             WebOperationContext.Current.OutgoingResponse.StatusCode = HttpStatusCode.Redirect;
             WebOperationContext.Current.OutgoingResponse.Headers.Add("Location",
                                                                      WebOperationContext.Current.IncomingRequest.Headers
                                                                          ["Location"] +
-                                                                     String.Format("runs/{0}", r.RunNumber));
+                                                                     String.Format("runs/{0}", newRun.RunNumber));
         }
 
         public void CancelRun()
@@ -481,6 +530,7 @@ namespace FlowMatters.Source.Veneer
             Log(String.Format("Requested run results ({0})",runId));
             string msg = "";
             string[] log;
+            string lastStackTrace = null;
             Run run = RunsForId(runId)[0];
 
             if (runId.ToLower() == "latest")
@@ -493,7 +543,9 @@ namespace FlowMatters.Source.Veneer
             }
             if (RunLogs.ContainsKey(run.RunNumber))
             {
-                log = RunLogs[run.RunNumber];
+                var captured = RunLogs[run.RunNumber];
+                log = captured.Messages;
+                lastStackTrace = captured.LastStackTrace;
             }
             else
             {
@@ -513,6 +565,7 @@ namespace FlowMatters.Source.Veneer
             }
             var result = new RunSummary(run);
             result.RunLog = log;
+            result.LastStackTrace = lastStackTrace;
             return result;
         }
 
@@ -788,6 +841,13 @@ namespace FlowMatters.Source.Veneer
             var sets = new InputSets(Scenario);
             InputSet set = sets.Find(inputSetName);
             sets.UpdateInstructions(set, summary.Configuration);
+        }
+
+        public void DeleteInputSet(string inputSetName)
+        {
+            Log("Deleting Input Set: " + inputSetName);
+            var sets = new InputSets(Scenario);
+            sets.Delete(inputSetName);
         }
 
         public void RunInputSet(string inputSetName,string action)

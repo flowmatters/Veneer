@@ -31,7 +31,7 @@ namespace FlowMatters.Source.Veneer.Formatting
         private const string DefaultLinkStrokeWidth = "2";
         private const string DefaultOpacity = "1";
         private const string DefaultNodeFill = "#cccccc";
-        private const string DefaultNodeStroke = "#333333";
+        private const string DefaultNodeStroke = "transparent";
 
         // Icon size is computed as bbox-diagonal / IconSizeDivisor. Higher = smaller icons.
         private const double IconSizeDivisor = 240.0;
@@ -57,7 +57,17 @@ namespace FlowMatters.Source.Veneer.Formatting
             // 3. Sanitise names.
             var nodeTagNames = SchematicNameSanitiser.SaniseAndDeCollide(
                 nodes.Select(n => n.Name).ToList(), "node");
-            var links = network.Links.OfType<Link>().ToList();
+            // Main-channel links plus lateral/conveyance links. Wetlands are wired as
+            // RiverSystem.Wetlands.ConveyanceLink (subclass of LateralLink) and live on
+            // network.ConveyanceLinks / network.LateralLinks — separate collections from
+            // network.Links — so iterating network.Links alone would omit them.
+            var links = new List<LinkSpec>();
+            foreach (var l in network.Links.OfType<Link>())
+                links.Add(new LinkSpec { Name = l.Name, From = (Node)l.UpstreamNode, To = (Node)l.DownstreamNode });
+            foreach (var l in network.LateralLinks.OfType<LateralLink>())
+                links.Add(new LinkSpec { Name = l.Name, From = l.LeftNode, To = l.RightNode });
+            foreach (var l in network.ConveyanceLinks.OfType<LateralLink>())
+                links.Add(new LinkSpec { Name = l.Name, From = l.LeftNode, To = l.RightNode });
             var linkTagNames = SchematicNameSanitiser.SaniseAndDeCollide(
                 links.Select(l => l.Name).ToList(), "link");
 
@@ -181,10 +191,17 @@ namespace FlowMatters.Source.Veneer.Formatting
               .Append("</style>");
         }
 
+        private sealed class LinkSpec
+        {
+            public string Name;
+            public Node From;
+            public Node To;
+        }
+
         private static SchematicLinkTag[] EmitLinks(
             StringBuilder sb,
             List<Node> nodes,
-            List<Link> links,
+            List<LinkSpec> links,
             List<PointF> locations,
             List<string> linkTagNames)
         {
@@ -198,8 +215,9 @@ namespace FlowMatters.Source.Veneer.Formatting
                 var link = links[i];
                 var tag = linkTagNames[i];
                 int fromIdx, toIdx;
-                if (!nodeIndex.TryGetValue((Node)link.UpstreamNode, out fromIdx) ||
-                    !nodeIndex.TryGetValue((Node)link.DownstreamNode, out toIdx))
+                if (link.From == null || link.To == null ||
+                    !nodeIndex.TryGetValue(link.From, out fromIdx) ||
+                    !nodeIndex.TryGetValue(link.To, out toIdx))
                 {
                     // Defensive: link to a node not in network.nodes — skip.
                     continue;
