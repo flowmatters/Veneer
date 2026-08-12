@@ -2,83 +2,35 @@
   <PropertyGroup>
     <TargetFramework>net8.0-windows</TargetFramework>
     <OutputType>Exe</OutputType>
-    <RootNamespace>FlowMatters.Source.VeneerCmd</RootNamespace>
-    <AssemblyName>FlowMatters.Source.VeneerCmd</AssemblyName>
-    <LangVersion>9.0</LangVersion>
-    <RootPath>$(MSBuildThisFileDirectory)..\..\</RootPath>
-    <OutputPath>$(RootPath)Output\Plugins\CommunityPlugins\Veneer</OutputPath>
-    <NoWarn>1591,1587</NoWarn>
-    <WarningLevel>4</WarningLevel>
-    <PlatformTarget>x64</PlatformTarget>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <UseWindowsForms>true</UseWindowsForms>
     <UseWPF>true</UseWPF>
     <ImportWindowsDesktopTargets>true</ImportWindowsDesktopTargets>
-    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-    <Title>FlowMatters.Source.VeneerCmd</Title>
-    <Product>FlowMatters.Source.VeneerCmd</Product>
-    <Copyright>FlowMatters @ 2013</Copyright>
   </PropertyGroup>
-	<Import Project="$(RootPath)RiverSystem\Solutions\SDK.build.props" />
-	<Import Project="$(RootPath)RiverSystem\Solutions\SDK.build.targets" />
-	<Import Project="$(RootPath)RiverSystem\Solutions\NormalisePdbBuildRoot.targets" />
   <ItemGroup>
-    <PackageReference Include="CommandLineParser" Version="2.9.1" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
-    <PackageReference Include="System.Text.Encoding.CodePages" Version="4.0.1" />
-    <PackageReference Include="FirebirdSql.Data.FirebirdClient" Version="10.3.1" />
-    <PackageReference Include="Nito.AsyncEx" Version="5.1.2" />
+    <PackageReference Include="CommandLineParser" />
+    <PackageReference Include="FirebirdSql.Data.FirebirdClient" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" />
+    <PackageReference Include="Newtonsoft.Json" />
+    <PackageReference Include="Nito.AsyncEx" />
+    <PackageReference Include="System.Text.Encoding.CodePages" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <Reference Include="RiverSystem">
-      <HintPath>..\..\Output\RiverSystem.dll</HintPath>
-    </Reference>
-    <Reference Include="RiverSystem.ApplicationLayer">
-      <HintPath>..\..\Output\RiverSystem.ApplicationLayer.dll</HintPath>
-    </Reference>
-    <Reference Include="RiverSystem.ApplicationLayer.Interfaces">
-      <HintPath>..\..\Output\RiverSystem.ApplicationLayer.Interfaces.dll</HintPath>
-    </Reference>
-    <Reference Include="RiverSystem.Persistence">
-      <HintPath>..\..\Output\RiverSystem.Persistence.dll</HintPath>
-    </Reference>
-    <Reference Include="RiverSystem.PluginManager">
-      <HintPath>..\..\Output\RiverSystem.PluginManager.dll</HintPath>
-    </Reference>
-    <Reference Include="TIME">
-      <HintPath>..\..\Output\TIME.dll</HintPath>
-    </Reference>
-    <Reference Include="TIME.ScenarioManagement">
-      <HintPath>..\..\Output\TIME.ScenarioManagement.dll</HintPath>
-    </Reference>
-    <Reference Include="TIME.Tools">
-      <HintPath>..\..\Output\TIME.Tools.dll</HintPath>
-    </Reference>
+    <Reference Include="RiverSystem" />
+    <Reference Include="RiverSystem.ApplicationLayer" />
+    <Reference Include="RiverSystem.ApplicationLayer.Interfaces" />
+    <Reference Include="RiverSystem.Persistence" />
+    <Reference Include="RiverSystem.PluginManager" />
+    <Reference Include="TIME" />
+    <Reference Include="TIME.ScenarioManagement" />
+    <Reference Include="TIME.Tools" />
   </ItemGroup>
   <ItemGroup>
     <None Update="appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
-  <!-- To run this from CommunityPlugins we need to make sure everything required is copied across -->
-  <Target Name="CopyToPlugins" AfterTargets="Build">
-    <!--<Copy SourceFiles="$(OutputPath)$(AssemblyName).dll" DestinationFolder="$(RootPath)Output\Plugins\CommunityPlugins" />
-    <Copy SourceFiles="$(OutputPath)$(AssemblyName).exe" DestinationFolder="$(RootPath)Output\Plugins\CommunityPlugins" />
-    <Copy SourceFiles="$(OutputPath)$(AssemblyName).deps.json" DestinationFolder="$(RootPath)Output\Plugins\CommunityPlugins" />
-    <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll.config" DestinationFolder="$(RootPath)Output\Plugins\CommunityPlugins" />
-    <Copy SourceFiles="$(OutputPath)$(AssemblyName).runtimeconfig.json" DestinationFolder="$(RootPath)Output\Plugins\CommunityPlugins" />-->
-
-    <!--Firebird dependencies-->
-    <Copy SourceFiles="$(RootPath)Output\fbclient.dll" DestinationFolder="$(OutputPath)" />
-    <Copy SourceFiles="$(RootPath)Output\fbembed.dll" DestinationFolder="$(OutputPath)" />
-    <Copy SourceFiles="$(RootPath)Output\icudt63.dll" DestinationFolder="$(OutputPath)" />
-    <Copy SourceFiles="$(RootPath)Output\icuin63.dll" DestinationFolder="$(OutputPath)" />
-    <Copy SourceFiles="$(RootPath)Output\icuuc63.dll" DestinationFolder="$(OutputPath)" />
-    <Copy SourceFiles="$(RootPath)Output\Plugins\engine13.dll" DestinationFolder="$(OutputPath)\Plugins" />
-  </Target>
 </Project>

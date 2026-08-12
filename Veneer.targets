@@ -1,0 +1,22 @@
+﻿<Project>
+  <!-- Settings from RiverSystem\Solutions\SDK.build.targets -->
+  <!-- Used when SDK.build.targets doesn't exist (e.g. when building against files from a Source release) -->
+  <Choose>
+    <When Condition="'$(NETCoreSdkVersion)' != '' AND $([MSBuild]::VersionGreaterThanOrEquals('$(NETCoreSdkVersion)', '7.0'))">
+      <PropertyGroup>
+        <GenerateResourceUsePreserializedResources>true</GenerateResourceUsePreserializedResources>
+      </PropertyGroup>
+      <ItemGroup>
+        <PackageReference Include="System.Resources.Extensions" />
+      </ItemGroup>
+    </When>
+  </Choose>
+
+  <Target Name="RemoveMsCoverageFiles" AfterTargets="AfterBuild">
+    <ItemGroup>
+      <MsCoverageFilesToDelete Include="$(OutputPath)*.msCoverageSourceRootsMapping_*" />
+      <MsCoverageFilesToDelete Include="$(OutputPath)CoverletSourceRootsMapping_*" />
+    </ItemGroup>
+    <Delete Files="@(MsCoverageFilesToDelete)" ContinueOnError="true"/>
+  </Target>
+</Project>
