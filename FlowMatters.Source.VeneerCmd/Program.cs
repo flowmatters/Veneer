@@ -188,6 +188,11 @@ namespace FlowMatters.Source.VeneerCmd
         // This method contains all the RiverSystem dependencies and must be called AFTER the search paths are set up
         private static void RunWithRiverSystemDependencies(Options options)
         {
+            // Before anything logs: LoadPlugins and LoadProject both write to
+            // TIME.Management.Log, and any message written before this call can still
+            // hit the dispatch race that kills the process.
+            LogDispatchGuard.Install();
+
             SynchronizationContext.SetSynchronizationContext(new SynchronizationContext());
             FlowMatters.Source.Veneer.AutoStart.InitialiseOnLoadAttribute.MarkInitialised();
             Constants.SetLargeDataOptions();

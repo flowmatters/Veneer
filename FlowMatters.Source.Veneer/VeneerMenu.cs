@@ -220,23 +220,43 @@ namespace FlowMatters.Source.Veneer
             AddonLauncher.LaunchUrl(addon, BuildAddonContext(), AddonLog());
         }
 
+        /// <summary>
+        /// The panel to route addon output and port lookups through.
+        ///
+        /// Control alone is not enough. It is assigned only by
+        /// WebServerStatusControl.PopulateMenu, which runs on the async continuation
+        /// of ChangeScenarioAsync -- after an awaited StartServer. So on the first
+        /// addon launch of a session it is still null even though LaunchAddon has
+        /// just opened the panel synchronously, and every Debug and Warning line
+        /// would go to SourceAddonLog and be dropped, leaving the panel we just
+        /// opened empty. ActiveInstance is set in the control's constructor, so it
+        /// is already there by the time Launch() returns. ProjectLoadListener
+        /// resolves the panel the same way.
+        /// </summary>
+        private WebServerStatusControl EffectiveControl
+        {
+            get { return Control ?? WebServerStatusControl.ActiveInstance; }
+        }
+
         private AddonContext BuildAddonContext()
         {
+            var control = EffectiveControl;
             return new AddonContext
             {
                 ProjectDirectory = Scenario?.Project?.FileDirectory,
                 ProjectFile = Scenario?.Project?.FullFilename,
                 // The configured port, not a promise the server is listening --
                 // Port is set independently of Running, and addons may be launched
-                // with the server stopped. Control is null on the URL path when the
-                // panel was never opened, which that path deliberately does not force.
-                Port = Control != null ? Control.Port : WebServerStatusControl.DefaultPort
+                // with the server stopped. Still null on the URL path when no panel
+                // was ever opened, which that path deliberately does not force.
+                Port = control != null ? control.Port : WebServerStatusControl.DefaultPort
             };
         }
 
         private IAddonLog AddonLog()
         {
-            return Control != null ? (IAddonLog)new ControlAddonLog(Control) : new SourceAddonLog();
+            var control = EffectiveControl;
+            return control != null ? (IAddonLog)new ControlAddonLog(control) : new SourceAddonLog();
         }
 
         /// <summary>
@@ -300,7 +320,8 @@ namespace FlowMatters.Source.Veneer
             // Was SourceRESTfulService.DEFAULT_PORT -- the compile-time constant
             // 9876 -- so report links pointed there no matter where the server
             // was actually listening.
-            int port = Control != null ? Control.Port : WebServerStatusControl.DefaultPort;
+            var control = EffectiveControl;
+            int port = control != null ? control.Port : WebServerStatusControl.DefaultPort;
             string url = string.Format("http://localhost:{0}/doc/{1}", port, p);
             OpenLink(url, string.Format("report '{0}'", p));
         }

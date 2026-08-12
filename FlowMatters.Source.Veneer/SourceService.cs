@@ -59,18 +59,12 @@ namespace FlowMatters.Source.Veneer
         private static bool _runningInGUI = true;
         private static List<CustomEndPoint> _customEndpoints = new List<CustomEndPoint>();
 
-        // TIME.Management.Log.OnMessageRecieved null-checks MessageRecieved on the logging
-        // thread but re-reads the field inside the work item it queues to the thread pool.
-        // If the last subscriber detaches between those two points (TriggerRun's finally
-        // block racing a message logged near run completion), the queued work item invokes
-        // a null delegate: a NullReferenceException on a thread-pool thread, which
-        // terminates the process. A permanent no-op subscriber keeps the field non-null,
-        // so a message that loses the race is dropped instead of fatal.
-        private static readonly LogAction _logDispatchKeepAlive = (sender, args) => { };
-
+        // Backstop only. Hosts install this much earlier (VeneerCmd's entry point and the
+        // in-Source plugin attribute); by the time SourceService is first touched, plugin
+        // and project loading have already logged. See LogDispatchGuard.
         static SourceService()
         {
-            TIME.Management.Log.MessageRecieved += _logDispatchKeepAlive;
+            LogDispatchGuard.Install();
         }
 
         public Dictionary<int,CapturedRunLog> RunLogs
