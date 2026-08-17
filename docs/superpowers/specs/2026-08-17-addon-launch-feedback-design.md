@@ -137,11 +137,22 @@ but harmless, and rejecting it would add a failure mode without preventing one.
 | `Addons/AddonMenuItemState.cs` | **New.** Pure menu-item state policy. |
 | `VeneerMenu.cs` | `LaunchAddon` raises the panel (guarded), marks running and owns the `OneShotLifecycle`; `PopulateReportMenu` applies `AddonMenuItemState`; `ControlAddonLog` maps `Info`; `SourceAddonLog` passes `Info` through. |
 | `WebServerStatusControl.xaml.cs` | New private `Append(msg, level, forceScroll)`; `ServerLogEvent` and `LogAddonMessage` both call it. |
-| `Tests/RunningAddonsTests.cs`, `Tests/AddonMenuItemStateTests.cs` | **New.** |
+| `Tests/RunningAddonsTests.cs`, `Tests/AddonMenuItemStateTests.cs`, `Tests/OneShotLifecycleTests.cs` | **New.** |
 | `Tests/AddonLauncherIntegrationTests.cs` | Five existing `Launch` call sites updated (`:103,129,162,180,193`); `FakeLog` records levels; new lifecycle tests. |
 
-Two new source files and two new test fixtures, plus `OneShotLifecycle` — see
+Three new source files and three new test fixtures — see
 **Porting to `legacy_ci`**.
+
+`RunningAddons` is an **instance field on the `VeneerMenu` singleton**
+(`VeneerMenu.cs:22-37`), constructed with it. That is what makes "`ClearMenu()`
+does not clear the counts" (see **Behaviour**) a statement about a live object
+rather than about static state.
+
+`RunningAddons` and `AddonMenuItemState` are `public`, matching the other types
+in `Addons/` (`MenuLayout`, `VeneerConfiguration`). That is a second reason
+`RunningAddons` must not implement `IAddonLifecycle`: the interface is
+`internal` (`AddonContext.cs:22-25`), so a public type could not implement it
+without widening it.
 
 ## Components
 
@@ -162,7 +173,10 @@ the process path whenever `EffectiveControl` is null (`VeneerMenu.cs:256-260`),
 and that is reachable on exactly the path where feedback matters most: if
 `TryRaisePanel` fails, `ActiveInstance` is null, `AddonLog()` returns
 `SourceAddonLog`, and an Error-only sink would discard `Launching 'X'...` too —
-leaving the operator with no panel, no line, and a disabled menu item.
+leaving the operator with no panel, no line, and a disabled menu item. Its
+docstring (`VeneerMenu.cs:288-293`) claims "The URL path emits only errors, so
+there is no Debug or Warning traffic to lose here", which this change makes
+false; update it in the same edit.
 
 ### `IAddonLifecycle` and the once-and-only-once guarantee
 
@@ -189,7 +203,7 @@ So the lifecycle object is threaded through `Launch` → `LaunchScript` /
 
 | Site | Fires |
 |---|---|
-| `Launch` addon-validation return (`:29`) | synchronously, UI thread |
+| `Launch` addon-validation return (`:28`) | synchronously, UI thread |
 | `Launch` empty-project-directory return (`:41`) | synchronously, UI thread |
 | `Launch` catch (`:53-58`) | synchronously — catches `BuildEffective`, `ResolveWorkingDirectory`, `Expand`, `AddonCommandLine.Compose`, `ApplyEnvironment`, and anything thrown by `Run` before `Task.Run` is reached |
 | `Run` `Start()`-failure return (`:241-247`) | synchronously |
@@ -214,8 +228,13 @@ audit of six call sites that will grow to seven.
 **The watcher's `try/catch/finally` is required, not stylistic.** `Task.Run(...)`
 at `:290` has no continuation and no `await`, so anything thrown inside becomes
 an *unobserved* task exception and is silently swallowed. `WaitForExit()`,
-`ExitCode` and `log.Write` can all throw there — `ControlAddonLog.Write` posts
-to a WPF dispatcher (`xaml.cs:221`) which throws if the panel has been disposed.
+`ExitCode` and `log.Write` can all throw there — `ControlAddonLog.Write` reaches
+`_originalContext.Post` (`xaml.cs:221`), and `_originalContext` is whatever
+`SynchronizationContext.Current` was at construction (`xaml.cs:67`), which can
+be null; `TIME.Management.Log.WriteError` (`VeneerMenu.cs:284`) is a second
+candidate, and a dispatcher shut down during Source exit a third. (`Post` itself
+is fire-and-forget — an exception *inside* the posted delegate surfaces on the
+UI thread, not here.)
 Without the `finally` the count is never decremented and the item is disabled
 until Source restarts. The watcher becomes:
 
@@ -307,6 +326,9 @@ function has no `config`. `PopulateReportMenu` computes it as it does today
 | running, `allowMultiple: true`, count N>1 | `name (N running)` | **yes** | `N instances already running — launching again will start another.` |
 | otherwise | `name` | yes | none |
 
+`ToolTipText` on the final row is `null`, not `""` — WinForms shows no tooltip
+for either, but `null` is what an item that was never assigned one carries.
+
 Precedence is top to bottom. The single `allowMultiple: false` row covers any
 count ≥ 1 — reachable at N > 1 by editing `allowMultiple` true→false between
 launches, since `VeneerConfiguration.Load` re-reads the file on every dropdown
@@ -329,6 +351,21 @@ function: `LogOnce` for invalid (`:101`) and unknown type (`:121`), and the
 per-dropdown `WriteError` for scenario-filtered (`:134-136`, documented at
 `docs/veneer-file-format.md:141`). **Running adds no log line** — it is not a
 problem, and `PopulateReportMenu` runs on every dropdown open.
+
+The dispatch `switch` (`VeneerMenu.cs:105-123`) also stays, since it attaches
+the Click handler — but its `Enabled`/`ToolTipText` assignments in the `default`
+arm are **removed**, leaving `AddonMenuItemState` the single writer. Otherwise
+the two disagree the moment the table changes, which is the class of defect the
+pure function exists to end.
+
+A `type: "url"` entry sharing a rendered menu location and `name` with a running
+`script`/`exe` entry gets the same key and is therefore rendered `(running)` and
+disabled, even though it launches nothing. Accepted for the same reason as the
+collapse itself (see `RunningAddons`): two menu items the operator cannot tell
+apart should not behave differently. Editing an addon's `menu` or `name` while
+an instance runs orphans its count under the old key and re-enables the item —
+`VeneerConfiguration.Load` re-reads on every dropdown (`:79`) — same family as
+the `allowMultiple` flip above.
 
 ### Ordering of `appliesToScenario` and running
 
@@ -393,7 +430,7 @@ synchronously on the same thread — 1 → 0, no hazard.
 
 ### Scroll behaviour
 
-`ServerLogEvent` (`xaml.cs:219-234`) appends but scrolls only if the user was
+`ServerLogEvent` (`xaml.cs:219-235`) appends but scrolls only if the user was
 already at the bottom (`:226-233`). Lifecycle lines must be brought into view
 regardless, while `Debug` child stdout keeps respecting the operator's
 scrollback.
@@ -402,14 +439,29 @@ scrollback.
 — `server.LogGenerator += ServerLogEvent` (`xaml.cs:184`) against
 `ServerLogListener(object, string, LogLevel)` (`AbstractSourceServer.cs:42`) —
 and C# delegate compatibility requires matching arity. A trailing
-`bool forceScroll = false` does **not** satisfy it; on `master` (net8.0) that is
+`bool forceScroll = false` does **not** satisfy it; on `master`
+(`net8.0-windows`) that is
 a `CS0123` build break, and the existing `LogLevel level = LogLevel.Info` default
 gets away with it only because the arity still matches.
 
 So the body moves to a new private `Append(string msg, LogLevel level, bool
 forceScroll)`. `ServerLogEvent` keeps its exact three-parameter signature and
 calls `Append(msg, level, forceScroll: false)`; `LogAddonMessage` (`:246-249`)
-calls `Append(msg, level, forceScroll: level >= LogLevel.Info)`.
+calls `Append(msg, level, forceScroll: level == LogLevel.Info || level ==
+LogLevel.Error)`.
+
+**Not `level >= LogLevel.Info`.** Child **stderr** is logged at
+`AddonLogLevel.Warning` (`AddonLauncher.cs:232-235`) → `LogLevel.Warning`, and
+`Warning >= Info` — so that predicate would force-scroll every stderr line. A
+Dash app writes its entire startup to stderr, which would yank the LogBox to the
+bottom on every line and destroy exactly the scrollback this design says it
+preserves.
+
+Testing `Info` and `Error` explicitly is precise rather than merely close:
+across the addon path those two levels are used **only** by Veneer's own
+lines — `Launching 'X'...` and `Addon 'X' finished` at Info, and `could not
+start` / `failed with exit code N` at Error — while both child streams are
+`Debug` (stdout) and `Warning` (stderr). Failures force-scroll, which is Goal 2.
 
 ## Threading
 
@@ -483,7 +535,10 @@ explicit `<Compile Include>` lines for `Addons\MenuLayout.cs`,
 `Addons\VeneerConfiguration.cs`, `Tests\AddonLauncherIntegrationTests.cs` and
 the rest) and needs five new entries: `Addons\RunningAddons.cs`,
 `Addons\AddonMenuItemState.cs`, `DomainActions\OneShotLifecycle.cs`,
-`Tests\RunningAddonsTests.cs` and `Tests\AddonMenuItemStateTests.cs`.
+`Tests\RunningAddonsTests.cs`, `Tests\AddonMenuItemStateTests.cs` and
+`Tests\OneShotLifecycleTests.cs`. A file missing from that list compiles on
+`master` and silently vanishes on `legacy_ci` — which for a test fixture means
+the guarantee it protects goes unchecked there.
 
 The five `Launch` call-site line numbers cited throughout are `master`'s;
 `legacy_ci`'s copy of `Tests/AddonLauncherIntegrationTests.cs` may differ, so
@@ -532,12 +587,22 @@ written.
 `Launching 'X'...` is emitted by `VeneerMenu`, not `AddonLauncher`, so it is
 **not** covered by these tests — it falls under manual verification below.
 
-**Not covered, stated plainly rather than papered over:** applying the state in
-`PopulateReportMenu`, the panel raise, and the scroll change. All are WinForms
-or reflection into WeifenLuo docking against a live Source instance. They are
-kept to the thinnest possible layer — read a pure value, assign three
-properties, call one guarded method — precisely because they can only be checked
-by hand.
+**Not covered, stated plainly rather than papered over:**
+
+- Applying the state in `PopulateReportMenu`, the panel raise, and the scroll
+  change. All are WinForms or reflection into WeifenLuo docking against a live
+  Source instance, kept to the thinnest possible layer — read a pure value,
+  assign three properties, call one guarded method — precisely because they can
+  only be checked by hand.
+- **The `LaunchAddon` ↔ `Launch` one-shot wiring.** `OneShotLifecycle` is tested
+  in isolation and `Launch`'s five terminal sites are tested against an
+  unguarded recording stub, but the composite path the design exists for — `Run`
+  reports → `log.Write` throws (`:243-244`) → `Launch`'s catch reports → *its*
+  `log.Write` throws (`:55-57`) → escapes → `LaunchAddon`'s catch — crosses a
+  `VeneerMenu` seam the integration fixture cannot reach. It is guaranteed by
+  construction (one object, `Interlocked`-guarded, spanning both layers) rather
+  than by test. Anyone moving the one-shot back inside `Launch` will break it
+  silently.
 
 **Manual verification:** with the Veneer panel closed, click an addon; the panel
 must re-show and `Launching 'X'...` must be visible **without touching the Log
@@ -555,7 +620,7 @@ panel already open and docked, and with `allowMultiple: true`.
 | Running state | Count per addon | Set (the first of several instances exiting would clear the label while others run) |
 | Key | Normalised menu path + name | Raw `addon.menu` + name (five spellings of one location produce five keys) |
 | `Finished` timing | In `Run`'s watcher `finally` | At `Launch`'s return (fires immediately on success; the item would never disable) |
-| Double-fire protection | One-shot wrapper inside `Launch` | Relying on the decrement floor (masks it at count 1, corrupts the label above it) |
+| Double-fire protection | One-shot owned by `LaunchAddon`, threaded into `Launch` | A one-shot *inside* `Launch` (leaves `LaunchAddon`'s own catch outside the guard — the double decrement stays constructible); relying on the decrement floor (masks it at count 1, corrupts the label above it) |
 | Thread safety | None needed — menus rebuild on `DropDownOpening` | Marshalling `Finished` to the UI thread |
 | `ClearMenu` on project change | Leave counts alone | Clear them (re-enables the item while the process still holds the port) |
 | `RunningAddons` owner | `VeneerMenu` | `AddonLauncher` (would give the launcher cross-launch state and UI concerns) |
@@ -589,16 +654,29 @@ alive: premature re-enable, and a child that is never waited on and never
 recoverable where a stranded disable is not. Closing the leak means restructuring
 those two catch blocks, which is a wider change than this design justifies.
 
-**`VeneerMenu.Instance.Control` is never nulled.** `WebServerStatusControl.Dispose`
-clears `_activeInstance` (`xaml.cs:289-295`) and `WebServerStatusPanel.Dispose`
-clears `_activePanel` (`WebServerStatusPanel.Designer.cs:14-24`) — the panel and
-control lifetimes are handled symmetrically, so `WebServerStatusControl.Launch()`
-correctly re-creates a genuinely disposed panel. But `Control` has no such
-clearing, so `EffectiveControl` (`VeneerMenu.cs:236-239`) can hand back a
-disposed control whose dispatcher is dead, and `ControlAddonLog.Write` then
-throws. That is the concrete trigger for the watcher's `catch`/`finally` and for
-`LaunchAddon`'s outer `try`. Not fixed here — nulling `Control` on dispose is a
-correct, separable change — but both guards exist because of it.
+**`VeneerMenu.Instance.Control` is never nulled.**
+`WebServerStatusPanel.Dispose` clears `_activePanel`
+(`WebServerStatusPanel.Designer.cs:14-24`), so
+`WebServerStatusControl.Launch()` correctly re-creates a genuinely disposed
+panel. `WebServerStatusControl.Dispose` clears `_activeInstance`
+(`xaml.cs:289-295`) but has **no caller** — `ElementHost` does not dispose its
+WPF `Child` — so `_activeInstance` self-corrects only when the next control's
+constructor reassigns it (`xaml.cs:61`). `Control` has no clearing at all.
+
+The likely residual harm is not a throw but a **silently invisible line**:
+`EffectiveControl` (`VeneerMenu.cs:236-239`) hands back the orphaned control,
+`TryRaisePanel` raises the *new* panel, and `Launching 'X'...` lands in a LogBox
+nobody can see — defeating Goal 1 on a path this design does not guard. Not
+fixed here; nulling `Control` on dispose is a correct, separable change.
+
+**The watcher's own `catch` can re-enable the item while the child still runs.**
+If `WaitForExit()` or `ExitCode` throws, the `catch` logs "could not be
+monitored", the `finally` fires `Finished` and disposes, and the process carries
+on unmonitored with the menu item enabled. Deliberate, and the same trade as the
+early re-enable above: an item wrongly enabled is recoverable, one wrongly
+disabled is not. Symmetrically, `Run`'s `Start()`-failure branch logs at
+`:243-244` *before* `process.Dispose()` at `:245`, so a throwing `log.Write`
+there skips the dispose — pre-existing, and low harm since `Start()` failed.
 
 **`AddonLogLevel` values shift** when `Info` is inserted after `Debug`. The enum
 is `internal` and never persisted or serialised, so nothing depends on the
