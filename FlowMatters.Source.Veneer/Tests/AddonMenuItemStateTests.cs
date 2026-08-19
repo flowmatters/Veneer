@@ -37,6 +37,7 @@ namespace FlowMatters.Source.Veneer.Tests
             var s = State(Addon(), invalid: "has no 'script' lines");
             Assert.That(s.Enabled, Is.False);
             AddonAssert.Contains(s.ToolTipText, "has no 'script' lines");
+            AddonAssert.Contains(s.ToolTipText, "Invalid addon:");
         }
 
         [Test]
@@ -44,7 +45,38 @@ namespace FlowMatters.Source.Veneer.Tests
         {
             var s = State(Addon(type: "wibble"));
             Assert.That(s.Enabled, Is.False);
+            Assert.That(s.Text, Is.EqualTo("Example Tool"));
             AddonAssert.Contains(s.ToolTipText, "wibble");
+        }
+
+        // Precedence: invalid (structurally broken) beats unknown type. An addon can be
+        // both -- e.g. {"name":"X","type":"wibble"} with no path/script/url is entirely
+        // ordinary -- and which tooltip wins is exactly the question this commit exists
+        // to settle.
+        [Test]
+        public void InvalidBeatsUnknownTypeForTheTooltip()
+        {
+            var s = State(Addon(type: "wibble"), invalid: "has neither 'path', 'script' nor 'url'; there is nothing to launch");
+            AddonAssert.Contains(s.ToolTipText, "has neither");
+        }
+
+        // Precedence: unknown type beats the scenario filter. A type with no dispatch
+        // arm can never be launched regardless of which scenario is active.
+        [Test]
+        public void UnknownTypeBeatsScenarioFilterForTheTooltip()
+        {
+            var s = State(Addon(type: "wibble"), applies: false, filter: "Ops");
+            AddonAssert.Contains(s.ToolTipText, "wibble");
+        }
+
+        // An unknown type must never render enabled, even when allowMultiple is set and
+        // instances are already running: the dispatch switch has no arm for it, so
+        // "enabled" would mean a menu item with no Click handler attached.
+        [Test]
+        public void UnknownTypeNeverRendersEnabledEvenWhileRunning()
+        {
+            var s = State(Addon(type: "wibble", allowMultiple: true), running: 2);
+            Assert.That(s.Enabled, Is.False);
         }
 
         // The dispatch switch in VeneerMenu.PopulateReportMenu is case-SENSITIVE while
