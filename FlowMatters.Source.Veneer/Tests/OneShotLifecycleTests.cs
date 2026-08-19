@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using FlowMatters.Source.Veneer.Addons;
@@ -64,14 +65,22 @@ namespace FlowMatters.Source.Veneer.Tests
         }
 
         // Parallel.For alone does not catch a non-atomic check-then-set: its workers arrive
-        // at the guard in sequence, so the window between the read and the write is never
-        // contended. Releasing every thread from one gate, over many rounds, is what makes
-        // the loss of atomicity observable -- and this class's whole contract is that the
-        // callback fires once no matter how many threads race it.
+        // at the guard in sequence rather than together, so the window between the read
+        // and the write is never genuinely contended. Releasing many threads from one gate
+        // makes the loss of atomicity observable, but only PROBABILISTICALLY, and the rate
+        // is environment-sensitive -- fewer cores means fewer racers actually overlap.
+        // Measured against the non-atomic mutation (`if (_fired == 1) return; _fired = 1;`
+        // in place of the Interlocked.Exchange): 9/10 standalone runs at 300 rounds, then
+        // independently re-measured at 26/30 (87%) on a 16-core machine and 62% in a
+        // non-NUnit host. 300 rounds sits at the knee of the detection curve (per-round
+        // double-fire probability ~0.0015-0.0033); 3000 pushes expected detection to
+        // >=99% for a few hundred ms of extra run time. A 4-core machine should still
+        // expect to detect less often than this was measured at, for the same reason
+        // Parallel.For alone detects it least of all: fewer threads arrive together.
         [Test]
         public void FinishedIsAtomicUnderContention()
         {
-            const int rounds = 300;
+            const int rounds = 3000;
             const int threads = 8;
 
             for (var round = 0; round < rounds; round++)
@@ -90,14 +99,15 @@ namespace FlowMatters.Source.Veneer.Tests
                     Task.WaitAll(racers);
                 }
 
-                Assert.That(calls, Is.EqualTo(1), "round " + round + " fired more than once");
+                Assert.That(calls, Is.EqualTo(1),
+                    "round " + round + " fired an unexpected number of times: expected 1, got " + calls);
             }
         }
 
         [Test]
-        public void ANullCallbackDoesNotThrow()
+        public void ANullCallbackThrows()
         {
-            Assert.DoesNotThrow(() => new OneShotLifecycle(null).Finished(Addon()));
+            Assert.Throws<ArgumentNullException>(() => new OneShotLifecycle(null));
         }
     }
 }
