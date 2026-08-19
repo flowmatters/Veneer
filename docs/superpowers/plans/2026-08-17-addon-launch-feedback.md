@@ -652,13 +652,13 @@ namespace FlowMatters.Source.Veneer.Addons
 
 Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --filter "FullyQualifiedName~AddonMenuItemStateTests" --nologo`
 
-Expected: `Passed: 19, Failed: 0` — thirteen `[Test]` methods plus six from the two `[TestCase]` sets.
+Expected: `Passed: 22, Failed: 0` — sixteen `[Test]` methods plus six from the two `[TestCase]` sets. (Thirteen as first written; code review added three pinning the unknown-type branch, which no test could distinguish.)
 
 - [ ] **Step 6: Run the whole suite**
 
 Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo`
 
-Expected: `Passed: 174, Failed: 0`.
+Expected: `Passed: 177, Failed: 0`.
 
 - [ ] **Step 7: Commit**
 
@@ -848,7 +848,7 @@ Expected: `Passed: 5, Failed: 0`.
 
 Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo`
 
-Expected: `Passed: 179, Failed: 0`.
+Expected: `Passed: 182, Failed: 0`.
 
 - [ ] **Step 7: Commit**
 
@@ -1206,7 +1206,7 @@ Expected: `Passed: 14, Failed: 0` (5 existing + 9 new).
 
 Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo`
 
-Expected: `Passed: 188, Failed: 0`.
+Expected: `Passed: 191, Failed: 0`.
 
 - [ ] **Step 7: Commit**
 
@@ -1286,7 +1286,7 @@ Note the level filter still applies first: an operator who raises the panel's mi
 
 Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo`
 
-Expected: `Passed: 188, Failed: 0` — no behaviour change reaches the tests; this step is checking it compiles and nothing regressed.
+Expected: `Passed: 191, Failed: 0` — no behaviour change reaches the tests; this step is checking it compiles and nothing regressed.
 
 - [ ] **Step 3: Commit**
 
@@ -1336,6 +1336,13 @@ Replace everything from `ToolStripItem item = targetMenu.DropDownItems.Add(addon
                         // Dispatch only -- the Enabled/ToolTipText assignments that used to
                         // live in the default arm have moved to AddonMenuItemState, so there
                         // is exactly one writer of the item's appearance.
+                        //
+                        // The arms below and AddonMenuItemState.IsKnownType are ONE LIST IN
+                        // TWO PLACES. A type added here but not there renders disabled, which
+                        // is loud. A type added there but not here renders ENABLED with no
+                        // Click handler -- a menu item that silently does nothing, which is
+                        // the exact defect the default arm was added to fix. A drift test is
+                        // not cheap for a switch inside WinForms, so this comment is the guard.
                         if (invalid == null)
                         {
                             switch (addon.type)
@@ -1483,7 +1490,7 @@ Replace `SourceAddonLog` (`:288-301`) — including its now-false docstring:
 
 Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo`
 
-Expected: `Passed: 188, Failed: 0`.
+Expected: `Passed: 191, Failed: 0`.
 
 - [ ] **Step 6: Commit**
 
@@ -1550,7 +1557,7 @@ Add a second addon to the sample that sets `"allowMultiple": true`, with a comme
 
 Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo`
 
-Expected: `Passed: 188, Failed: 0`. (The samples are not parsed by tests; this step only confirms nothing else broke. Validate the JSON with `python -m json.tool Samples/addons/inline-script.rsproj.veneer`.)
+Expected: `Passed: 191, Failed: 0`. (The samples are not parsed by tests; this step only confirms nothing else broke. Validate the JSON with `python -m json.tool Samples/addons/inline-script.rsproj.veneer`.)
 
 - [ ] **Step 3: Commit**
 
@@ -1657,13 +1664,18 @@ git commit -m "feat: port addon launch feedback to legacy_ci"
 |---|---|
 | Baseline | 134 passing |
 | Task 1 | +21 → 155 |
-| Task 2 | +19 → 174 |
-| Task 3 | +5 → 179 |
-| Task 4 | +9 → 188 |
-| **Total** | **188 passing, 0 failing** |
+| Task 2 | +22 → 177 |
+| Task 3 | +5 → 182 |
+| Task 4 | +9 → 191 |
+| **Total** | **191 passing, 0 failing** |
 
-Counts are `[Test]` methods plus one per `[TestCase]` attribute: Task 2 is 13 + 6.
+Counts are `[Test]` methods plus one per `[TestCase]` attribute.
 
-**Task 1 came in at +21, not the +14 this plan first predicted** (8 + 6 as written, plus 7 added during code review: four null-input tests through each entry point, a null/missing-name key-collision test, a separator-vs-menu-pipe collision test, and a distinct-keys concurrency test that would catch a wrongly-scoped lock). Every later total here has been shifted by that 7. If a review adds tests to a later task, shift the remaining rows the same way rather than letting the gates drift — an executor who cannot trust these numbers cannot tell a silently unregistered test from a stale plan.
+**Both implemented tasks came in above their first prediction, and the gates below have been shifted to match.** Task 1 was written as +14 and landed at +21; Task 2 was written as +19 and landed at +22. In both cases the extra tests came from mutation testing during code review, and in both cases they closed a real hole:
+
+- **Task 1** — the null guards in `RunningAddons.Key` could be deleted with all 14 tests still green, in a class whose `Finished` runs inside a `Task.Run` that swallows exceptions. Four null-input tests, a null/missing-name key-collision test, a separator collision test, and a distinct-keys concurrency test.
+- **Task 2** — the unknown-type branch of `AddonMenuItemState` had neither its precedence nor its `Text` pinned. Moving the running check above it made a typo'd `type` render **enabled with no Click handler**, the exact outcome that branch exists to prevent.
+
+If a later task's review adds tests, shift the remaining rows the same way rather than letting the gates drift. An executor who cannot trust these numbers cannot tell a silently unregistered test from a stale plan — which is the failure this table was already corrected for once.
 
 Tasks 5-8 add no tests. Task 9 is manual and Task 10 is a branch port.
