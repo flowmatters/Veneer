@@ -1607,31 +1607,42 @@ Put `"options": {"defaultPort": 9877}` in `global.veneer` and no `options` block
 in the project layer. Reopen.
 Expected: the Veneer panel's port field pre-fills `9877`.
 
-Now the Task 3 fix. **Read this before running it** — the obvious version of this
-check cannot fail on either build, and would send you hunting a non-bug:
+Now `allowScripts`. **Do not try to reproduce the old bug** — it has no
+in-session GUI-observable manifestation, so any such attempt passes identically on
+a fixed and an unfixed build, which is worse than not checking at all. Three
+things prevent it:
 
-- `VENEER_ALLOW_SCRIPTS` is read in exactly one place, `ProjectLoadListener.StartVeneer()`,
-  which runs only when `VENEER_START_ON_LOAD` is *also* set.
-- `WebServerStatusControl` reads `DefaultAllowScripts` only in its **constructor**.
-  Nothing writes back from the checkbox, and no dropdown-open can uncheck a panel
-  that already exists.
+- `WebServerStatusControl` reads `DefaultAllowScripts` only in its **constructor**
+  (`.xaml.cs:65`), and nothing writes back from the checkbox.
+- The panel is never reconstructed once it exists. `Launch()` returns early
+  whenever `WebServerStatusPanel.ActivePanel != null` (`.xaml.cs:338-343`),
+  `ApplyScenarioChange` reuses `ActiveInstance` and only reassigns `.Scenario`,
+  and the panel sets `HideOnClose = true` without ever clearing `_activePanel`.
+- Restarting Source does not expose it either: the static resets to `false` and
+  `StartVeneer` immediately sets it back.
 
-So the clobber is observable only at the *next* panel construction:
+Verify **the new rule** instead. This needs no environment variables and no
+restart, because the panel does not exist until you open it:
 
-1. Set both `VENEER_START_ON_LOAD=1` and `VENEER_ALLOW_SCRIPTS=1`.
-2. Give the project layer an `options` block that sets `defaultPort` and **omits**
+1. Do **not** set `VENEER_START_ON_LOAD`, so no panel is constructed at load.
+2. `global.veneer`: `"options": { "allowScripts": true }`.
+3. Project layer: `"options": { "defaultPort": 9877 }` — sets a field, **omits**
    `allowScripts`.
-3. Open the project. The panel is constructed with "Allow scripts" checked.
-4. Open an addon dropdown — this is what runs `PopulateReportMenu` and writes
-   `DefaultAllowScripts`.
-5. Switch to a different project, forcing a fresh panel.
+4. Open the project, then open an addon dropdown. This runs `PopulateReportMenu`,
+   which is what writes the statics.
+5. *Now* open the panel for the first time — Tools > Veneer Server, or click an
+   `exe` addon, which force-opens it.
 
-Expected: "Allow scripts" is still **checked**. On a pre-Task-3 build step 4 would
-have reset `DefaultAllowScripts` to `false` and the new panel would come up
-unchecked.
+Expected: "Allow scripts" comes up **checked** and the port pre-fills `9877` — the
+project layer's options block did not clobber the global's `allowScripts`.
 
-If steps 1–5 cannot be arranged, say so rather than marking this verified —
-Task 3 has no unit coverage and this is its only check.
+Then the contrast case, which proves the precedence direction: change the project
+layer to `"allowScripts": false`, restart Source and repeat.
+Expected: the panel comes up **unchecked**.
+
+Together these exercise Task 3's per-field assignment and Task 4's
+`Merge_GlobalOptionsFillFieldsTheProjectOmits` / `Merge_ProjectOptionsBeatGlobalOptions`
+against the real GUI.
 
 - [ ] **Step 7: `%VENEER_CONFIG_DIR%` expands**
 
@@ -1674,16 +1685,22 @@ git checkout -b port/global-veneer-config
 
 - [ ] **Step 2: Confirm the assumption still holds**
 
+Step 3 copies five files wholesale from `master`, which is only safe if they were
+identical **before** this feature. Compare against the pre-feature commit, not
+against `master` — by now `master` has changed all five, so diffing `master` would
+report every one as differing and send you hand-porting the lot.
+
 ```bash
 for f in FlowMatters.Source.Veneer/DomainActions/AddonContext.cs \
          FlowMatters.Source.Veneer/DomainActions/AddonEnvironment.cs \
          FlowMatters.Source.Veneer/Tests/AddonEnvironmentTests.cs \
          docs/veneer-file-format.md \
          Samples/addons/README.md; do
-  echo "== $f"; git diff --stat master:$f legacy_ci:$f
+  echo "== $f"; git diff --stat f62aa28:$f legacy_ci:$f
 done
 ```
-Expected: empty output under every heading — Step 3 copies all five wholesale.
+Expected: empty output under every heading. (`git merge-base master legacy_ci`
+works equally well as the baseline ref if `f62aa28` has been rewritten.)
 For any that differ, hand-apply that file's changes instead of copying it.
 
 - [ ] **Step 3: Copy the files that copy cleanly**
@@ -1741,15 +1758,14 @@ builds.
 If the full build cannot run, compile the new file standalone:
 
 ```
-dotnet build FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj -p:LangVersion=7.3
+"C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MsBuild.exe" ^
+  FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj /p:LangVersion=7.3
 ```
 
-`csc` is normally not on `PATH`; if you want it, it lives under the VS 2022
-`MSBuild\Current\Bin\Roslyn\` directory.
-
-Missing-type errors are expected; **language-version** errors (`CS8107`,
-`CS8370`, `CS8652`) are not. This is a weaker check than a real build — report it
-as such.
+Full MSBuild, not `dotnet build`: `legacy_ci`'s project is non-SDK .NET Framework
+4.8. Whatever else fails, the pass/fail criterion here is narrow — **no
+language-version errors** (`CS8107`, `CS8370`, `CS8652`). This is a weaker check
+than a working build; report it as such.
 
 - [ ] **Step 9: Commit**
 
