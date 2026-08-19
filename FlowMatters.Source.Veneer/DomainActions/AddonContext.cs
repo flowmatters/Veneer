@@ -1,3 +1,5 @@
+using FlowMatters.Source.Veneer.Addons;
+
 namespace FlowMatters.Source.Veneer.DomainActions
 {
     /// <summary>
@@ -15,6 +17,7 @@ namespace FlowMatters.Source.Veneer.DomainActions
     internal enum AddonLogLevel
     {
         Debug,
+        Info,
         Warning,
         Error
     }
@@ -22,5 +25,17 @@ namespace FlowMatters.Source.Veneer.DomainActions
     internal interface IAddonLog
     {
         void Write(string message, AddonLogLevel level);
+    }
+
+    /// <summary>
+    /// Reports that an addon launch has finished -- the process exited, or never
+    /// started. NOT that Launch() returned: Launch returns as soon as the completion
+    /// watcher is queued, and cannot even distinguish a failed Start() from a running
+    /// process, so firing on its return would clear the running state immediately on
+    /// every successful launch.
+    /// </summary>
+    internal interface IAddonLifecycle
+    {
+        void Finished(VeneerAddon addon);
     }
 }
