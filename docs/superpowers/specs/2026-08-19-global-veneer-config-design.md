@@ -190,6 +190,9 @@ plain carriers declared alongside it.
 
 ### New: `ResolvedVeneerConfiguration`
 
+Declared in `VeneerConfigurationResolver.cs` alongside the other carriers, so
+`VeneerConfiguration.cs` holds only the on-disk schema types.
+
 ```csharp
 public VeneerAddon[] addons;
 public VeneerOptions options;
@@ -233,7 +236,8 @@ diagnostic line.
 | `VeneerMenu.PopulateReportMenu` (`:79`) | type of `config`; conditional assignment of `DefaultAllowScripts` and `DefaultPort` |
 | `VeneerMenu.PopulateReportMenu` (`:129`, `:131`) | drop the `config` argument to `AddonAppliesTo` / `EffectiveFilter` |
 | `VeneerMenu.RequiredMenus` (`:378`) | type of `config` only |
-| `ProjectLoadListener.ApplyDefaultsFromEnvironmentAndConfig` (`:192`) | type of `config`; `defaultPort.GetValueOrDefault() > 0`; emits the diagnostic line |
+| `ProjectLoadListener.ApplyDefaultsFromEnvironmentAndConfig` (`:192`) | type of `config`; `defaultPort.GetValueOrDefault() > 0`; calls `LogConfigurationChain` |
+| `ProjectLoadListener.ApplyScenarioChange` (`:156`) | calls `LogConfigurationChain` |
 
 ### Changed: addon environment
 
@@ -271,11 +275,29 @@ that guard is out of scope; the limitation is documented instead.
 With up to two files feeding one menu, "where did this item come from?" and "why
 is my sidecar being ignored?" are questions a user will ask.
 
-`ProjectLoadListener.ApplyDefaultsFromEnvironmentAndConfig` emits one
-`TIME.Management.Log.WriteInfo` per project load, naming each contributing file
-in resolution order, plus an explicit line when a global project file supersedes
-a sidecar that exists on disk. It runs exactly once per load, which the
-per-dropdown `Load` calls in `VeneerMenu` would not.
+A new `ProjectLoadListener.LogConfigurationChain(resolved)` emits a
+`TIME.Management.Log.WriteInfo` naming each contributing file in resolution
+order, plus an explicit line when a global project file supersedes a sidecar that
+exists on disk.
+
+It is called from **two** places, because neither alone covers the case that
+prompts the question:
+
+- `ApplyDefaultsFromEnvironmentAndConfig`, reached via `ScenarioLoaded()` on the
+  `FirstSighting` transition — the first project of a session.
+- `ApplyScenarioChange`, the `Rebind` / `Cleared` path (`:132-141`). Opening a
+  different project while one is loaded goes here and never reaches
+  `ScenarioLoaded`, yet "why is my sidecar being ignored?" is most likely to be
+  asked immediately after a project switch. This path does its own
+  `VeneerConfiguration.Load` for the purpose; it does **not** re-apply
+  `options` defaults, which stays a load-time concern.
+
+`LogConfigurationChain` holds the last chain it logged in a static field and
+writes only when the chain differs. `Rebind` also fires for a scenario change
+*within* one project, where the resolved files are identical — deduplicating on
+the chain keeps that silent while still reporting a genuine project switch. This
+is the only per-dropdown-safe design too, which is why the diagnostic does not
+live in `VeneerMenu`.
 
 This is **GUI only**. `VeneerCmd` calls
 `InitialiseOnLoadAttribute.MarkInitialised()` (`Program.cs:197`) before any plugin
@@ -336,7 +358,8 @@ alongside a shared model.
 
 `Addons/VeneerConfiguration.cs`, `DomainActions/AddonContext.cs` and
 `DomainActions/AddonEnvironment.cs` are byte-identical between `master` and
-`legacy_ci`, so those four files copy across. `VeneerMenu.cs` differs, including
+`legacy_ci`, so they copy across along with the new resolver and its tests.
+`VeneerMenu.cs` differs, including
 `BuildAddonContext` itself — `legacy_ci` uses `Control` directly where `master`
 uses `EffectiveControl` — so the one-line `ConfigDirectory` addition and the
 `AddonAppliesTo` / `EffectiveFilter` call-site edits are applied by hand on that
