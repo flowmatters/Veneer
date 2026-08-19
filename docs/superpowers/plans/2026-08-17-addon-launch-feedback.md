@@ -131,7 +131,7 @@ namespace FlowMatters.Source.Veneer.Tests
             return new VeneerAddon { name = name, type = "script", menu = menu };
         }
 
-        // The five spellings below all render in the SAME menu (MenuLayout.SplitMenuPath
+        // The six spellings below all render in the SAME menu (MenuLayout.SplitMenuPath
         // maps null/whitespace to "Reporting", trims segments and drops empties). Keying
         // on the raw string would give five independent counts for one menu item, and the
         // double launch this class exists to prevent would come straight back.
@@ -285,8 +285,8 @@ namespace FlowMatters.Source.Veneer.Addons
         /// <summary>
         /// The NORMALISED menu path plus the name. Keying on addon.menu raw would be
         /// wrong: SplitMenuPath maps null/whitespace to "Reporting", trims segments and
-        /// drops empties, so null, "", "Reporting", " Reporting " and "Reporting|" all
-        /// render one menu item while producing five different raw keys. "Same key"
+        /// drops empties, so null, "", "   ", "Reporting", " Reporting " and "Reporting|"
+        /// all render one menu item while producing six different raw keys. "Same key"
         /// must mean "same rendered location".
         /// </summary>
         public static string Key(VeneerAddon addon)
@@ -340,13 +340,13 @@ namespace FlowMatters.Source.Veneer.Addons
 
 Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --filter "FullyQualifiedName~RunningAddonsTests" --nologo`
 
-Expected: `Passed: 15, Failed: 0` (the `[TestCase]` attribute contributes six).
+Expected: `Passed: 14, Failed: 0` — eight `[Test]` methods plus six from the one `[TestCase]` set.
 
 - [ ] **Step 5: Run the whole suite**
 
 Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo`
 
-Expected: `Passed: 149, Failed: 0`.
+Expected: `Passed: 148, Failed: 0`.
 
 - [ ] **Step 6: Commit**
 
@@ -652,13 +652,13 @@ namespace FlowMatters.Source.Veneer.Addons
 
 Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --filter "FullyQualifiedName~AddonMenuItemStateTests" --nologo`
 
-Expected: `Passed: 20, Failed: 0` (two `[TestCase]` sets contribute six).
+Expected: `Passed: 19, Failed: 0` — thirteen `[Test]` methods plus six from the two `[TestCase]` sets.
 
 - [ ] **Step 6: Run the whole suite**
 
 Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo`
 
-Expected: `Passed: 169, Failed: 0`.
+Expected: `Passed: 167, Failed: 0`.
 
 - [ ] **Step 7: Commit**
 
@@ -848,7 +848,7 @@ Expected: `Passed: 5, Failed: 0`.
 
 Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo`
 
-Expected: `Passed: 174, Failed: 0`.
+Expected: `Passed: 172, Failed: 0`.
 
 - [ ] **Step 7: Commit**
 
@@ -865,6 +865,7 @@ The biggest task. `Launch` gains a required parameter, the watcher gains `try/ca
 
 **Files:**
 - Modify: `FlowMatters.Source.Veneer/DomainActions/AddonLauncher.cs`
+- Modify: `FlowMatters.Source.Veneer/VeneerMenu.cs:215` — a one-line shim (Step 4e). `Launch` gains a **required** parameter, so the tree does not compile until its only production caller is updated. Task 6 replaces the shim properly.
 - Test: `FlowMatters.Source.Veneer/Tests/AddonLauncherIntegrationTests.cs`
 
 - [ ] **Step 1: Extend the fixture with level recording and a lifecycle stub**
@@ -980,6 +981,10 @@ Then append these tests to the fixture. The once-and-only-once cases are the loa
             Assert.That(life.Count, Is.EqualTo(0), "Finished fired before the child exited");
             Assert.That(life.WaitForFinish(), Is.True, "lifecycle never fired. Log was:\n" + log.Dump());
         }
+        // ^ The one mildly timing-dependent test here: it leans on `ping -n 3` giving
+        //   ~2s of headroom. If it fails, check the log first -- if cmd.exe is blocked in
+        //   the environment, Start() throws and Finished fires synchronously, which is a
+        //   broken environment rather than a broken guarantee.
 
         [Test]
         public void Lifecycle_FiresOnceOnNonZeroExit()
@@ -1104,9 +1109,9 @@ Add to the method's doc comment:
         /// disabled until Source restarts, with no error to explain it.
 ```
 
-**(b)** `LaunchScript` and `LaunchExe` each take `IAddonLifecycle lifecycle` and pass it to `Run`.
+**(b)** `LaunchScript` and `LaunchExe` each take `IAddonLifecycle lifecycle` as a new **last** parameter, and pass it to `Run`.
 
-**(c)** `Run` takes `IAddonLifecycle lifecycle`. Its `Start()`-failure branch (`:241-247`) reports before returning:
+**(c)** `Run` takes `IAddonLifecycle lifecycle` as a new **last** parameter, after `feedStdin`. Its `Start()`-failure branch (`:241-247`) reports before returning:
 
 ```csharp
             catch (Exception ex)
@@ -1183,6 +1188,14 @@ Note the order: `Dispose` first, then report. A throwing `log.Write` would other
             });
 ```
 
+**(e) Shim the one production caller so the tree builds.** `VeneerMenu.LaunchAddon` (`VeneerMenu.cs:215`) still calls the three-argument `Launch`, which is now a **certain** `CS7036` on the whole project — not a maybe. Task 6 rewrites this method properly; for now change that one line to:
+
+```csharp
+            AddonLauncher.Launch(addon, BuildAddonContext(), AddonLog(), new OneShotLifecycle(null));
+```
+
+**Do not** instead give `lifecycle` a `= null` default. The parameter is required precisely so a future call site cannot silently opt out of the guarantee. A null *callback* is inert here and correct at this commit: `_runningAddons` does not exist until Task 6, so there is nothing to decrement yet. `OneShotLifecycle` is `internal` in `FlowMatters.Source.Veneer.DomainActions` and `VeneerMenu.cs:11` already has that `using`.
+
 - [ ] **Step 5: Run the tests to verify they pass**
 
 Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --filter "FullyQualifiedName~AddonLauncherIntegrationTests" --nologo`
@@ -1193,9 +1206,7 @@ Expected: `Passed: 14, Failed: 0` (5 existing + 9 new).
 
 Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo`
 
-Expected: `Passed: 183, Failed: 0`.
-
-Note: `VeneerMenu.LaunchAddon` still calls the 3-argument `Launch` and will not compile — that is Task 6. If the build breaks there, **do not** add a defaulted `lifecycle = null` to paper over it; the parameter is required so a future call site cannot silently opt out. Temporarily pass `new OneShotLifecycle(null)` from `VeneerMenu` to keep the tree building, and replace it properly in Task 6.
+Expected: `Passed: 181, Failed: 0`.
 
 - [ ] **Step 7: Commit**
 
@@ -1249,6 +1260,13 @@ Replace `ServerLogEvent` and `LogAddonMessage` with:
         }
 
         /// <summary>
+        /// Log entry point for addon output, usable regardless of server state.
+        /// The LogBox sink is otherwise only wired up inside StartServer
+        /// (server.LogGenerator += ServerLogEvent), but addons can be launched with
+        /// the server stopped, so their output needs a path that does not depend on
+        /// it. Append marshals to the UI thread via _originalContext -- which is what
+        /// OutputDataReceived, raised on a threadpool thread, requires.
+        ///
         /// Info and Error are tested explicitly, NOT `level >= LogLevel.Info`. Child
         /// stderr is logged at Warning, and Warning >= Info -- a Dash app writes its whole
         /// startup to stderr, so that predicate would yank the log to the bottom on every
@@ -1268,7 +1286,7 @@ Note the level filter still applies first: an operator who raises the panel's mi
 
 Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo`
 
-Expected: `Passed: 183, Failed: 0` — no behaviour change reaches the tests; this step is checking it compiles and nothing regressed.
+Expected: `Passed: 181, Failed: 0` — no behaviour change reaches the tests; this step is checking it compiles and nothing regressed.
 
 - [ ] **Step 3: Commit**
 
@@ -1465,7 +1483,7 @@ Replace `SourceAddonLog` (`:288-301`) — including its now-false docstring:
 
 Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo`
 
-Expected: `Passed: 183, Failed: 0`.
+Expected: `Passed: 181, Failed: 0`.
 
 - [ ] **Step 6: Commit**
 
@@ -1492,7 +1510,9 @@ In `docs/veneer-file-format.md`, add a row to the addon field table (`:50-61`), 
 
 - [ ] **Step 2: Reconcile the panel sentence**
 
-`:99` currently reads "Opens the Veneer panel if it is closed, because that is where addon output is written." That sentence was **aspirational** — the code did it on the first click of a session only. It is now true as written. Leave the text; verify it reads correctly in context and that nothing nearby still describes the old first-click behaviour.
+`:99` currently reads "Opens the Veneer panel if it is closed, because that is where addon output is written." That sentence was **aspirational** — the code did it on the first click of a session only, so an operator who closed the panel never saw it again. It is now true as written.
+
+Keep the sentence and extend it to say the panel is raised on **every** launch, and that Veneer's own `Launching …` / `… finished` lines appear there at `Info` without changing the Log Level. Then check the surrounding paragraph for any remaining description of the first-click-only behaviour.
 
 - [ ] **Step 3: Update the sample README**
 
@@ -1530,7 +1550,7 @@ Add a second addon to the sample that sets `"allowMultiple": true`, with a comme
 
 Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo`
 
-Expected: `Passed: 183, Failed: 0`. (The samples are not parsed by tests; this step only confirms nothing else broke. Validate the JSON with `python -m json.tool Samples/addons/inline-script.rsproj.veneer`.)
+Expected: `Passed: 181, Failed: 0`. (The samples are not parsed by tests; this step only confirms nothing else broke. Validate the JSON with `python -m json.tool Samples/addons/inline-script.rsproj.veneer`.)
 
 - [ ] **Step 3: Commit**
 
@@ -1600,7 +1620,7 @@ Cherry-pick or re-apply Tasks 1-8 onto `legacy_ci`.
 
 - [ ] **Step 2: Add the `<Compile Include>` entries**
 
-`legacy_ci`'s csproj is non-SDK with explicit file lists. Add **five** entries:
+`legacy_ci`'s csproj is non-SDK with explicit file lists. Add **six** entries — three source files and three test fixtures:
 
 ```xml
     <Compile Include="Addons\RunningAddons.cs" />
@@ -1611,7 +1631,7 @@ Cherry-pick or re-apply Tasks 1-8 onto `legacy_ci`.
     <Compile Include="Tests\OneShotLifecycleTests.cs" />
 ```
 
-That is six lines — count them against the file list, not against this sentence. A file missing here compiles fine on `master` and **silently vanishes** on `legacy_ci`; for a test fixture that means the guarantee it protects goes unchecked there, with no failure to notice.
+A file missing here compiles fine on `master` and **silently vanishes** on `legacy_ci`; for a test fixture that means the guarantee it protects goes unchecked there, with no failure to notice. Check each of the six against the csproj's existing `<Compile Include>` block rather than trusting this list.
 
 - [ ] **Step 3: Check C# 7.3 compatibility**
 
@@ -1636,10 +1656,12 @@ git commit -m "feat: port addon launch feedback to legacy_ci"
 | | |
 |---|---|
 | Baseline | 134 passing |
-| Task 1 | +15 → 149 |
-| Task 2 | +20 → 169 |
-| Task 3 | +5 → 174 |
-| Task 4 | +9 → 183 |
-| **Total** | **183 passing, 0 failing** |
+| Task 1 | +14 → 148 |
+| Task 2 | +19 → 167 |
+| Task 3 | +5 → 172 |
+| Task 4 | +9 → 181 |
+| **Total** | **181 passing, 0 failing** |
+
+Counts are `[Test]` methods plus one per `[TestCase]` attribute: Task 1 is 8 + 6, Task 2 is 13 + 6.
 
 Tasks 5-8 add no tests. Task 9 is manual and Task 10 is a branch port.
