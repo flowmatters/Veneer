@@ -862,6 +862,12 @@ git commit -m "feat: merge .veneer layers with targetScenario push-down"
 
 **9 new cases (4 tests; two are multi-row `[TestCase]`s). Running total: 173.**
 
+**This task lands a deliberate one-commit regression.** After it, `AddonAppliesTo`
+no longer consults `config.targetScenario`, but `Load` does not push it down until
+Task 6 — so between the two commits a `.veneer` file with a top-level
+`targetScenario` stops filtering. Nothing goes red, because no test covers the old
+two-argument path. Do not "fix" it here; Task 6 closes it. Do not stop at Task 5.
+
 Push-down leaves the `VeneerConfiguration config` parameter dead, so both helpers lose it. `AddonAppliesTo` still needs a `RiverSystemScenario`, which cannot be constructed in a unit test — so the comparison moves into a pure `AppliesTo(addon, string)` and `AddonAppliesTo` becomes a one-line wrapper. That is the same split `AddonContext` already uses to keep launch logic testable.
 
 - [ ] **Step 1: Write the failing tests**
@@ -1498,6 +1504,9 @@ In the **Options** section, replace the paragraph introducing the table and the
 `allowScripts` / `defaultPort` rows' Default column text so the table reads:
 
 ```markdown
+These are **never** scenario-gated — they take effect whenever the project is
+loaded.
+
 Each field is independent. A field a layer omits falls through to the global
 layer, and then to Veneer's default — omitting `allowScripts` no longer forces it
 to `false`.
@@ -1574,7 +1583,9 @@ Expected: a `My Tools` menu appears with the item; clicking opens the link.
 
 - [ ] **Step 3: Ordering is project-first**
 
-Add a sidecar with an addon under menu `Models` to that project.
+Add a sidecar with an addon under menu `Models` to that project, then **reopen the
+project** — top-level menu-bar entries are computed once, in
+`InitialiseRequiredMenus`, so a new menu does not appear mid-session.
 Expected: `Models` appears **left of** `My Tools` in the menu bar.
 
 - [ ] **Step 4: The global project file replaces the sidecar**
@@ -1596,9 +1607,31 @@ Put `"options": {"defaultPort": 9877}` in `global.veneer` and no `options` block
 in the project layer. Reopen.
 Expected: the Veneer panel's port field pre-fills `9877`.
 
-Then set `VENEER_ALLOW_SCRIPTS=1` and use a project layer with an `options` block
-that omits `allowScripts`.
-Expected: "Allow scripts" stays **checked** — this is the bug Task 3 fixed.
+Now the Task 3 fix. **Read this before running it** — the obvious version of this
+check cannot fail on either build, and would send you hunting a non-bug:
+
+- `VENEER_ALLOW_SCRIPTS` is read in exactly one place, `ProjectLoadListener.StartVeneer()`,
+  which runs only when `VENEER_START_ON_LOAD` is *also* set.
+- `WebServerStatusControl` reads `DefaultAllowScripts` only in its **constructor**.
+  Nothing writes back from the checkbox, and no dropdown-open can uncheck a panel
+  that already exists.
+
+So the clobber is observable only at the *next* panel construction:
+
+1. Set both `VENEER_START_ON_LOAD=1` and `VENEER_ALLOW_SCRIPTS=1`.
+2. Give the project layer an `options` block that sets `defaultPort` and **omits**
+   `allowScripts`.
+3. Open the project. The panel is constructed with "Allow scripts" checked.
+4. Open an addon dropdown — this is what runs `PopulateReportMenu` and writes
+   `DefaultAllowScripts`.
+5. Switch to a different project, forcing a fresh panel.
+
+Expected: "Allow scripts" is still **checked**. On a pre-Task-3 build step 4 would
+have reset `DefaultAllowScripts` to `false` and the new panel would come up
+unchecked.
+
+If steps 1–5 cannot be arranged, say so rather than marking this verified —
+Task 3 has no unit coverage and this is its only check.
 
 - [ ] **Step 7: `%VENEER_CONFIG_DIR%` expands**
 
@@ -1642,10 +1675,16 @@ git checkout -b port/global-veneer-config
 - [ ] **Step 2: Confirm the assumption still holds**
 
 ```bash
-git diff master:FlowMatters.Source.Veneer/DomainActions/AddonContext.cs legacy_ci:FlowMatters.Source.Veneer/DomainActions/AddonContext.cs
-git diff master:FlowMatters.Source.Veneer/DomainActions/AddonEnvironment.cs legacy_ci:FlowMatters.Source.Veneer/DomainActions/AddonEnvironment.cs
+for f in FlowMatters.Source.Veneer/DomainActions/AddonContext.cs \
+         FlowMatters.Source.Veneer/DomainActions/AddonEnvironment.cs \
+         FlowMatters.Source.Veneer/Tests/AddonEnvironmentTests.cs \
+         docs/veneer-file-format.md \
+         Samples/addons/README.md; do
+  echo "== $f"; git diff --stat master:$f legacy_ci:$f
+done
 ```
-Expected: empty output for both. If not, hand-edit those two as well.
+Expected: empty output under every heading — Step 3 copies all five wholesale.
+For any that differ, hand-apply that file's changes instead of copying it.
 
 - [ ] **Step 3: Copy the files that copy cleanly**
 
@@ -1702,11 +1741,15 @@ builds.
 If the full build cannot run, compile the new file standalone:
 
 ```
-csc /langversion:7.3 /t:library /warnaserror FlowMatters.Source.Veneer\Addons\VeneerConfigurationResolver.cs
+dotnet build FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj -p:LangVersion=7.3
 ```
 
-Missing-type errors are expected; **language-version** errors are not. This is a
-weaker check than a real build — report it as such.
+`csc` is normally not on `PATH`; if you want it, it lives under the VS 2022
+`MSBuild\Current\Bin\Roslyn\` directory.
+
+Missing-type errors are expected; **language-version** errors (`CS8107`,
+`CS8370`, `CS8652`) are not. This is a weaker check than a real build — report it
+as such.
 
 - [ ] **Step 9: Commit**
 

@@ -131,9 +131,15 @@ change — Newtonsoft maps an absent key to `null` and a present one to its valu
 Making the fields nullable also fixes a current defect. `VeneerMenu.cs:150`
 assigns `WebServerStatusControl.DefaultAllowScripts = config.options.allowScripts`
 unconditionally, so any `.veneer` file with an `options` block that omits
-`allowScripts` resets the flag to `false` — overwriting a value set from the
-`VENEER_ALLOW_SCRIPTS` environment variable or the GUI. Under the new rule the
-assignment happens only when a layer specified the field.
+`allowScripts` resets the flag to `false`, discarding a value set from the
+`VENEER_ALLOW_SCRIPTS` environment variable. Under the new rule the assignment
+happens only when a layer specified the field.
+
+The effect is delayed, not immediate: `WebServerStatusControl` reads
+`DefaultAllowScripts` only in its constructor and nothing writes back from the
+checkbox, so an already-open panel is unaffected and the clobber shows up at the
+*next* panel construction — a project or scenario change. That also means the GUI
+toggle is not at risk here; it never writes `DefaultAllowScripts`.
 
 ### Relative paths and `%VENEER_CONFIG_DIR%`
 
