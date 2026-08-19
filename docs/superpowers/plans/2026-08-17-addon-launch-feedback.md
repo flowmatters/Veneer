@@ -1531,11 +1531,23 @@ In "Diagnosing a menu item that does nothing" (`:139-151`), add *already running
 
 **Also amend the list preamble at `:141-142`**, which currently promises "the same reason is written to Source's log once". That is false for the new entry, which deliberately logs nothing.
 
-- [ ] **Step 4: Verify the field table against the code, both directions**
+- [ ] **Step 4: Fix the tooltip quoted at `docs/veneer-file-format.md:140`**
+
+That line quotes a live string verbatim:
+
+```
+- Hovering shows the tooltip `Requires scenario '<filter>' to be active`.
+```
+
+It is correct against `VeneerMenu.cs:133` today, but Task 6 hands that string to `AddonMenuItemState`, where it ends with a period. Update the quote to match.
+
+This was found by grepping the whole tree for all six tooltip strings — it is the **only** site outside the source that quotes one. If you change a tooltip in a later task, repeat that grep rather than assuming.
+
+- [ ] **Step 5: Verify the field table against the code, both directions**
 
 Every property on `VeneerAddon` (`Addons/VeneerConfiguration.cs:79-100`) appears in the table, and every table row names a real property. This check caught a drift in the url-addons work.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add docs/veneer-file-format.md Samples/addons/README.md
