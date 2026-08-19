@@ -346,7 +346,7 @@ Expected: `Passed: 14, Failed: 0` — eight `[Test]` methods plus six from the o
 
 Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo`
 
-Expected: `Passed: 148, Failed: 0`.
+Expected: `Passed: 155, Failed: 0`.
 
 - [ ] **Step 6: Commit**
 
@@ -658,7 +658,7 @@ Expected: `Passed: 19, Failed: 0` — thirteen `[Test]` methods plus six from th
 
 Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo`
 
-Expected: `Passed: 167, Failed: 0`.
+Expected: `Passed: 174, Failed: 0`.
 
 - [ ] **Step 7: Commit**
 
@@ -848,7 +848,7 @@ Expected: `Passed: 5, Failed: 0`.
 
 Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo`
 
-Expected: `Passed: 172, Failed: 0`.
+Expected: `Passed: 179, Failed: 0`.
 
 - [ ] **Step 7: Commit**
 
@@ -1206,7 +1206,7 @@ Expected: `Passed: 14, Failed: 0` (5 existing + 9 new).
 
 Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo`
 
-Expected: `Passed: 181, Failed: 0`.
+Expected: `Passed: 188, Failed: 0`.
 
 - [ ] **Step 7: Commit**
 
@@ -1286,7 +1286,7 @@ Note the level filter still applies first: an operator who raises the panel's mi
 
 Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo`
 
-Expected: `Passed: 181, Failed: 0` — no behaviour change reaches the tests; this step is checking it compiles and nothing regressed.
+Expected: `Passed: 188, Failed: 0` — no behaviour change reaches the tests; this step is checking it compiles and nothing regressed.
 
 - [ ] **Step 3: Commit**
 
@@ -1483,7 +1483,7 @@ Replace `SourceAddonLog` (`:288-301`) — including its now-false docstring:
 
 Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo`
 
-Expected: `Passed: 181, Failed: 0`.
+Expected: `Passed: 188, Failed: 0`.
 
 - [ ] **Step 6: Commit**
 
@@ -1550,7 +1550,7 @@ Add a second addon to the sample that sets `"allowMultiple": true`, with a comme
 
 Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo`
 
-Expected: `Passed: 181, Failed: 0`. (The samples are not parsed by tests; this step only confirms nothing else broke. Validate the JSON with `python -m json.tool Samples/addons/inline-script.rsproj.veneer`.)
+Expected: `Passed: 188, Failed: 0`. (The samples are not parsed by tests; this step only confirms nothing else broke. Validate the JSON with `python -m json.tool Samples/addons/inline-script.rsproj.veneer`.)
 
 - [ ] **Step 3: Commit**
 
@@ -1656,12 +1656,14 @@ git commit -m "feat: port addon launch feedback to legacy_ci"
 | | |
 |---|---|
 | Baseline | 134 passing |
-| Task 1 | +14 → 148 |
-| Task 2 | +19 → 167 |
-| Task 3 | +5 → 172 |
-| Task 4 | +9 → 181 |
-| **Total** | **181 passing, 0 failing** |
+| Task 1 | +21 → 155 |
+| Task 2 | +19 → 174 |
+| Task 3 | +5 → 179 |
+| Task 4 | +9 → 188 |
+| **Total** | **188 passing, 0 failing** |
 
-Counts are `[Test]` methods plus one per `[TestCase]` attribute: Task 1 is 8 + 6, Task 2 is 13 + 6.
+Counts are `[Test]` methods plus one per `[TestCase]` attribute: Task 2 is 13 + 6.
+
+**Task 1 came in at +21, not the +14 this plan first predicted** (8 + 6 as written, plus 7 added during code review: four null-input tests through each entry point, a null/missing-name key-collision test, a separator-vs-menu-pipe collision test, and a distinct-keys concurrency test that would catch a wrongly-scoped lock). Every later total here has been shifted by that 7. If a review adds tests to a later task, shift the remaining rows the same way rather than letting the gates drift — an executor who cannot trust these numbers cannot tell a silently unregistered test from a stale plan.
 
 Tasks 5-8 add no tests. Task 9 is manual and Task 10 is a branch port.
