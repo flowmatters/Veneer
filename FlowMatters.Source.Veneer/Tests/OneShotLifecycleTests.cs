@@ -63,6 +63,37 @@ namespace FlowMatters.Source.Veneer.Tests
             Assert.That(calls, Is.EqualTo(1));
         }
 
+        // Parallel.For alone does not catch a non-atomic check-then-set: its workers arrive
+        // at the guard in sequence, so the window between the read and the write is never
+        // contended. Releasing every thread from one gate, over many rounds, is what makes
+        // the loss of atomicity observable -- and this class's whole contract is that the
+        // callback fires once no matter how many threads race it.
+        [Test]
+        public void FinishedIsAtomicUnderContention()
+        {
+            const int rounds = 300;
+            const int threads = 8;
+
+            for (var round = 0; round < rounds; round++)
+            {
+                var calls = 0;
+                var once = new OneShotLifecycle(a => Interlocked.Increment(ref calls));
+                var addon = Addon();
+
+                using (var gate = new ManualResetEventSlim(false))
+                {
+                    var racers = new Task[threads];
+                    for (var i = 0; i < threads; i++)
+                        racers[i] = Task.Run(() => { gate.Wait(); once.Finished(addon); });
+
+                    gate.Set();
+                    Task.WaitAll(racers);
+                }
+
+                Assert.That(calls, Is.EqualTo(1), "round " + round + " fired more than once");
+            }
+        }
+
         [Test]
         public void ANullCallbackDoesNotThrow()
         {

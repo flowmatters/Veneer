@@ -14,6 +14,10 @@ namespace FlowMatters.Source.Veneer.DomainActions
         public int Port { get; set; }
     }
 
+    // Every call site compares these with == only, never <, >, <= or >= (verified by
+    // grep, not just assumed). That is what makes it safe to insert a member and shift
+    // the ordinals below it, as Info did here between Debug and Warning -- a >= or <=
+    // comparison would silently reorder which levels it matches.
     internal enum AddonLogLevel
     {
         Debug,
