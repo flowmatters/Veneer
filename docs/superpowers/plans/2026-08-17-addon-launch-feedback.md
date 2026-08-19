@@ -1182,8 +1182,15 @@ Note the order: `Dispose` first, then report. A throwing `log.Write` would other
                 }
                 finally
                 {
-                    lifecycle.Finished(addon);
-                    process.Dispose();
+                    // Nested, not sequential. lifecycle.Finished invokes a caller-supplied
+                    // Action; if it throws, a plain `Finished(); Dispose();` skips the
+                    // Dispose and leaks the handle -- while the exception becomes an
+                    // unobserved task exception, which is the exact failure this whole
+                    // try/catch/finally exists to prevent. Finished goes first so the count
+                    // is released as early as possible; the inner finally guarantees Dispose
+                    // runs either way.
+                    try { lifecycle.Finished(addon); }
+                    finally { process.Dispose(); }
                 }
             });
 ```

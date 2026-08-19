@@ -241,11 +241,22 @@ until Source restarts. The watcher becomes:
 ```
 try     { WaitForExit; Flush; if (ExitCode != 0) Error(...) else Info("Addon 'X' finished"); }
 catch   { best-effort Error("Addon 'X' could not be monitored: ..."), itself guarded }
-finally { lifecycle.Finished(addon); process.Dispose(); }
+finally { try { lifecycle.Finished(addon); } finally { process.Dispose(); } }
 ```
 
 `process.Dispose()` moves into the `finally` for the same reason it is there at
 `:317` today — it must not be skipped by a throw above it.
+
+**The two statements are nested rather than sequential.** `lifecycle.Finished`
+invokes a caller-supplied `Action`, so a plain `Finished(); Dispose();` lets a
+throwing callback skip the `Dispose` and leak the handle — while the exception
+becomes an unobserved task exception, which is precisely what this
+`try/catch/finally` exists to prevent. `Finished` still goes first, so the count
+is released as early as possible; the inner `finally` guarantees the `Dispose`
+either way. In the wiring this design specifies the callback is
+`RunningAddons.Finished`, which is documented no-throw — the nesting is what
+keeps that a property of the *contract* rather than a coincidence of the current
+caller.
 
 `LaunchUrl` does **not** take a lifecycle. It starts no process.
 
