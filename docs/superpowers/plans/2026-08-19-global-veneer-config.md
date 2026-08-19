@@ -1621,24 +1621,33 @@ things prevent it:
 - Restarting Source does not expose it either: the static resets to `false` and
   `StartVeneer` immediately sets it back.
 
-Verify **the new rule** instead. This needs no environment variables and no
-restart, because the panel does not exist until you open it:
+Verify **the new rule** instead. This needs no environment variables, but it does
+need a fresh session, because it depends on the panel not existing yet:
 
-1. Do **not** set `VENEER_START_ON_LOAD`, so no panel is constructed at load.
-2. `global.veneer`: `"options": { "allowScripts": true }`.
-3. Project layer: `"options": { "defaultPort": 9877 }` — sets a field, **omits**
+1. **Restart Source.** The port check above opened the panel to read its port
+   field, and the panel is never reconstructed within a session.
+2. Do **not** set `VENEER_START_ON_LOAD`, so no panel is constructed at load.
+3. `global.veneer`: `"options": { "allowScripts": true }`.
+4. Project layer: `"options": { "defaultPort": 9877 }` — sets a field, **omits**
    `allowScripts`.
-4. Open the project, then open an addon dropdown. This runs `PopulateReportMenu`,
+5. Open the project, then open an addon dropdown. This runs `PopulateReportMenu`,
    which is what writes the statics.
-5. *Now* open the panel for the first time — Tools > Veneer Server, or click an
+6. *Now* open the panel for the first time — Tools > Veneer Server, or click an
    `exe` addon, which force-opens it.
 
 Expected: "Allow scripts" comes up **checked** and the port pre-fills `9877` — the
 project layer's options block did not clobber the global's `allowScripts`.
 
-Then the contrast case, which proves the precedence direction: change the project
-layer to `"allowScripts": false`, restart Source and repeat.
+Then the contrast case: change the project layer to `"allowScripts": false`,
+restart Source and repeat. A restart is the only way back to the first-open state —
+`_activePanel`, `_activeInstance` and `DefaultAllowScripts` are process statics
+that nothing clears.
 Expected: the panel comes up **unchecked**.
+
+The contrast case is only meaningful paired with the first. `DefaultAllowScripts`
+initialises to `false`, so "unchecked" is also what you would see if nothing were
+assigned at all — what the pair catches is **inverted precedence**, where a global
+`true` beating a project `false` would show checked.
 
 Together these exercise Task 3's per-field assignment and Task 4's
 `Merge_GlobalOptionsFillFieldsTheProjectOmits` / `Merge_ProjectOptionsBeatGlobalOptions`
@@ -1758,8 +1767,7 @@ builds.
 If the full build cannot run, compile the new file standalone:
 
 ```
-"C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MsBuild.exe" ^
-  FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj /p:LangVersion=7.3
+"C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MsBuild.exe" FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj /p:LangVersion=7.3
 ```
 
 Full MSBuild, not `dotnet build`: `legacy_ci`'s project is non-SDK .NET Framework
