@@ -45,10 +45,9 @@ Resolved on every load, in this order:
    `.veneer` — `C:\Users\<user>\.veneer` on Windows.
 
 Veneer never creates the directory. A missing directory is not an error; it
-simply contributes no layers. The environment variable is not only an escape
-hatch for roaming profiles and site deployments — it is what makes a headless
-`VeneerCmd` run able to point at its own configuration set, and what makes the
-resolution logic testable.
+simply contributes no layers. The environment variable is an escape hatch for
+roaming profiles and site deployments, and it is what makes the resolution logic
+testable without faking a home directory.
 
 ### Layers
 
@@ -103,9 +102,19 @@ addons on a scenario their author never mentioned. After push-down every addon
 carries its own effective filter, so `ResolvedVeneerConfiguration` has no
 `targetScenario` field at all — there is no correct single value for one.
 
-`VeneerConfiguration.EffectiveFilter` and `AddonAppliesTo` continue to work
-unchanged against a resolved addon, since push-down populates precisely the field
-they read first.
+Push-down populates precisely the field `EffectiveFilter` reads first, which
+makes their `VeneerConfiguration config` parameter dead. Both lose it:
+
+```csharp
+public static string EffectiveFilter(VeneerAddon addon)
+public static bool AddonAppliesTo(VeneerAddon addon, RiverSystemScenario currentScenario)
+```
+
+The alternative — deriving `ResolvedVeneerConfiguration` from
+`VeneerConfiguration` so the existing two-argument signatures still bind — would
+mean the resolved type inherits a `targetScenario` field that must never be read,
+which is the trap push-down exists to remove. `VeneerMenu.cs:129` and `:131` are
+the only callers.
 
 **`options` — merged field by field, project layer wins.**
 
@@ -165,11 +174,16 @@ public static bool TryParse(string json, out VeneerConfiguration config, out str
 public static ResolvedVeneerConfiguration Merge(IList<VeneerConfigurationLayer> layers)
 ```
 
-`Resolve` returns the ordered list of paths that exist, plus `SupersededSidecar`
-— the sidecar path when a global project file displaced an existing one, used for
-the diagnostic line and null otherwise. File-system access enters only through
+`Resolve` returns a `ConfigCandidates` carrying the ordered list of paths that
+exist, plus `SupersededSidecar` — the sidecar path when a global project file
+displaced an existing one, null otherwise. File-system access enters only through
 the injected `exists` predicate, so the entire precedence table can be tested
 against an in-memory set of paths.
+
+`Merge` sees only the layers. It fills `addons`, `options` and `SourceFiles` (the
+layer paths, in order); `Load` copies `SupersededSidecar` across from the
+`ConfigCandidates` afterwards. Splitting it that way keeps `Merge` a pure
+function of its layers, which is what the merge tests exercise.
 
 `ConfigCandidates` and `VeneerConfigurationLayer` (`Path` + `Configuration`) are
 plain carriers declared alongside it.
@@ -193,6 +207,14 @@ diagnostic line.
   `ResolvedVeneerConfiguration`. `Load` does only directory resolution,
   `File.Exists`, `File.ReadAllText` and per-layer `TryParse`; everything else
   delegates to the resolver.
+- `Load` never returns null. With no layers it returns a
+  `ResolvedVeneerConfiguration` whose `addons` is an empty array and whose
+  `options` is a `VeneerOptions` with every field null. `addons` and `options` are
+  never null, which is what lets the consumers test individual option fields
+  rather than the block. The existing `config?.` call sites keep working either
+  way.
+- `EffectiveFilter` and `AddonAppliesTo` drop their `VeneerConfiguration`
+  parameter, as described under **Merging**.
 - `ConfigurationFilename(project)` stays public but now returns the *effective
   project-layer* path — the global override if present, else the sidecar, else
   null — so the name remains honest under the new scheme.
@@ -209,6 +231,7 @@ diagnostic line.
 | Site | Change |
 |---|---|
 | `VeneerMenu.PopulateReportMenu` (`:79`) | type of `config`; conditional assignment of `DefaultAllowScripts` and `DefaultPort` |
+| `VeneerMenu.PopulateReportMenu` (`:129`, `:131`) | drop the `config` argument to `AddonAppliesTo` / `EffectiveFilter` |
 | `VeneerMenu.RequiredMenus` (`:378`) | type of `config` only |
 | `ProjectLoadListener.ApplyDefaultsFromEnvironmentAndConfig` (`:192`) | type of `config`; `defaultPort.GetValueOrDefault() > 0`; emits the diagnostic line |
 
@@ -230,9 +253,18 @@ all normal states. They yield fewer layers and never an exception.
 
 A project that has never been saved (`FullFilename == null`) has no project layer
 but **does** receive `global.veneer`, where `Load` returns `null` outright today.
-That is the point of a wildcard file. In that state `%VENEER_PROJECT_DIR%` is
-empty, and `AddonLauncher` already guards an empty `ProjectDirectory` by
-reporting rather than throwing.
+That is the point of a wildcard file: the menu items appear.
+
+They cannot all be *launched* there, though, and the spec is explicit about it
+rather than leaving it to be discovered. `AddonLauncher.Launch` refuses an empty
+`ProjectDirectory` before any path resolution (`AddonLauncher.cs:35-42`),
+deliberately — an empty project directory would leave a relative `FileName` that
+Windows resolves against the parent's cwd and `PATH`, so an addon named
+`python.exe` could silently launch something else. So in a never-saved project a
+global `exe` or `script` addon reports "no project directory is available" even
+when its `path` is rooted or `%VENEER_CONFIG_DIR%`-based; only `type: "url"`
+addons, which take the separate `LaunchUrl` entry point, actually run. Relaxing
+that guard is out of scope; the limitation is documented instead.
 
 ## Diagnostics
 
@@ -242,8 +274,15 @@ is my sidecar being ignored?" are questions a user will ask.
 `ProjectLoadListener.ApplyDefaultsFromEnvironmentAndConfig` emits one
 `TIME.Management.Log.WriteInfo` per project load, naming each contributing file
 in resolution order, plus an explicit line when a global project file supersedes
-a sidecar that exists on disk. It runs exactly once per load and in both the GUI
-and headless `VeneerCmd`, where `VeneerMenu` does not exist.
+a sidecar that exists on disk. It runs exactly once per load, which the
+per-dropdown `Load` calls in `VeneerMenu` would not.
+
+This is **GUI only**. `VeneerCmd` calls
+`InitialiseOnLoadAttribute.MarkInitialised()` (`Program.cs:197`) before any plugin
+attribute is constructed, precisely so `ProjectLoadListener` is never created —
+and `VeneerConfiguration.Load` has no call site in `FlowMatters.Source.VeneerCmd`
+at all. Headless runs consume no `.veneer` configuration today and this feature
+does not change that; see **Out of scope**.
 
 No echo to the Veneer panel: the panel is not reliably constructed at project
 load, and `WebServerStatusControl.ActiveInstance` is a `master`-only member, so
@@ -297,7 +336,11 @@ alongside a shared model.
 
 `Addons/VeneerConfiguration.cs`, `DomainActions/AddonContext.cs` and
 `DomainActions/AddonEnvironment.cs` are byte-identical between `master` and
-`legacy_ci`. `VeneerMenu.cs` differs, but only outside the regions this touches.
+`legacy_ci`, so those four files copy across. `VeneerMenu.cs` differs, including
+`BuildAddonContext` itself — `legacy_ci` uses `Control` directly where `master`
+uses `EffectiveControl` — so the one-line `ConfigDirectory` addition and the
+`AddonAppliesTo` / `EffectiveFilter` call-site edits are applied by hand on that
+branch rather than copied.
 
 All new code is framework-agnostic: no WCF or CoreWCF surface, no async, no
 `ISourceService` entry, so none of the adaptations in `branch-porting-guide.md`
@@ -308,13 +351,21 @@ reference types or `is not` — making the port:
 1. Copy `VeneerConfigurationResolver.cs`, `VeneerConfiguration.cs`,
    `AddonContext.cs`, `AddonEnvironment.cs` and the two test files.
 2. Add `<Compile Include>` entries for the new files to the non-SDK `.csproj`.
-3. Apply the three call-site edits and the `BuildAddonContext` change.
+3. Hand-apply the `VeneerMenu.cs` edits (config type, conditional option
+   assignment, the two filter call sites, `ConfigDirectory` in
+   `BuildAddonContext`) and the `ProjectLoadListener.cs` edits.
 4. Copy the documentation changes.
 
 ## Out of scope
 
 - A machine-wide (`%PROGRAMDATA%`) tier. `VENEER_CONFIG_DIR` covers site
   deployment without a third layer to explain against the replace rule.
+- Consuming `.veneer` configuration in headless `FlowMatters.Source.VeneerCmd`.
+  It has no `VeneerConfiguration.Load` call site today and never constructs
+  `ProjectLoadListener`, so wiring global configuration in would be a new feature
+  in its own right, not a consequence of this one.
+- Relaxing `AddonLauncher`'s empty-`ProjectDirectory` guard so global addons can
+  launch in a never-saved project.
 - Exposing the resolved source files over the REST API.
 - Any way for a layer to *remove* an addon contributed by another layer.
 - Resolving the project layer by anything other than file name.
