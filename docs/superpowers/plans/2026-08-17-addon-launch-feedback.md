@@ -842,13 +842,13 @@ namespace FlowMatters.Source.Veneer.DomainActions
 
 Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --filter "FullyQualifiedName~OneShotLifecycleTests" --nologo`
 
-Expected: `Passed: 5, Failed: 0`.
+Expected: `Passed: 6, Failed: 0` — five as first written, plus `FinishedIsAtomicUnderContention` added during code review.
 
 - [ ] **Step 6: Run the whole suite**
 
 Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo`
 
-Expected: `Passed: 182, Failed: 0`.
+Expected: `Passed: 183, Failed: 0`.
 
 - [ ] **Step 7: Commit**
 
@@ -1206,7 +1206,7 @@ Expected: `Passed: 14, Failed: 0` (5 existing + 9 new).
 
 Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo`
 
-Expected: `Passed: 191, Failed: 0`.
+Expected: `Passed: 192, Failed: 0`.
 
 - [ ] **Step 7: Commit**
 
@@ -1286,7 +1286,7 @@ Note the level filter still applies first: an operator who raises the panel's mi
 
 Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo`
 
-Expected: `Passed: 191, Failed: 0` — no behaviour change reaches the tests; this step is checking it compiles and nothing regressed.
+Expected: `Passed: 192, Failed: 0` — no behaviour change reaches the tests; this step is checking it compiles and nothing regressed.
 
 - [ ] **Step 3: Commit**
 
@@ -1490,7 +1490,7 @@ Replace `SourceAddonLog` (`:288-301`) — including its now-false docstring:
 
 Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo`
 
-Expected: `Passed: 191, Failed: 0`.
+Expected: `Passed: 192, Failed: 0`.
 
 - [ ] **Step 6: Commit**
 
@@ -1569,7 +1569,7 @@ Add a second addon to the sample that sets `"allowMultiple": true`, with a comme
 
 Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo`
 
-Expected: `Passed: 191, Failed: 0`. (The samples are not parsed by tests; this step only confirms nothing else broke. Validate the JSON with `python -m json.tool Samples/addons/inline-script.rsproj.veneer`.)
+Expected: `Passed: 192, Failed: 0`. (The samples are not parsed by tests; this step only confirms nothing else broke. Validate the JSON with `python -m json.tool Samples/addons/inline-script.rsproj.veneer`.)
 
 - [ ] **Step 3: Commit**
 
@@ -1677,9 +1677,9 @@ git commit -m "feat: port addon launch feedback to legacy_ci"
 | Baseline | 134 passing |
 | Task 1 | +21 → 155 |
 | Task 2 | +22 → 177 |
-| Task 3 | +5 → 182 |
-| Task 4 | +9 → 191 |
-| **Total** | **191 passing, 0 failing** |
+| Task 3 | +6 → 183 |
+| Task 4 | +9 → 192 |
+| **Total** | **192 passing, 0 failing** |
 
 Counts are `[Test]` methods plus one per `[TestCase]` attribute.
 
@@ -1687,6 +1687,7 @@ Counts are `[Test]` methods plus one per `[TestCase]` attribute.
 
 - **Task 1** — the null guards in `RunningAddons.Key` could be deleted with all 14 tests still green, in a class whose `Finished` runs inside a `Task.Run` that swallows exceptions. Four null-input tests, a null/missing-name key-collision test, a separator collision test, and a distinct-keys concurrency test.
 - **Task 2** — the unknown-type branch of `AddonMenuItemState` had neither its precedence nor its `Text` pinned. Moving the running check above it made a typo'd `type` render **enabled with no Click handler**, the exact outcome that branch exists to prevent.
+- **Task 3** — nothing distinguished `Interlocked.Exchange` from a plain `if (_fired == 1) return; _fired = 1;`. `Parallel.For` never contends the guard, because its workers reach it in sequence. A barrier-released, 300-round test catches the non-atomic variant 9 times in 10 (measured, not assumed); `Parallel.For` alone caught it 0 times in 21. The regression it guards is the silent one: a double decrement is invisible at count 1 because `RunningAddons` floors at zero, and above 1 it makes the menu label lie.
 
 If a later task's review adds tests, shift the remaining rows the same way rather than letting the gates drift. An executor who cannot trust these numbers cannot tell a silently unregistered test from a stale plan — which is the failure this table was already corrected for once.
 
