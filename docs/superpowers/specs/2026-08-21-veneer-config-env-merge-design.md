@@ -127,10 +127,18 @@ Step 4 *can* see step 3, so an individual addon may write
 `"env": { "RUN_DIR": "%TOOLS_ROOT%\\runs" }`. An addon's own `env` wins on
 conflict, being the most specific of all.
 
-The merged result reaches `path`, `args`, `workingDirectory`, `url` and script
-lines through the existing `Expand` call, which is what makes a committed
-sidecar's `%TOOLS_ROOT%` resolve. Unknown variables continue to expand to
-themselves.
+The merged result reaches `path`, `args`, `workingDirectory` and `url` through the
+existing `AddonEnvironment.Expand` calls in `AddonLauncher`, which is what makes a
+committed sidecar's `%TOOLS_ROOT%` in `path` resolve. Unknown variables continue
+to expand to themselves.
+
+**Script lines take a different route, and a plan must not assume otherwise.**
+`LaunchScript` writes `addon.script` to stdin unexpanded — `Expand` is never
+called on it. Script bodies see the variables because `ApplyEnvironment` sets the
+merged dictionary as the child process's real environment and `cmd.exe` performs
+its own `%VAR%` substitution at run time. The user-visible outcome is the same,
+including the "unknown variable stays literal" behaviour, but any test asserting
+`Expand` runs over script bodies would be asserting something false.
 
 ### Two accepted consequences
 
@@ -178,11 +186,12 @@ visibly. Worth revisiting only if it proves insufficient in practice.
 - the resolver tests asserting replacement
 - the "one slot, two candidates" framing throughout the documentation
 
-`ConfigurationFilename` is **redefined, not removed**: it returns the sidecar path
-if it exists, otherwise null — its meaning before the global-config work. Its
-current definition, "the effective project layer", describes a notion that ceases
-to exist. It is pre-existing public API with no in-tree caller, so redefining is
-safer than deleting.
+## Redefined, not removed
+
+`ConfigurationFilename` returns the sidecar path if it exists, otherwise null —
+its meaning before the global-config work. Its current definition, "the effective
+project layer", describes a notion that ceases to exist. It is pre-existing public
+API with no in-tree caller, so redefining is safer than deleting.
 
 ## Compatibility
 
