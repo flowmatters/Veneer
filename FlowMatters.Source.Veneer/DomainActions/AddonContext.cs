@@ -11,6 +11,7 @@ namespace FlowMatters.Source.Veneer.DomainActions
     {
         public string ProjectDirectory { get; set; }
         public string ProjectFile { get; set; }
+        public string ConfigDirectory { get; set; }
         public int Port { get; set; }
     }
 
