@@ -19,16 +19,14 @@ namespace FlowMatters.Source.Veneer.DomainActions
     // the ordinals below it, as Info did here between Debug and Warning -- a >= or <=
     // comparison would silently reorder which levels it matches.
     //
-    // That is only half the question, though: AddonLogLevel itself is fine, but its one
-    // consumer is not. VeneerMenu.ControlAddonLog.Write (VeneerMenu.cs:277-279) is a
-    // three-way == chain -- Error, Warning, else -- so Info falls into the "else" and is
-    // folded into LogLevel.Debug. LogLevel (a different, unrelated enum) IS ordinal
-    // compared, at WebServerStatusControl.xaml.cs:223 ("if (level < _minimumLogLevel)"),
-    // so an operator who has raised their panel's minimum level above Debug will not see
-    // an addon's Info message at all. At this commit Info has no consumer that maps it
-    // correctly -- Task 6 is expected to add one. Until then, an Info(...) log call added
-    // by Task 4 will compile, run, and be silently invisible in the panel, which would
-    // read as "the feature doesn't report" rather than "the mapping isn't wired yet".
+    // Info must be mapped EXPLICITLY by every consumer. VeneerMenu.ControlAddonLog.Write
+    // maps it to LogLevel.Info; the trap is that an == chain which forgets Info drops it
+    // into the "else" and folds it into LogLevel.Debug. LogLevel (a different, unrelated
+    // enum) IS ordinal compared ("if (level < _minimumLogLevel)" in
+    // WebServerStatusControl.Append), so an operator whose panel minimum is above Debug
+    // would then not see the addon's Info message at all -- an Info(...) call that
+    // compiles, runs, and is silently invisible, reading as "the feature doesn't report"
+    // rather than "the mapping isn't wired".
     internal enum AddonLogLevel
     {
         Debug,

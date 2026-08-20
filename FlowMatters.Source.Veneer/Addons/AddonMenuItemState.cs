@@ -4,11 +4,11 @@ namespace FlowMatters.Source.Veneer.Addons
     /// How one addon's menu item should look: its text, whether it is clickable, and
     /// the tooltip explaining why not.
     ///
-    /// Pure, and will become the SINGLE writer of those three properties once Task 6
-    /// wires it into VeneerMenu.PopulateReportMenu, which today assigns them three
-    /// times in a row -- where the scenario-filter block overwrites an invalid addon's
-    /// tooltip, a defect the code currently carries as a comment rather than a fix.
-    /// At this commit it has no callers.
+    /// Pure, and the SINGLE writer of those three properties:
+    /// VeneerMenu.PopulateReportMenu assigns them once, from what this returns. It used
+    /// to assign them three times in a row, where the scenario-filter block overwrote an
+    /// invalid addon's tooltip -- a defect the code carried as a comment rather than a
+    /// fix.
     /// </summary>
     public class AddonMenuItemState
     {

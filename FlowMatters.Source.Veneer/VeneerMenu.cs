@@ -103,12 +103,19 @@ namespace FlowMatters.Source.Veneer
 
                         string invalid = VeneerAddon.Validate(addon);
                         if (invalid != null)
-                        {
-                            item.Enabled = false;
-                            item.ToolTipText = $"Invalid addon: {invalid}";
                             LogOnce($"Veneer addon '{addon.name}' {invalid}");
-                        }
-                        else
+
+                        // Dispatch only -- the Enabled/ToolTipText assignments that used to
+                        // live in the default arm have moved to AddonMenuItemState, so there
+                        // is exactly one writer of the item's appearance.
+                        //
+                        // The arms below and AddonMenuItemState.IsKnownType are ONE LIST IN
+                        // TWO PLACES. A type added here but not there renders disabled, which
+                        // is loud. A type added there but not here renders ENABLED with no
+                        // Click handler -- a menu item that silently does nothing, which is
+                        // the exact defect the default arm was added to fix. A drift test is
+                        // not cheap for a switch inside WinForms, so this comment is the guard.
+                        if (invalid == null)
                         {
                             switch (addon.type)
                             {
@@ -121,28 +128,28 @@ namespace FlowMatters.Source.Veneer
                                     item.Click += (o, args) => LaunchUrlAddon(addon);
                                     break;
 
-                                // Previously absent, so an unrecognised type silently
-                                // produced a menu item that did nothing when clicked.
                                 default:
-                                    item.Enabled = false;
-                                    item.ToolTipText = $"Unknown addon type '{addon.type}'";
                                     LogOnce($"Veneer addon '{addon.name}' has unknown type '{addon.type}'");
                                     break;
                             }
                         }
 
-                        // Runs after the above and may overwrite ToolTipText for an
-                        // addon that is both invalid and scenario-filtered. Harmless:
-                        // this block only ever disables.
-                        if (!VeneerConfiguration.AddonAppliesTo(addon, config, currentScenario))
-                        {
-                            var filter = VeneerConfiguration.EffectiveFilter(addon, config);
-                            item.Enabled = false;
-                            item.ToolTipText = $"Requires scenario '{filter}' to be active";
+                        var applies = VeneerConfiguration.AddonAppliesTo(addon, config, currentScenario);
+                        var filter = VeneerConfiguration.EffectiveFilter(addon, config);
+
+                        if (!applies)
                             TIME.Management.Log.WriteError(
                                 this,
                                 $"Veneer addon '{addon.name}' disabled: requires scenario '{filter}', current is '{currentScenario?.Name ?? "none"}'");
-                        }
+
+                        // Running deliberately adds NO log line: it is not a problem, and
+                        // this runs on every dropdown open.
+                        var state = AddonMenuItemState.For(
+                            addon, invalid, applies, filter, _runningAddons.RunningCount(addon));
+
+                        item.Text = state.Text;
+                        item.Enabled = state.Enabled;
+                        item.ToolTipText = state.ToolTipText;
                     }
                 }
 
@@ -213,14 +220,73 @@ namespace FlowMatters.Source.Veneer
 
         private void LaunchAddon(VeneerAddon addon)
         {
-            // Still force-opens the panel, unlike the URL path: this path routes a
-            // child process's stdout and stderr there, so having it open is the point.
-            if (Control == null)
+            // The one-shot is constructed HERE, not inside AddonLauncher.Launch, because
+            // the catch below is a second place that has to report. One object spanning
+            // both layers is what makes a double decrement impossible; see
+            // OneShotLifecycle.
+            //
+            // Outside the try, and safe there despite the constructor throwing on a null
+            // callback: _runningAddons is readonly with an inline initialiser, so the
+            // method group cannot be null and the ArgumentNullException is unreachable
+            // from this call site. Were it reachable, it would escape a Click handler as
+            // an unhandled-exception dialog.
+            var lifecycle = new OneShotLifecycle(_runningAddons.Finished);
+
+            // FIRST, and outside the try, so the increment and the catch's decrement are
+            // trivially balanced. With this inside the try, a throw from TryRaisePanel,
+            // AddonLog() or BuildAddonContext() would decrement a count that was never
+            // incremented -- masked at zero by the floor in RunningAddons, but with a
+            // second instance genuinely live the count would go 2 -> 1 and the label
+            // would lie.
+            _runningAddons.MarkRunning(addon);
+
+            try
+            {
+                TryRaisePanel();
+
+                var log = AddonLog();
+                log.Write(string.Format("Launching '{0}'...", addon.name), AddonLogLevel.Info);
+
+                AddonLauncher.Launch(addon, BuildAddonContext(), log, lifecycle);
+            }
+            catch (Exception ex)
+            {
+                // Launch is documented as never throwing, but that promise rests on the
+                // supplied IAddonLog never throwing, which ControlAddonLog does not
+                // guarantee. Without this, a throw between MarkRunning and the watcher
+                // strands the count and disables the item permanently -- and this is a
+                // Click handler, so it would also raise an unhandled-exception dialog.
+                lifecycle.Finished(addon);
+                TIME.Management.Log.WriteError(
+                    this, string.Format("Veneer addon '{0}' could not be launched: {1}",
+                                        addon.name, ex.Message));
+            }
+        }
+
+        /// <summary>
+        /// Raise the Veneer panel, unconditionally -- the old `if (Control == null)` guard
+        /// meant this ran on the FIRST click of a session only. Control is assigned by
+        /// WebServerStatusControl.PopulateMenu and never nulled, so once the operator
+        /// closes the panel (HideOnClose merely hides it) every later click silently failed
+        /// to bring it back, leaving the click with no acknowledgement at all.
+        ///
+        /// Guarded because Launch() ends in unguarded reflection (GetMethod can return
+        /// null, Invoke can throw) inside MainForm.Instance.Invoke, which rethrows on this
+        /// thread. At most once per session that was survivable; on every click, at the top
+        /// of a Click handler, it is not.
+        /// </summary>
+        private void TryRaisePanel()
+        {
+            try
             {
                 WebServerStatusControl.Launch();
             }
-
-            AddonLauncher.Launch(addon, BuildAddonContext(), AddonLog(), new OneShotLifecycle(_runningAddons.Finished));
+            catch (Exception ex)
+            {
+                TIME.Management.Log.WriteError(
+                    this, string.Format("Veneer could not open the monitoring panel: {0}",
+                                        ex.Message));
+            }
         }
 
         private void LaunchUrlAddon(VeneerAddon addon)
@@ -284,6 +350,7 @@ namespace FlowMatters.Source.Veneer
             {
                 var mapped = level == AddonLogLevel.Error   ? LogLevel.Error
                            : level == AddonLogLevel.Warning ? LogLevel.Warning
+                           : level == AddonLogLevel.Info    ? LogLevel.Info
                            : LogLevel.Debug;
 
                 _control.LogAddonMessage(message, mapped);
@@ -294,10 +361,13 @@ namespace FlowMatters.Source.Veneer
         }
 
         /// <summary>
-        /// Used when the Veneer panel is closed, which the URL path allows --
-        /// opening the panel to show a wiki link would be an odd side effect.
-        /// The URL path emits only errors, so there is no Debug or Warning
-        /// traffic to lose here.
+        /// Used when no Veneer panel is available: the URL path, which deliberately does
+        /// not open one, and the process path when TryRaisePanel failed.
+        ///
+        /// Info is passed through, not dropped. That second case is exactly where feedback
+        /// matters most -- if the panel could not be raised, an Error-only sink would
+        /// discard 'Launching ...' too, leaving the operator with no panel, no line, and a
+        /// disabled menu item.
         /// </summary>
         private sealed class SourceAddonLog : IAddonLog
         {
@@ -305,6 +375,8 @@ namespace FlowMatters.Source.Veneer
             {
                 if (level == AddonLogLevel.Error)
                     TIME.Management.Log.WriteError(this, message);
+                else if (level == AddonLogLevel.Info)
+                    TIME.Management.Log.WriteInfo(this, message);
             }
         }
 

@@ -15,10 +15,10 @@ namespace FlowMatters.Source.Veneer.DomainActions
     /// click) would fire once for the first launch and then silently swallow the
     /// decrement for every launch after it, addon argument included.
     ///
-    /// Will be owned by VeneerMenu.LaunchAddon and threaded down into AddonLauncher (Task
-    /// 6), so that ONE object spans both layers -- at this commit nothing constructs or
-    /// wires it in. That placement is the point: LaunchAddon's own catch also has to
-    /// report, and a wrapper created inside Launch would leave it outside the guard. The
+    /// Owned by VeneerMenu.LaunchAddon, which constructs it and threads it down into
+    /// AddonLauncher, so that ONE object spans both layers. That placement is the point:
+    /// LaunchAddon's own catch also has to report, and a wrapper created inside Launch
+    /// would leave it outside the guard. The
     /// escaping path is real -- Run's Start()-failure branch reports, its next log.Write
     /// throws, Launch's catch reports (a no-op), ITS log.Write throws, and the exception
     /// reaches LaunchAddon's catch, which would decrement a second time. At count 1 the
