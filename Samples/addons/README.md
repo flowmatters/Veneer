@@ -166,3 +166,28 @@ The *already running* case is deliberately silent — see that entry. Causes:
   `"allowMultiple": true` on the addon if running several at once is safe. This
   one is not written to the log at all: it is not a problem, and the menu is
   rebuilt every time the dropdown opens, so a log line would repeat endlessly.
+
+## A personal `global.veneer` alongside a shared model
+
+Put this at `%USERPROFILE%\.veneer\global.veneer` and it applies to every project
+you open, without touching any repository:
+
+```json
+{
+  "addons": [
+    { "name": "My calibration", "type": "exe",
+      "path": "%VENEER_CONFIG_DIR%/tools/calibrate.bat", "menu": "My Tools" },
+    { "name": "Team wiki", "type": "url",
+      "url": "https://wiki.example.org/models", "menu": "My Tools" }
+  ],
+  "options": { "defaultPort": 9877 }
+}
+```
+
+`%VENEER_CONFIG_DIR%` is used for `path` because relative paths resolve against
+the *project* directory, which is not where a personal tool lives.
+
+To override a model's committed sidecar rather than add to it, name the file for
+the project instead — `%USERPROFILE%\.veneer\ExampleProject.rsproj.veneer`. The
+sidecar next to the `.rsproj` is then ignored entirely, and Source's log says so
+on project load.

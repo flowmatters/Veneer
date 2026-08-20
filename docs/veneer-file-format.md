@@ -4,16 +4,68 @@ A `.veneer` file is an optional JSON sidecar to a Source `.rsproj` project. It c
 
 ## Filename and discovery
 
-Veneer looks for the configuration alongside the Source project file:
+Veneer resolves configuration from **two layers**, merged into one effective
+configuration. Every file uses the format described below.
+
+| # | Layer | Where |
+|---|-------|-------|
+| 1 | Project | `<configDir>/<project>.rsproj.veneer` **if it exists**, otherwise the sidecar `<projectDir>/<project>.rsproj.veneer` |
+| 2 | Global  | `<configDir>/global.veneer` |
+
+`<configDir>` is the `VENEER_CONFIG_DIR` environment variable if set, otherwise
+`%USERPROFILE%\.veneer`. Veneer never creates it; a missing directory simply
+contributes no layers.
 
 ```
-my-model.rsproj
-my-model.rsproj.veneer
+C:\models\ExampleProject.rsproj              the project
+C:\models\ExampleProject.rsproj.veneer       sidecar         (layer 1, candidate 2)
+%USERPROFILE%\.veneer\ExampleProject.rsproj.veneer           (layer 1, candidate 1)
+%USERPROFILE%\.veneer\global.veneer                          (layer 2)
 ```
 
-The match is exact: the `.veneer` file's name is the `.rsproj` filename with `.veneer` appended. If no such file exists, Veneer behaves with built-in defaults — no addons, default port, scripts disabled, single `Reporting` menu.
+The match is exact: a `.veneer` file's name is the `.rsproj` filename with
+`.veneer` appended. If no file exists anywhere, Veneer behaves with built-in
+defaults — no addons, default port, scripts disabled, single `Reporting` menu.
 
-The file is loaded from disk every time a relevant menu opens, so edits take effect on the next dropdown without restarting Source.
+Files are loaded from disk every time a relevant menu opens, so edits take effect
+on the next dropdown without restarting Source. A malformed file is logged and
+skipped; the other layer still applies.
+
+## Global configuration
+
+The project layer is **one slot with two candidates**. A file named for the
+project in the configuration directory *replaces* the sidecar entirely — the
+escape hatch for a model whose committed `.veneer` file you do not want. The
+global layer is **additive**: it never replaces anything and is never replaced.
+
+This is what lets a model be shared over git while each modeller keeps their own
+tools: commit the `.rsproj`, and put your own addons in
+`%USERPROFILE%\.veneer\`, where a fresh clone cannot disturb them.
+
+Matching is by **file name only**. Two projects with the same file name in
+different directories share the same `<configDir>/<name>.rsproj.veneer`.
+
+### How the layers combine
+
+| Field | Rule |
+|---|---|
+| `addons` | Concatenated, **project layer first**, global appended. No de-duplication — two addons with the same name produce two menu items. |
+| `targetScenario` | Applies only to the addons **in its own file**. A `targetScenario` in `global.veneer` never gates the project's addons. |
+| `options` | Merged field by field. The project layer wins where it sets a value; the global layer fills the rest; a field neither sets keeps Veneer's own default. |
+
+Because addons are concatenated project-first, a shared model's menu-bar layout
+is unaffected by whatever you have in `~/.veneer` — your personal entries appear
+after the project's own.
+
+**Relative paths still resolve against the project directory**, in every layer.
+That is what makes `<configDir>/<name>.rsproj.veneer` a true stand-in for the
+sidecar. For a tool that lives with your configuration rather than with the
+model, use `%VENEER_CONFIG_DIR%` (see **Injected variables**).
+
+**In a project that has never been saved**, only the global layer applies, and
+only `type: "url"` addons can actually be launched — `exe` and `script` addons
+report `no project directory is available`, because Veneer refuses to resolve a
+program name with no directory to resolve it against.
 
 ## Top-level structure
 
@@ -65,7 +117,13 @@ Each entry in `addons` describes one launchable tool that appears as a menu item
 
 ### Injected variables
 
-`%VENEER_PORT%`, `%VENEER_PROJECT_DIR%` and `%VENEER_PROJECT_FILE%` expand inside `path`, `args`, `workingDirectory`, `url`, `env` values and script lines.
+`%VENEER_PORT%`, `%VENEER_PROJECT_DIR%`, `%VENEER_PROJECT_FILE%` and
+`%VENEER_CONFIG_DIR%` expand inside `path`, `args`, `workingDirectory`, `url`,
+`env` values and script lines.
+
+`VENEER_CONFIG_DIR` is the resolved configuration directory — useful for a global
+addon whose tool lives beside the configuration rather than in the model
+directory: `"path": "%VENEER_CONFIG_DIR%/tools/calibrate.bat"`.
 
 An unknown `%VAR%` is left as literal text rather than blanked, so a typo is visible rather than silently producing a truncated argument — or, for a `url`, a malformed address in the browser.
 
@@ -178,11 +236,15 @@ Server-level defaults applied to Veneer's in-Source web-server control. These ar
 }
 ```
 
+Each field is independent. A field a layer omits falls through to the global
+layer, and then to Veneer's default — omitting `allowScripts` no longer forces it
+to `false`.
+
 | Field          | Type | Default | Purpose |
 |----------------|------|---------|---------|
-| `allowScripts` | bool | `false` | Pre-checks the "Allow scripts" toggle on the Veneer control, enabling Python script execution endpoints. Override at runtime via the GUI or the `VENEER_ALLOW_SCRIPTS` environment variable. |
-| `defaultPort`  | int  | `9876`  | Pre-fills the port number on the Veneer control. Values `≤ 0` are ignored. Override at runtime via the GUI or the `VENEER_PORT` environment variable. |
-| `autoStart`    | bool | `false` | **Currently defined in the schema but not consumed by Veneer.** To start Veneer automatically on project load, use the `VENEER_START_ON_LOAD` environment variable. |
+| `allowScripts` | bool | unset → `false` | Pre-checks the "Allow scripts" toggle on the Veneer control, enabling Python script execution endpoints. Override at runtime via the GUI or the `VENEER_ALLOW_SCRIPTS` environment variable. |
+| `defaultPort`  | int  | unset → `9876`  | Pre-fills the port number on the Veneer control. Values `≤ 0` are ignored. Override at runtime via the GUI or the `VENEER_PORT` environment variable. |
+| `autoStart`    | bool | unset → `false` | **Currently defined in the schema but not consumed by Veneer.** To start Veneer automatically on project load, use the `VENEER_START_ON_LOAD` environment variable. |
 
 ## Veneer logo entry
 
