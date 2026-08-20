@@ -1742,8 +1742,11 @@ For any that differ, hand-apply that file's changes instead of copying it.
 
 - [ ] **Step 3: Copy the files that copy cleanly**
 
+Copy from the **feature branch**, not `master` — this work is not merged when the
+port is made, so `master` still holds the pre-feature versions of all eight files.
+
 ```bash
-git checkout master -- \
+git checkout feature/global-veneer-config -- \
   FlowMatters.Source.Veneer/Addons/VeneerConfigurationResolver.cs \
   FlowMatters.Source.Veneer/Addons/VeneerConfiguration.cs \
   FlowMatters.Source.Veneer/DomainActions/AddonContext.cs \
