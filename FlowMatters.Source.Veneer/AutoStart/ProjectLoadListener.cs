@@ -155,6 +155,10 @@ namespace FlowMatters.Source.Veneer.AutoStart
 
         private void ApplyScenarioChange(RiverSystem.RiverSystemScenario newScenario)
         {
+            // Diagnostics only. Option defaults stay a load-time concern, so this
+            // deliberately does not re-apply them.
+            LogConfigurationChain(VeneerConfiguration.Load(newScenario));
+
             var control = WebServerStatusControl.ActiveInstance;
             if (control != null)
             {
@@ -202,6 +206,32 @@ namespace FlowMatters.Source.Veneer.AutoStart
             }
 
             WebServerStatusControl.DefaultPort = port;
+            LogConfigurationChain(config);
+        }
+
+        private static string _lastLoggedChain;
+
+        /// <summary>
+        /// With two files feeding one menu, "where did this item come from?" and
+        /// "why is my sidecar being ignored?" are questions a user will ask.
+        ///
+        /// Deduplicated on the chain rather than fired once per load, because the
+        /// Rebind transition also covers a scenario change within one project,
+        /// where the resolved files are identical and a second line would be noise.
+        /// </summary>
+        private void LogConfigurationChain(ResolvedVeneerConfiguration config)
+        {
+            var chain = config.SourceFiles.Length == 0
+                ? "none"
+                : String.Join(", ", config.SourceFiles);
+
+            if (config.SupersededSidecar != null)
+                chain += " (superseding " + config.SupersededSidecar + ")";
+
+            if (chain == _lastLoggedChain) return;
+            _lastLoggedChain = chain;
+
+            TIME.Management.Log.WriteInfo(this, "Veneer configuration: " + chain);
         }
 
         private void PopulateReportingMenu()
