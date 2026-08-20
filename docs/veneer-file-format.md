@@ -67,6 +67,31 @@ only `type: "url"` addons can actually be launched — `exe` and `script` addons
 report `no project directory is available`, because Veneer refuses to resolve a
 program name with no directory to resolve it against.
 
+### Finding out what actually loaded
+
+Two layers resolving to one menu means "which file did this come from?" is a real
+question. Veneer answers it in Source's log when a project loads:
+
+```
+Veneer configuration: C:\models\ExampleProject.rsproj.veneer, C:\Users\joel\.veneer\global.veneer
+```
+
+That line lists the files that contributed, project layer first, and is the only
+place `<configDir>` is reported as a resolved path rather than a rule — so it is
+also how you confirm where Veneer is looking on a given machine. When a file in
+the configuration directory has displaced a sidecar, the line says so:
+
+```
+Veneer configuration: C:\Users\joel\.veneer\ExampleProject.rsproj.veneer (ignoring the sidecar C:\models\ExampleProject.rsproj.veneer)
+```
+
+`Veneer configuration: none` means no file was found in either layer. A file that
+was found but could not be read or parsed is reported separately, on its own line,
+and does not stop the other layer from applying.
+
+The line is logged once per project rather than on every scenario change, so
+switching scenarios inside one project will not repeat it.
+
 ## Top-level structure
 
 ```jsonc
@@ -224,7 +249,13 @@ When `Calibration` is active: only `Run Calibration` is enabled; the two `Operat
 
 ## Options
 
-Server-level defaults applied to Veneer's in-Source web-server control. These are **never** scenario-gated — they take effect whenever the project is loaded.
+Server-level defaults applied to Veneer's in-Source web-server control. These are
+**never** scenario-gated — no `targetScenario` or per-addon `scenario` affects
+them.
+
+They are applied at different moments, which matters if you are watching one
+change: `defaultPort` is read when the project loads, `allowScripts` when a Veneer
+menu is first opened.
 
 ```jsonc
 {
@@ -242,7 +273,7 @@ to `false`.
 
 | Field          | Type | Default | Purpose |
 |----------------|------|---------|---------|
-| `allowScripts` | bool | unset → `false` | Pre-checks the "Allow scripts" toggle on the Veneer control, enabling Python script execution endpoints. Override at runtime via the GUI or the `VENEER_ALLOW_SCRIPTS` environment variable. |
+| `allowScripts` | bool | unset → `false` | Pre-checks the "Allow scripts" toggle on the Veneer control, enabling Python script execution endpoints. Override at runtime via the GUI. `VENEER_ALLOW_SCRIPTS` also sets it, but **only when `VENEER_START_ON_LOAD` is set** — it is read on the auto-start path only, where it overrides this field in either direction. |
 | `defaultPort`  | int  | unset → `9876`  | Pre-fills the port number on the Veneer control. Values `≤ 0` are ignored. Override at runtime via the GUI or the `VENEER_PORT` environment variable. |
 | `autoStart`    | bool | unset → `false` | **Currently defined in the schema but not consumed by Veneer.** To start Veneer automatically on project load, use the `VENEER_START_ON_LOAD` environment variable. |
 
