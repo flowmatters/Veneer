@@ -27,6 +27,7 @@ namespace FlowMatters.Source.Veneer.DomainActions
             env["VENEER_PORT"] = context.Port.ToString();
             env["VENEER_PROJECT_DIR"] = context.ProjectDirectory ?? string.Empty;
             env["VENEER_PROJECT_FILE"] = context.ProjectFile ?? string.Empty;
+            env["VENEER_CONFIG_DIR"] = context.ConfigDirectory ?? string.Empty;
 
             if (addonEnv != null)
             {

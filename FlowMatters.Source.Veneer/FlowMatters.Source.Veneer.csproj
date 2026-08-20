@@ -243,6 +243,7 @@
     <Compile Include="Addons\MenuLayout.cs" />
     <Compile Include="Addons\RunningAddons.cs" />
     <Compile Include="Addons\VeneerConfiguration.cs" />
+    <Compile Include="Addons\VeneerConfigurationResolver.cs" />
     <Compile Include="CORS\EnableCrossOriginResourceSharingBehavior.cs" />
     <Compile Include="CORS\CORSMessageInspector.cs" />
     <Compile Include="DomainActions\AddonCommandLine.cs" />
@@ -298,6 +299,7 @@
     <Compile Include="Tests\SchematicSvgBuilderTests.cs" />
     <Compile Include="Tests\AddonCommandLineTests.cs" />
     <Compile Include="Tests\AddonEnvironmentTests.cs" />
+    <Compile Include="Tests\VeneerConfigurationResolverTests.cs" />
     <Compile Include="Tests\AddonLauncherIntegrationTests.cs" />
     <Compile Include="Tests\AddonScriptTests.cs" />
     <Compile Include="Tests\AddonValidationTests.cs" />

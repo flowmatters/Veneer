@@ -16,63 +16,140 @@ namespace FlowMatters.Source.Veneer.Addons
         public VeneerOptions options;
         public string targetScenario;
 
+        /// <summary>
+        /// The configuration directory in effect, for %VENEER_CONFIG_DIR% and for
+        /// discovery. Null when there is neither VENEER_CONFIG_DIR nor a profile.
+        /// </summary>
+        public static string ConfigDirectory()
+        {
+            return VeneerConfigurationResolver.ConfigDirectory(
+                Environment.GetEnvironmentVariable,
+                () => Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+        }
+
+        private static ConfigCandidates Candidates(RiverSystemProject project)
+        {
+            return VeneerConfigurationResolver.Resolve(
+                ConfigDirectory(),
+                project == null ? null : project.FullFilename,
+                File.Exists);
+        }
+
         public static string ConfigurationFilename(RiverSystemScenario scenario)
         {
             return ConfigurationFilename(scenario?.RiverSystemProject);
         }
 
-        public static string ConfigurationFilename(RiverSystemProject project){
-            if (project?.FullFilename == null)
-            {
-                return null;
-            }
-
-            var result = project.FullFilename.Replace(".rsproj", ".rsproj.veneer");
-            if (File.Exists(result))
-            {
-                return result;
-            }
-
-            return null;
+        /// <summary>
+        /// The effective project-layer file: the global override if there is one,
+        /// otherwise the sidecar, otherwise null. Does not report global.veneer,
+        /// which is an additional layer rather than "the" configuration file.
+        ///
+        /// Public with no in-tree caller: Load stopped using it when it grew to
+        /// read every layer. Kept because it is the honest answer to "which file
+        /// is this project's configuration", which the status surface still wants.
+        /// </summary>
+        public static string ConfigurationFilename(RiverSystemProject project)
+        {
+            return Candidates(project).ProjectLayer;
         }
 
-        public static VeneerConfiguration Load(RiverSystemScenario scenario)
+        public static ResolvedVeneerConfiguration Load(RiverSystemScenario scenario)
         {
             return Load(scenario?.RiverSystemProject);
         }
 
-        public static VeneerConfiguration Load(RiverSystemProject project)
+        /// <summary>
+        /// Never returns null. With no files it returns an empty resolved
+        /// configuration, so consumers can dereference addons and options without
+        /// a null check.
+        /// </summary>
+        public static ResolvedVeneerConfiguration Load(RiverSystemProject project)
         {
-            var filename = ConfigurationFilename(project);
-            if (filename == null)
+            var candidates = Candidates(project);
+            var layers = new List<VeneerConfigurationLayer>();
+
+            foreach (var path in candidates.Paths)
             {
-                return null;
+                string json;
+                try
+                {
+                    json = File.ReadAllText(path);
+                }
+                catch (Exception ex)
+                {
+                    LogOnce("Veneer could not read '" + path + "': " + ex.Message);
+                    continue;
+                }
+
+                VeneerConfiguration parsed;
+                string error;
+                if (!VeneerConfigurationResolver.TryParse(json, out parsed, out error))
+                {
+                    LogOnce("Veneer could not parse '" + path + "': " + error);
+                    continue;
+                }
+
+                layers.Add(new VeneerConfigurationLayer { Path = path, Configuration = parsed });
             }
-            var json = File.ReadAllText(filename);
-            return Newtonsoft.Json.JsonConvert.DeserializeObject<VeneerConfiguration>(json);
+
+            var resolved = VeneerConfigurationResolver.Merge(layers);
+            resolved.SupersededSidecar = candidates.SupersededSidecar;
+            return resolved;
         }
 
-        public static bool AddonAppliesTo(
-            VeneerAddon addon,
-            VeneerConfiguration config,
-            RiverSystemScenario currentScenario)
+        private static readonly HashSet<string> _loggedProblems = new HashSet<string>();
+
+        /// <summary>
+        /// Load runs on every menu open, so an unreadable file would otherwise log
+        /// on every drop-down. Mirrors VeneerMenu.LogOnce, and is cleared from the
+        /// same place, so a project change re-reports.
+        /// </summary>
+        private static void LogOnce(string message)
         {
-            var filter = EffectiveFilter(addon, config);
+            lock (_loggedProblems)
+            {
+                if (!_loggedProblems.Add(message)) return;
+            }
+
+            TIME.Management.Log.WriteError(typeof(VeneerConfiguration), message);
+        }
+
+        public static void ClearLoggedProblems()
+        {
+            lock (_loggedProblems)
+            {
+                _loggedProblems.Clear();
+            }
+        }
+
+        /// <summary>
+        /// After VeneerConfigurationResolver.Merge, every addon carries its own
+        /// effective filter -- its layer's targetScenario was pushed into it. So
+        /// there is nothing left for a config argument to contribute.
+        /// </summary>
+        public static string EffectiveFilter(VeneerAddon addon)
+        {
+            return addon == null ? null : addon.scenario;
+        }
+
+        /// <summary>
+        /// Pure counterpart of AddonAppliesTo, so the matching rule is testable
+        /// without a loaded RiverSystemScenario.
+        /// </summary>
+        public static bool AppliesTo(VeneerAddon addon, string activeScenarioName)
+        {
+            var filter = EffectiveFilter(addon);
 
             if (string.IsNullOrEmpty(filter)) return true;
-            if (currentScenario == null) return false;
+            if (string.IsNullOrEmpty(activeScenarioName)) return false;
 
-            return string.Equals(
-                currentScenario.Name,
-                filter,
-                StringComparison.OrdinalIgnoreCase);
+            return string.Equals(activeScenarioName, filter, StringComparison.OrdinalIgnoreCase);
         }
 
-        public static string EffectiveFilter(VeneerAddon addon, VeneerConfiguration config)
+        public static bool AddonAppliesTo(VeneerAddon addon, RiverSystemScenario currentScenario)
         {
-            return !string.IsNullOrEmpty(addon?.scenario)
-                ? addon.scenario
-                : config?.targetScenario;
+            return AppliesTo(addon, currentScenario?.Name);
         }
     }
 
@@ -155,10 +232,15 @@ namespace FlowMatters.Source.Veneer.Addons
         }
     }
 
+    /// <summary>
+    /// Nullable so that "absent" and "false" are distinguishable. Merging layers
+    /// needs that distinction, and so does leaving a value alone that the GUI or
+    /// an environment variable already set.
+    /// </summary>
     public class VeneerOptions
     {
-        public bool autoStart;
-        public bool allowScripts;
-        public int defaultPort;
+        public bool? autoStart;
+        public bool? allowScripts;
+        public int? defaultPort;
     }
 }

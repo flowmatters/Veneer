@@ -153,8 +153,8 @@ namespace FlowMatters.Source.Veneer
                             }
                         }
 
-                        var applies = VeneerConfiguration.AddonAppliesTo(addon, config, currentScenario);
-                        var filter = VeneerConfiguration.EffectiveFilter(addon, config);
+                        var applies = VeneerConfiguration.AddonAppliesTo(addon, currentScenario);
+                        var filter = VeneerConfiguration.EffectiveFilter(addon);
 
                         if (!applies)
                             TIME.Management.Log.WriteError(
@@ -179,12 +179,17 @@ namespace FlowMatters.Source.Veneer
                     AddHtmlReports(reportMenu);
                 }
 
-                if (config?.options!= null)
+                // Per field, not per block. The old code assigned allowScripts
+                // unconditionally, so any .veneer file with an options block that
+                // omitted the field reset it to false -- overwriting a value set
+                // from VENEER_ALLOW_SCRIPTS or the GUI.
+                if (config?.options != null)
                 {
-                    WebServerStatusControl.DefaultAllowScripts = config.options.allowScripts;
-                    WebServerStatusControl.DefaultPort = config.options.defaultPort > 0
-                        ? config.options.defaultPort
-                        : WebServerStatusControl.DefaultPort;
+                    if (config.options.allowScripts != null)
+                        WebServerStatusControl.DefaultAllowScripts = config.options.allowScripts.Value;
+
+                    if (config.options.defaultPort != null && config.options.defaultPort.Value > 0)
+                        WebServerStatusControl.DefaultPort = config.options.defaultPort.Value;
                 }
             }
 
@@ -216,6 +221,7 @@ namespace FlowMatters.Source.Veneer
         internal void ClearLoggedProblems()
         {
             _loggedProblems.Clear();
+            VeneerConfiguration.ClearLoggedProblems();
         }
 
         private void LaunchAddon(VeneerAddon addon)
@@ -300,6 +306,7 @@ namespace FlowMatters.Source.Veneer
             {
                 ProjectDirectory = Scenario?.Project?.FileDirectory,
                 ProjectFile = Scenario?.Project?.FullFilename,
+                ConfigDirectory = VeneerConfiguration.ConfigDirectory(),
                 // The configured port, not a promise the server is listening --
                 // Port is set independently of Running, and addons may be launched
                 // with the server stopped. Control is null on the URL path when the

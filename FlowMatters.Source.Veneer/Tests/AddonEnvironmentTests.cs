@@ -13,6 +13,7 @@ namespace FlowMatters.Source.Veneer.Tests
             {
                 ProjectDirectory = @"C:\models\catchment",
                 ProjectFile = @"C:\models\catchment\m.rsproj",
+                ConfigDirectory = @"C:\Users\joel\.veneer",
                 Port = 9876
             };
         }
@@ -24,6 +25,24 @@ namespace FlowMatters.Source.Veneer.Tests
             Assert.That(env["VENEER_PORT"], Is.EqualTo("9876"));
             Assert.That(env["VENEER_PROJECT_DIR"], Is.EqualTo(@"C:\models\catchment"));
             Assert.That(env["VENEER_PROJECT_FILE"], Is.EqualTo(@"C:\models\catchment\m.rsproj"));
+            Assert.That(env["VENEER_CONFIG_DIR"], Is.EqualTo(@"C:\Users\joel\.veneer"));
+        }
+
+        [Test]
+        public void BuildEffective_NullConfigDirectoryBecomesEmptyString()
+        {
+            var context = Ctx();
+            context.ConfigDirectory = null;
+            var env = AddonEnvironment.BuildEffective(context, null);
+            Assert.That(env["VENEER_CONFIG_DIR"], Is.EqualTo(""));
+        }
+
+        [Test]
+        public void Expand_ResolvesConfigDirInAPath()
+        {
+            var env = AddonEnvironment.BuildEffective(Ctx(), null);
+            Assert.That(AddonEnvironment.Expand(@"%VENEER_CONFIG_DIR%\tools\calibrate.bat", env),
+                        Is.EqualTo(@"C:\Users\joel\.veneer\tools\calibrate.bat"));
         }
 
         [Test]
