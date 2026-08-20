@@ -157,7 +157,12 @@ namespace FlowMatters.Source.Veneer.AutoStart
         {
             // Diagnostics only. Option defaults stay a load-time concern, so this
             // deliberately does not re-apply them.
-            LogConfigurationChain(VeneerConfiguration.Load(newScenario));
+            //
+            // This Load duplicates the one the menu rebuild below performs. Both
+            // are cheap -- two Exists, two small reads -- and this path runs at
+            // human speed, so sharing one result is not worth having the log line
+            // and the menu disagree about what was on disk.
+            LogConfigurationChain(VeneerConfiguration.Load(newScenario), newScenario);
 
             var control = WebServerStatusControl.ActiveInstance;
             if (control != null)
@@ -206,7 +211,7 @@ namespace FlowMatters.Source.Veneer.AutoStart
             }
 
             WebServerStatusControl.DefaultPort = port;
-            LogConfigurationChain(config);
+            LogConfigurationChain(config, MainForm.Instance.CurrentScenario);
         }
 
         private static string _lastLoggedChain;
@@ -215,21 +220,32 @@ namespace FlowMatters.Source.Veneer.AutoStart
         /// With two files feeding one menu, "where did this item come from?" and
         /// "why is my sidecar being ignored?" are questions a user will ask.
         ///
-        /// Deduplicated on the chain rather than fired once per load, because the
-        /// Rebind transition also covers a scenario change within one project,
-        /// where the resolved files are identical and a second line would be noise.
+        /// Deduplicated rather than fired once per load, because the Rebind
+        /// transition also covers a scenario change within one project, where the
+        /// resolved files are identical and a second line would be noise.
+        ///
+        /// The project is part of the key, not just the chain: two projects that
+        /// both resolve to nothing both produce "none", and suppressing the second
+        /// would read as "Veneer did not look" rather than "Veneer found nothing".
+        ///
+        /// Call on the UI thread only -- _lastLoggedChain is unsynchronised. Both
+        /// call sites reach here inside MainForm.Instance.Invoke.
         /// </summary>
-        private void LogConfigurationChain(ResolvedVeneerConfiguration config)
+        private void LogConfigurationChain(
+            ResolvedVeneerConfiguration config, RiverSystem.RiverSystemScenario scenario)
         {
             var chain = config.SourceFiles.Length == 0
                 ? "none"
                 : String.Join(", ", config.SourceFiles);
 
+            // Which file is doing the superseding is not obvious from a bare
+            // "superseding X" -- name the loser and say it is being ignored.
             if (config.SupersededSidecar != null)
-                chain += " (superseding " + config.SupersededSidecar + ")";
+                chain += " (ignoring the sidecar " + config.SupersededSidecar + ")";
 
-            if (chain == _lastLoggedChain) return;
-            _lastLoggedChain = chain;
+            var key = scenario?.RiverSystemProject?.FullFilename + " -> " + chain;
+            if (key == _lastLoggedChain) return;
+            _lastLoggedChain = key;
 
             TIME.Management.Log.WriteInfo(this, "Veneer configuration: " + chain);
         }
