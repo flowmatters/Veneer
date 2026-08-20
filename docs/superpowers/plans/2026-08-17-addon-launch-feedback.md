@@ -1114,6 +1114,14 @@ Add to the method's doc comment:
         /// disabled until Source restarts, with no error to explain it.
 ```
 
+Five terminal paths result, and four are covered by the tests above. **`Launch`'s own
+`catch` is the uncovered one**: there is no seam to make `AddonEnvironment.BuildEffective`
+or `ProcessStartInfo` construction throw from a test, and inventing one is not worth the
+coupling. Recorded here so a later reader knows it is a deliberate gap rather than an
+oversight. `LaunchScript` and `LaunchExe` have no early `return` — both build a
+`ProcessStartInfo` and call `Run` unconditionally — so an exception is the only way out of
+that `try` other than `Run`, which is what makes four-of-five acceptable.
+
 **(b)** `LaunchScript` and `LaunchExe` each take `IAddonLifecycle lifecycle` as a new **last** parameter, and pass it to `Run`.
 
 **(c)** `Run` takes `IAddonLifecycle lifecycle` as a new **last** parameter, after `feedStdin`. Its `Start()`-failure branch (`:241-247`) reports before returning:
@@ -1406,6 +1414,14 @@ Replace everything from `ToolStripItem item = targetMenu.DropDownItems.Add(addon
 ```
 
 - [ ] **Step 3: Rewrite `LaunchAddon` and add `TryRaisePanel`**
+
+> **`MarkRunning` goes in `LaunchAddon` ONLY — never in `LaunchUrlAddon`.**
+> `AddonLauncher.LaunchUrl` takes no lifecycle and has none to give: it opens a
+> URL and returns, with no process to wait on. A url addon that marked itself
+> running would therefore never be matched by a `Finished`, and its menu item
+> would stay disabled until Source restarts — precisely the failure this feature
+> exists to prevent. `AddonMenuItemState.For` is still called for url addons, but
+> their count is permanently zero, which is correct.
 
 Replace `LaunchAddon` (`:206-216`):
 
