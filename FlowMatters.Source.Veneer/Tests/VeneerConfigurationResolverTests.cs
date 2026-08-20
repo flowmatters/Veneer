@@ -351,5 +351,38 @@ namespace FlowMatters.Source.Veneer.Tests
             Assert.That(Names(resolved), Is.EqualTo("only"));
             Assert.That(resolved.SourceFiles.Length, Is.EqualTo(2));
         }
+
+        [Test]
+        public void EffectiveFilter_IsTheAddonScenarioAfterPushDown()
+        {
+            Assert.That(VeneerConfiguration.EffectiveFilter(Addon("a", "Operations")),
+                        Is.EqualTo("Operations"));
+            Assert.That(VeneerConfiguration.EffectiveFilter(Addon("a", null)), Is.Null);
+        }
+
+        [Test]
+        public void EffectiveFilter_OfNullAddonIsNull()
+        {
+            Assert.That(VeneerConfiguration.EffectiveFilter(null), Is.Null);
+        }
+
+        [TestCase(null)]
+        [TestCase("")]
+        public void AppliesTo_UnfilteredAddonIsAlwaysEnabled(string filter)
+        {
+            Assert.That(VeneerConfiguration.AppliesTo(Addon("a", filter), "Anything"), Is.True);
+            Assert.That(VeneerConfiguration.AppliesTo(Addon("a", filter), null), Is.True);
+        }
+
+        [TestCase("Operations", "Operations", true)]
+        [TestCase("Operations", "operations", true)]
+        [TestCase("OPERATIONS", "Operations", true)]
+        [TestCase("Operations", "Calibration", false)]
+        [TestCase("Operations", null, false)]
+        public void AppliesTo_MatchesCaseInsensitively(string filter, string active, bool expected)
+        {
+            Assert.That(VeneerConfiguration.AppliesTo(Addon("a", filter), active),
+                        Is.EqualTo(expected));
+        }
     }
 }

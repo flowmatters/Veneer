@@ -134,8 +134,8 @@ namespace FlowMatters.Source.Veneer
                             }
                         }
 
-                        var applies = VeneerConfiguration.AddonAppliesTo(addon, config, currentScenario);
-                        var filter = VeneerConfiguration.EffectiveFilter(addon, config);
+                        var applies = VeneerConfiguration.AddonAppliesTo(addon, currentScenario);
+                        var filter = VeneerConfiguration.EffectiveFilter(addon);
 
                         if (!applies)
                             TIME.Management.Log.WriteError(

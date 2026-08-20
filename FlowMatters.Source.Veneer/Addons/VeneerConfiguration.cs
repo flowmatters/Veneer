@@ -52,27 +52,33 @@ namespace FlowMatters.Source.Veneer.Addons
             return Newtonsoft.Json.JsonConvert.DeserializeObject<VeneerConfiguration>(json);
         }
 
-        public static bool AddonAppliesTo(
-            VeneerAddon addon,
-            VeneerConfiguration config,
-            RiverSystemScenario currentScenario)
+        /// <summary>
+        /// After VeneerConfigurationResolver.Merge, every addon carries its own
+        /// effective filter -- its layer's targetScenario was pushed into it. So
+        /// there is nothing left for a config argument to contribute.
+        /// </summary>
+        public static string EffectiveFilter(VeneerAddon addon)
         {
-            var filter = EffectiveFilter(addon, config);
-
-            if (string.IsNullOrEmpty(filter)) return true;
-            if (currentScenario == null) return false;
-
-            return string.Equals(
-                currentScenario.Name,
-                filter,
-                StringComparison.OrdinalIgnoreCase);
+            return addon == null ? null : addon.scenario;
         }
 
-        public static string EffectiveFilter(VeneerAddon addon, VeneerConfiguration config)
+        /// <summary>
+        /// Pure counterpart of AddonAppliesTo, so the matching rule is testable
+        /// without a loaded RiverSystemScenario.
+        /// </summary>
+        public static bool AppliesTo(VeneerAddon addon, string activeScenarioName)
         {
-            return !string.IsNullOrEmpty(addon?.scenario)
-                ? addon.scenario
-                : config?.targetScenario;
+            var filter = EffectiveFilter(addon);
+
+            if (string.IsNullOrEmpty(filter)) return true;
+            if (string.IsNullOrEmpty(activeScenarioName)) return false;
+
+            return string.Equals(activeScenarioName, filter, StringComparison.OrdinalIgnoreCase);
+        }
+
+        public static bool AddonAppliesTo(VeneerAddon addon, RiverSystemScenario currentScenario)
+        {
+            return AppliesTo(addon, currentScenario?.Name);
         }
     }
 
