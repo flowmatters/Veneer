@@ -1688,9 +1688,26 @@ Expect: child output does **not** yank the view to the bottom; the `finished` li
 
 Repeat Step 2 with the panel already open and docked. Expect the line to appear and scroll into view. Note honestly whether the raise is perceptible — the spec's Risks section predicts it is **not**, and records that as an accepted limitation. If it is worse than that in practice, say so rather than passing the step.
 
-- [ ] **Step 9: Record the results in this plan**
+- [x] **Step 9: Record the results in this plan**
 
 Add an execution-status table (see the url-addons plan for the format) recording what passed, what did not, and anything surprising.
+
+### Execution status
+
+Run by the operator in the Source GUI on **2026-08-21**, against the build at
+`c8d912a`. Reported outcome: **good — all steps passed.**
+
+Recorded at the granularity actually reported. The operator confirmed the run
+as a whole rather than step by step, so this entry deliberately does not claim
+per-step observations that were not stated — in particular Step 1 (the
+pre-change regression baseline) and Step 8 (whether the panel raise is
+perceptible when the panel is already docked, which the spec predicts it is
+not) are covered by the overall pass, not by separate recorded findings.
+
+This is the first and only observation of Tasks 5 and 6 behaving as designed.
+Neither has automated coverage — the panel raise, the force-scroll, and the
+whole menu-item application are WinForms and reflection against a live Source
+instance — so this step is what moved them from reasoned-about to seen.
 
 ---
 
