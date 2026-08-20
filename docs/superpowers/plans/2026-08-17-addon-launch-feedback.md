@@ -746,10 +746,15 @@ namespace FlowMatters.Source.Veneer.Tests
             Assert.That(calls, Is.EqualTo(1));
         }
 
+        // A null callback is a wiring bug supplied on the UI thread, not a runtime
+        // condition. Tolerating it means a mis-wired LaunchAddon never decrements and
+        // the menu item stays greyed out until Source restarts, with no diagnostic --
+        // exactly the failure this feature exists to prevent. Fail at construction,
+        // where the stack still names the caller.
         [Test]
-        public void ANullCallbackDoesNotThrow()
+        public void ANullCallbackThrows()
         {
-            Assert.DoesNotThrow(() => new OneShotLifecycle(null).Finished(Addon()));
+            Assert.Throws<ArgumentNullException>(() => new OneShotLifecycle(null));
         }
     }
 }
@@ -865,7 +870,7 @@ The biggest task. `Launch` gains a required parameter, the watcher gains `try/ca
 
 **Files:**
 - Modify: `FlowMatters.Source.Veneer/DomainActions/AddonLauncher.cs`
-- Modify: `FlowMatters.Source.Veneer/VeneerMenu.cs:215` — a one-line shim (Step 4e). `Launch` gains a **required** parameter, so the tree does not compile until its only production caller is updated. Task 6 replaces the shim properly.
+- Modify: `FlowMatters.Source.Veneer/VeneerMenu.cs:215` — the `_runningAddons` field and the real call-site wiring, pulled forward from Task 6 Step 1 (Step 4e). `Launch` gains a **required** parameter, so the tree does not compile until its only production caller is updated.
 - Test: `FlowMatters.Source.Veneer/Tests/AddonLauncherIntegrationTests.cs`
 
 - [ ] **Step 1: Extend the fixture with level recording and a lifecycle stub**
@@ -1195,13 +1200,31 @@ Note the order: `Dispose` first, then report. A throwing `log.Write` would other
             });
 ```
 
-**(e) Shim the one production caller so the tree builds.** `VeneerMenu.LaunchAddon` (`VeneerMenu.cs:215`) still calls the three-argument `Launch`, which is now a **certain** `CS7036` on the whole project — not a maybe. Task 6 rewrites this method properly; for now change that one line to:
+**(e) Wire the one production caller so the tree builds.** `VeneerMenu.LaunchAddon` (`VeneerMenu.cs:215`) still calls the three-argument `Launch`, which is now a **certain** `CS7036` on the whole project — not a maybe.
+
+Do this as the *real* wiring one commit early, rather than a placeholder. Add the counts field next to `_createdMenus` (`:47`) — this is Task 6 Step 1, moved forward:
 
 ```csharp
-            AddonLauncher.Launch(addon, BuildAddonContext(), AddonLog(), new OneShotLifecycle(null));
+        /// <summary>
+        /// Live instance counts, an instance field on this singleton. Deliberately NOT
+        /// cleared by ClearMenu: the counts track live OS processes, not menu state. A
+        /// Dash app survives a project switch, and clearing would re-enable the item
+        /// while the process still holds its port.
+        /// </summary>
+        private readonly RunningAddons _runningAddons = new RunningAddons();
 ```
 
-**Do not** instead give `lifecycle` a `= null` default. The parameter is required precisely so a future call site cannot silently opt out of the guarantee. A null *callback* is inert here and correct at this commit: `_runningAddons` does not exist until Task 6, so there is nothing to decrement yet. `OneShotLifecycle` is `internal` in `FlowMatters.Source.Veneer.DomainActions` and `VeneerMenu.cs:11` already has that `using`.
+and change the call at `:215` to:
+
+```csharp
+            AddonLauncher.Launch(addon, BuildAddonContext(), AddonLog(), new OneShotLifecycle(_runningAddons.Finished));
+```
+
+This is behaviourally inert at this commit — nothing calls `MarkRunning` until Task 6, and `RunningAddons.Finished` returns cleanly on an absent key — but it leaves no broken intermediate state.
+
+**Do not** pass `new OneShotLifecycle(null)`. Task 3 made that constructor throw `ArgumentNullException`, and `LaunchAddon` is a WinForms `Click` handler with no automated coverage: the suite would stay green through Tasks 4 and 5 while every addon click raised an unhandled-exception dialog in Source.
+
+**Do not** instead give `lifecycle` a `= null` default. The parameter is required precisely so a future call site cannot silently opt out of the guarantee. `OneShotLifecycle` is `internal` in `FlowMatters.Source.Veneer.DomainActions` and `VeneerMenu.cs:11` already has that `using`; `RunningAddons` is in `FlowMatters.Source.Veneer.Addons`, whose `using` is at `:10`.
 
 - [ ] **Step 5: Run the tests to verify they pass**
 
@@ -1313,21 +1336,16 @@ Where it all becomes visible.
 
 No automated test: WinForms and reflection into WeifenLuo docking. Task 9 verifies it by hand.
 
-- [ ] **Step 1: Add the counts field**
+- [ ] **Step 1: Confirm the counts field is present**
 
-Next to `_createdMenus` (`:47`):
+Already added by Task 4 Step 4e, which needed it to wire the call site rather than
+leave a placeholder that throws. Verify it is there next to `_createdMenus` (`:47`):
 
 ```csharp
-        /// <summary>
-        /// Live instance counts, an instance field on this singleton. Deliberately NOT
-        /// cleared by ClearMenu: the counts track live OS processes, not menu state. A
-        /// Dash app survives a project switch, and clearing would re-enable the item
-        /// while the process still holds its port.
-        /// </summary>
         private readonly RunningAddons _runningAddons = new RunningAddons();
 ```
 
-Add `using FlowMatters.Source.Veneer.Addons;` if not already present (it is, at `:10`).
+Nothing calls `MarkRunning` yet — Step 3 below is what makes it live.
 
 - [ ] **Step 2: Replace the item-state block in `PopulateReportMenu`**
 
@@ -1398,6 +1416,12 @@ Replace `LaunchAddon` (`:206-216`):
             // the catch below is a second place that has to report. One object spanning
             // both layers is what makes a double decrement impossible; see
             // OneShotLifecycle.
+            //
+            // Outside the try, and safe there despite the constructor throwing on a null
+            // callback: _runningAddons is readonly with an inline initialiser, so the
+            // method group cannot be null and the ArgumentNullException is unreachable
+            // from this call site. Were it reachable, it would escape a Click handler as
+            // an unhandled-exception dialog.
             var lifecycle = new OneShotLifecycle(_runningAddons.Finished);
 
             // FIRST, and outside the try, so the increment and the catch's decrement are
@@ -1493,16 +1517,34 @@ Replace `SourceAddonLog` (`:288-301`) — including its now-false docstring:
         }
 ```
 
-- [ ] **Step 5: Run the whole suite**
+- [ ] **Step 5: Delete the comments this task falsifies**
+
+Tasks 3 and 4 wrote comments scoped to "at this commit", describing a half-wired
+state. This is the commit that finishes the wiring, so they become confidently
+wrong documentation the moment it lands. Nothing else removes them.
+
+- `DomainActions/OneShotLifecycle.cs` (~`:18-19`) — "Will be owned by ... (Task 6) ...
+  at this commit nothing constructs or wires it in". `VeneerMenu.LaunchAddon` now
+  constructs it; say what owns it, in the present tense, and drop the task number.
+- `DomainActions/AddonContext.cs` (~`:21-31`) — "At this commit `Info` has no consumer
+  that maps it correctly -- Task 6 is expected to add one". Step 4 above *is* that
+  consumer. Keep the substance (an `Info` line is invisible to an operator whose panel
+  threshold is raised — that trap is real and worth documenting) and drop the
+  "expected to" framing.
+- While there, drop the hardcoded `VeneerMenu.cs:277-279` line reference in that same
+  block. Step 2 rewrote `PopulateReportMenu` above it, so the number is already stale.
+  Name `ControlAddonLog.Write` instead; it does not drift.
+
+- [ ] **Step 6: Run the whole suite**
 
 Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo`
 
 Expected: `Passed: 192, Failed: 0`.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add FlowMatters.Source.Veneer/VeneerMenu.cs
+git add FlowMatters.Source.Veneer/VeneerMenu.cs FlowMatters.Source.Veneer/DomainActions/OneShotLifecycle.cs FlowMatters.Source.Veneer/DomainActions/AddonContext.cs
 git commit -m "feat: acknowledge addon launches and disable the item while running"
 ```
 
