@@ -160,12 +160,17 @@ namespace FlowMatters.Source.Veneer
                     AddHtmlReports(reportMenu);
                 }
 
-                if (config?.options!= null)
+                // Per field, not per block. The old code assigned allowScripts
+                // unconditionally, so any .veneer file with an options block that
+                // omitted the field reset it to false -- overwriting a value set
+                // from VENEER_ALLOW_SCRIPTS or the GUI.
+                if (config?.options != null)
                 {
-                    WebServerStatusControl.DefaultAllowScripts = config.options.allowScripts;
-                    WebServerStatusControl.DefaultPort = config.options.defaultPort > 0
-                        ? config.options.defaultPort
-                        : WebServerStatusControl.DefaultPort;
+                    if (config.options.allowScripts != null)
+                        WebServerStatusControl.DefaultAllowScripts = config.options.allowScripts.Value;
+
+                    if (config.options.defaultPort != null && config.options.defaultPort.Value > 0)
+                        WebServerStatusControl.DefaultPort = config.options.defaultPort.Value;
                 }
             }
 

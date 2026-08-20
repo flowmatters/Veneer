@@ -190,9 +190,9 @@ namespace FlowMatters.Source.Veneer.AutoStart
             var port = WebServerStatusControl.DefaultPort;
 
             var config = VeneerConfiguration.Load(MainForm.Instance.CurrentScenario);
-            if (config?.options != null && config.options.defaultPort > 0)
+            if (config?.options != null && config.options.defaultPort.GetValueOrDefault() > 0)
             {
-                port = config.options.defaultPort;
+                port = config.options.defaultPort.Value;
             }
 
             var envPort = Environment.GetEnvironmentVariable("VENEER_PORT");

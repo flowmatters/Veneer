@@ -155,10 +155,15 @@ namespace FlowMatters.Source.Veneer.Addons
         }
     }
 
+    /// <summary>
+    /// Nullable so that "absent" and "false" are distinguishable. Merging layers
+    /// needs that distinction, and so does leaving a value alone that the GUI or
+    /// an environment variable already set.
+    /// </summary>
     public class VeneerOptions
     {
-        public bool autoStart;
-        public bool allowScripts;
-        public int defaultPort;
+        public bool? autoStart;
+        public bool? allowScripts;
+        public int? defaultPort;
     }
 }
