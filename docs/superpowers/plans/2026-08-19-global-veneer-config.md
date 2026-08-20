@@ -1620,7 +1620,7 @@ Expected: `Models` appears **left of** `My Tools` in the menu bar.
 Copy the sidecar to `%USERPROFILE%\.veneer\<name>.rsproj.veneer` and change the
 addon's name. Reopen the project.
 Expected: only the renamed item appears; the sidecar's is gone. Source's log
-contains `Veneer configuration: …(superseding C:\…\<name>.rsproj.veneer)`.
+contains `Veneer configuration: …(ignoring the sidecar C:\…\<name>.rsproj.veneer)`.
 
 - [ ] **Step 5: The diagnostic fires on a project switch**
 
