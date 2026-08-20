@@ -7,21 +7,21 @@ namespace FlowMatters.Source.Veneer.Addons
     /// How many instances of each addon are currently running, so the menu can
     /// disable an item while its process is alive.
     ///
-    /// A count rather than a set: a later task is expected to add an `allowMultiple`
-    /// flag permitting concurrent instances of one addon, and with a set the first
-    /// one exiting would clear the state while the others were still running -- the
-    /// label would lie. The count also feeds the label directly.
+    /// A count rather than a set, because `allowMultiple` permits concurrent
+    /// instances of one addon: with a set, the first one exiting would clear the
+    /// state while the others were still running and the label would lie. The count
+    /// also feeds the label directly.
     ///
     /// Not "pure" (it holds mutable state), but free of WinForms and RiverSystem
     /// types, so it is unit-testable without a loaded scenario.
     ///
-    /// At this commit, nothing stops a double-fired `Finished` from under-counting
-    /// (see the note on `Finished` itself) -- there is no lifecycle guard yet
-    /// ensuring a watcher calls it at most once per launch. A later task is
-    /// expected to route every decrement through such a guard; until that lands,
-    /// two `Finished` calls for one `MarkRunning` will floor the count early and
-    /// silently re-enable a menu item while another instance is still running.
-    /// This class only counts what it is told -- it cannot detect that on its own.
+    /// This class only counts what it is told, and cannot detect a double-fired
+    /// `Finished` on its own -- two `Finished` calls for one `MarkRunning` would
+    /// floor the count early and silently re-enable a menu item while an instance
+    /// was still running. That is why every decrement is routed through
+    /// `OneShotLifecycle`, which fires at most once per launch;
+    /// `VeneerMenu.LaunchAddon` constructs one per click and hands it to
+    /// `AddonLauncher.Launch`. Nothing should call `Finished` directly.
     /// </summary>
     public class RunningAddons
     {
