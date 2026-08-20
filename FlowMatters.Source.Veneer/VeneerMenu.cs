@@ -46,6 +46,14 @@ namespace FlowMatters.Source.Veneer
         /// <summary>Menu items Veneer itself added to the main menu strip.</summary>
         private readonly List<ToolStripMenuItem> _createdMenus = new List<ToolStripMenuItem>();
 
+        /// <summary>
+        /// Live instance counts, an instance field on this singleton. Deliberately NOT
+        /// cleared by ClearMenu: the counts track live OS processes, not menu state. A
+        /// Dash app survives a project switch, and clearing would re-enable the item
+        /// while the process still holds its port.
+        /// </summary>
+        private readonly RunningAddons _runningAddons = new RunningAddons();
+
         public static Form FindMainForm()
         {
             return Application.OpenForms.Cast<Form>().FirstOrDefault(f => f.MainMenuStrip != null);
@@ -212,7 +220,7 @@ namespace FlowMatters.Source.Veneer
                 WebServerStatusControl.Launch();
             }
 
-            AddonLauncher.Launch(addon, BuildAddonContext(), AddonLog());
+            AddonLauncher.Launch(addon, BuildAddonContext(), AddonLog(), new OneShotLifecycle(_runningAddons.Finished));
         }
 
         private void LaunchUrlAddon(VeneerAddon addon)

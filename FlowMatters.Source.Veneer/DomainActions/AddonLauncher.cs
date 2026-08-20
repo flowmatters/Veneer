@@ -14,8 +14,15 @@ namespace FlowMatters.Source.Veneer.DomainActions
         /// Entry point. Launch runs on the WinForms menu Click handler, so nothing
         /// here may throw: an escaping exception becomes an unhandled-exception
         /// dialog in Source rather than a logged addon failure.
+        ///
+        /// Reports exactly one lifecycle.Finished per call, on every path: addon
+        /// validation, missing project directory, this catch, a failed Start(), and the
+        /// completion watcher. The caller supplies a OneShotLifecycle, so a path that
+        /// reports twice is harmless -- but a path that reports NONE leaves the menu item
+        /// disabled until Source restarts, with no error to explain it.
         /// </summary>
-        public static void Launch(VeneerAddon addon, AddonContext context, IAddonLog log)
+        public static void Launch(VeneerAddon addon, AddonContext context, IAddonLog log,
+                                  IAddonLifecycle lifecycle)
         {
             // Re-validate even though VeneerMenu disables invalid entries. Without
             // this, a null path reaches Path.Combine(dir, null) and throws
@@ -25,6 +32,7 @@ namespace FlowMatters.Source.Veneer.DomainActions
             {
                 log.Write(string.Format("Addon '{0}' {1}", addon.name, invalid),
                           AddonLogLevel.Error);
+                lifecycle.Finished(addon);
                 return;
             }
 
@@ -38,6 +46,7 @@ namespace FlowMatters.Source.Veneer.DomainActions
                     "Addon '{0}' cannot run: no project directory is available. " +
                     "Load a project before launching addons.", addon.name),
                     AddonLogLevel.Error);
+                lifecycle.Finished(addon);
                 return;
             }
 
@@ -46,15 +55,16 @@ namespace FlowMatters.Source.Veneer.DomainActions
                 var env = AddonEnvironment.BuildEffective(context, addon.env);
 
                 if (addon.script != null && addon.script.Length > 0)
-                    LaunchScript(addon, context, env, log);
+                    LaunchScript(addon, context, env, log, lifecycle);
                 else
-                    LaunchExe(addon, context, env, log);
+                    LaunchExe(addon, context, env, log, lifecycle);
             }
             catch (Exception ex)
             {
                 log.Write(string.Format("Addon '{0}' could not be launched: {1}",
                                         addon.name, ex.Message),
                           AddonLogLevel.Error);
+                lifecycle.Finished(addon);
             }
         }
 
@@ -112,7 +122,8 @@ namespace FlowMatters.Source.Veneer.DomainActions
         /// and because it is a single shell session set/cd/&amp;&amp; persist across lines.
         /// </summary>
         private static void LaunchScript(VeneerAddon addon, AddonContext context,
-                                         IDictionary<string, string> env, IAddonLog log)
+                                         IDictionary<string, string> env, IAddonLog log,
+                                         IAddonLifecycle lifecycle)
         {
             // Default "D" format: interpolated into the filter's regexes, so it must
             // contain no metacharacters. "B"/"P" would inject braces or parens.
@@ -142,7 +153,7 @@ namespace FlowMatters.Source.Veneer.DomainActions
             {
                 foreach (var line in AddonScript.Generate(addon.script, nonce))
                     stdin.WriteLine(line);
-            });
+            }, lifecycle);
         }
 
         private static string ResolveWorkingDirectory(VeneerAddon addon, AddonContext context,
@@ -158,7 +169,8 @@ namespace FlowMatters.Source.Veneer.DomainActions
         }
 
         private static void LaunchExe(VeneerAddon addon, AddonContext context,
-                                      IDictionary<string, string> env, IAddonLog log)
+                                      IDictionary<string, string> env, IAddonLog log,
+                                      IAddonLifecycle lifecycle)
         {
             var path = AddonEnvironment.Expand(addon.path, env);
             var fullPath = Path.IsPathRooted(path) ? path : Path.Combine(context.ProjectDirectory, path);
@@ -184,7 +196,7 @@ namespace FlowMatters.Source.Veneer.DomainActions
             // filter is null: exe mode has no banner and no @echo off sentinel, so
             // applying the script-mode rules would buffer the whole stream.
             // feedStdin is null: nothing is written to an exe's stdin.
-            Run(startInfo, addon, log, null, null);
+            Run(startInfo, addon, log, null, null, lifecycle);
         }
 
         private static void ApplyEnvironment(ProcessStartInfo startInfo,
@@ -217,7 +229,7 @@ namespace FlowMatters.Source.Veneer.DomainActions
         /// </remarks>
         private static void Run(ProcessStartInfo startInfo, VeneerAddon addon,
                                 IAddonLog log, ScriptOutputFilter filter,
-                                Action<StreamWriter> feedStdin)
+                                Action<StreamWriter> feedStdin, IAddonLifecycle lifecycle)
         {
             var process = new Process { StartInfo = startInfo };
 
@@ -243,6 +255,7 @@ namespace FlowMatters.Source.Veneer.DomainActions
                 log.Write(string.Format("Addon '{0}' could not start: {1}", addon.name, ex.Message),
                           AddonLogLevel.Error);
                 process.Dispose();
+                lifecycle.Finished(addon);
                 return;
             }
 
@@ -298,23 +311,58 @@ namespace FlowMatters.Source.Veneer.DomainActions
                 // state and could report the wrong step number. Use
                 // WaitForExitAsync() if a timeout is ever needed -- it preserves the
                 // guarantee and frees this threadpool thread.
-                process.WaitForExit();
-
-                if (filter != null)
-                    foreach (var line in filter.Flush())
-                        log.Write(line, AddonLogLevel.Debug);
-
-                if (process.ExitCode != 0)
+                try
                 {
-                    var where = filter != null && filter.CurrentStep > 0
-                        ? string.Format(" at line {0}", filter.CurrentStep)
-                        : string.Empty;
-                    log.Write(string.Format("Addon '{0}' failed{1} with exit code {2}",
-                                            addon.name, where, process.ExitCode),
-                              AddonLogLevel.Error);
-                }
+                    process.WaitForExit();
 
-                process.Dispose();
+                    if (filter != null)
+                        foreach (var line in filter.Flush())
+                            log.Write(line, AddonLogLevel.Debug);
+
+                    if (process.ExitCode != 0)
+                    {
+                        var where = filter != null && filter.CurrentStep > 0
+                            ? string.Format(" at line {0}", filter.CurrentStep)
+                            : string.Empty;
+                        log.Write(string.Format("Addon '{0}' failed{1} with exit code {2}",
+                                                addon.name, where, process.ExitCode),
+                                  AddonLogLevel.Error);
+                    }
+                    else
+                    {
+                        log.Write(string.Format("Addon '{0}' finished", addon.name),
+                                  AddonLogLevel.Info);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Task.Run has no continuation and nothing awaits it, so anything
+                    // escaping here would become an unobserved task exception and be
+                    // swallowed -- the count would never decrement and the menu item
+                    // would stay disabled until Source restarts, unexplained.
+                    // WaitForExit, ExitCode and log.Write can all throw: ControlAddonLog
+                    // reaches a SynchronizationContext captured at construction, which
+                    // may be null, and Source's own log during shutdown.
+                    try
+                    {
+                        log.Write(string.Format("Addon '{0}' could not be monitored: {1}",
+                                                addon.name, ex.Message),
+                                  AddonLogLevel.Error);
+                    }
+                    catch { /* the log is what failed; there is nowhere left to report */ }
+                }
+                finally
+                {
+                    // Nested, not sequential. lifecycle.Finished invokes a caller-supplied
+                    // Action; if it throws, a plain `Finished(); Dispose();` skips the
+                    // Dispose and leaks the handle -- while the exception becomes an
+                    // unobserved task exception, which is the exact failure this whole
+                    // try/catch/finally exists to prevent. Finished goes first so the count
+                    // is released as early as possible; the inner finally guarantees Dispose
+                    // runs either way.
+                    try { lifecycle.Finished(addon); }
+                    finally { process.Dispose(); }
+                }
             });
         }
     }
