@@ -161,5 +161,195 @@ namespace FlowMatters.Source.Veneer.Tests
             Assert.That(Chain(c), Is.EqualTo(GLOBAL_PROJECT),
                         "matching is by file name, so a project of the same name anywhere matches");
         }
+
+        private static VeneerConfigurationLayer Layer(
+            string path, string targetScenario, params VeneerAddon[] addons)
+        {
+            return new VeneerConfigurationLayer
+            {
+                Path = path,
+                Configuration = new VeneerConfiguration
+                {
+                    targetScenario = targetScenario,
+                    addons = addons
+                }
+            };
+        }
+
+        private static VeneerAddon Addon(string name, string scenario)
+        {
+            return new VeneerAddon { name = name, type = "exe", path = "x.bat", scenario = scenario };
+        }
+
+        private static VeneerConfigurationLayer OptionsLayer(
+            string path, bool? allowScripts, int? defaultPort)
+        {
+            return new VeneerConfigurationLayer
+            {
+                Path = path,
+                Configuration = new VeneerConfiguration
+                {
+                    options = new VeneerOptions { allowScripts = allowScripts, defaultPort = defaultPort }
+                }
+            };
+        }
+
+        private static string Names(ResolvedVeneerConfiguration resolved)
+        {
+            var names = new List<string>();
+            foreach (var addon in resolved.addons) names.Add(addon.name);
+            return string.Join(",", names);
+        }
+
+        [Test]
+        public void Merge_ConcatenatesProjectAddonsBeforeGlobal()
+        {
+            var resolved = VeneerConfigurationResolver.Merge(new List<VeneerConfigurationLayer>
+            {
+                Layer(SIDECAR, null, Addon("proj1", null), Addon("proj2", null)),
+                Layer(GLOBAL, null, Addon("mine", null))
+            });
+            Assert.That(Names(resolved), Is.EqualTo("proj1,proj2,mine"));
+        }
+
+        [Test]
+        public void Merge_RecordsSourceFilesInOrder()
+        {
+            var resolved = VeneerConfigurationResolver.Merge(new List<VeneerConfigurationLayer>
+            {
+                Layer(SIDECAR, null), Layer(GLOBAL, null)
+            });
+            Assert.That(string.Join(" | ", resolved.SourceFiles),
+                        Is.EqualTo(SIDECAR + " | " + GLOBAL));
+        }
+
+        [Test]
+        public void Merge_KeepsDuplicateAddonNames()
+        {
+            var resolved = VeneerConfigurationResolver.Merge(new List<VeneerConfigurationLayer>
+            {
+                Layer(SIDECAR, null, Addon("Reports", null)),
+                Layer(GLOBAL, null, Addon("Reports", null))
+            });
+            Assert.That(Names(resolved), Is.EqualTo("Reports,Reports"),
+                        "two menu items is visible and diagnosable; silently dropping one is not");
+        }
+
+        // The whole reason targetScenario is pushed down instead of merged: a
+        // wildcard file's default must not gate the project's addons.
+        [Test]
+        public void Merge_TargetScenarioStaysInsideItsOwnLayer()
+        {
+            var resolved = VeneerConfigurationResolver.Merge(new List<VeneerConfigurationLayer>
+            {
+                Layer(SIDECAR, null, Addon("project", null)),
+                Layer(GLOBAL, "Operations", Addon("global", null))
+            });
+            Assert.That(resolved.addons[0].scenario, Is.Null);
+            Assert.That(resolved.addons[1].scenario, Is.EqualTo("Operations"));
+        }
+
+        [Test]
+        public void Merge_PerAddonScenarioBeatsItsLayerTargetScenario()
+        {
+            var resolved = VeneerConfigurationResolver.Merge(new List<VeneerConfigurationLayer>
+            {
+                Layer(SIDECAR, "Operations", Addon("calib", "Calibration"))
+            });
+            Assert.That(resolved.addons[0].scenario, Is.EqualTo("Calibration"));
+        }
+
+        [Test]
+        public void Merge_ProjectOptionsBeatGlobalOptions()
+        {
+            var resolved = VeneerConfigurationResolver.Merge(new List<VeneerConfigurationLayer>
+            {
+                OptionsLayer(SIDECAR, false, 9000),
+                OptionsLayer(GLOBAL, true, 9877)
+            });
+            Assert.That(resolved.options.allowScripts, Is.EqualTo(false),
+                        "an explicit project false must beat a global true");
+            Assert.That(resolved.options.defaultPort, Is.EqualTo(9000));
+        }
+
+        [Test]
+        public void Merge_GlobalOptionsFillFieldsTheProjectOmits()
+        {
+            var resolved = VeneerConfigurationResolver.Merge(new List<VeneerConfigurationLayer>
+            {
+                OptionsLayer(SIDECAR, null, 9000),
+                OptionsLayer(GLOBAL, true, 9877)
+            });
+            Assert.That(resolved.options.allowScripts, Is.EqualTo(true));
+            Assert.That(resolved.options.defaultPort, Is.EqualTo(9000));
+        }
+
+        [Test]
+        public void Merge_FieldSetByNeitherLayerStaysNull()
+        {
+            var resolved = VeneerConfigurationResolver.Merge(new List<VeneerConfigurationLayer>
+            {
+                OptionsLayer(SIDECAR, null, null),
+                OptionsLayer(GLOBAL, null, null)
+            });
+            Assert.That(resolved.options.allowScripts, Is.Null);
+            Assert.That(resolved.options.defaultPort, Is.Null);
+            Assert.That(resolved.options.autoStart, Is.Null);
+        }
+
+        [Test]
+        public void Merge_LayerWithNoOptionsBlockDoesNotBlockFallback()
+        {
+            var resolved = VeneerConfigurationResolver.Merge(new List<VeneerConfigurationLayer>
+            {
+                Layer(SIDECAR, null),
+                OptionsLayer(GLOBAL, true, 9877)
+            });
+            Assert.That(resolved.options.allowScripts, Is.EqualTo(true));
+            Assert.That(resolved.options.defaultPort, Is.EqualTo(9877));
+        }
+
+        // Load must be able to hand Merge whatever survived parsing, including
+        // nothing, and get back something the consumers can dereference.
+        [Test]
+        public void Merge_OfNoLayersReturnsAnEmptyConfiguration()
+        {
+            var resolved = VeneerConfigurationResolver.Merge(new List<VeneerConfigurationLayer>());
+            Assert.That(resolved, Is.Not.Null);
+            Assert.That(resolved.addons.Length, Is.EqualTo(0));
+            Assert.That(resolved.options, Is.Not.Null);
+            Assert.That(resolved.SourceFiles.Length, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void Merge_OfNullIsEmptyRatherThanAThrow()
+        {
+            var resolved = VeneerConfigurationResolver.Merge(null);
+            Assert.That(resolved.addons.Length, Is.EqualTo(0));
+            Assert.That(resolved.options, Is.Not.Null);
+        }
+
+        [Test]
+        public void Merge_SkipsNullAddonEntries()
+        {
+            // A trailing comma in the JSON array produces a null element.
+            var resolved = VeneerConfigurationResolver.Merge(new List<VeneerConfigurationLayer>
+            {
+                Layer(SIDECAR, null, Addon("real", null), null)
+            });
+            Assert.That(Names(resolved), Is.EqualTo("real"));
+        }
+
+        [Test]
+        public void Merge_LayerWithNoAddonsContributesOnlyItsSourceFile()
+        {
+            var resolved = VeneerConfigurationResolver.Merge(new List<VeneerConfigurationLayer>
+            {
+                Layer(SIDECAR, null, Addon("only", null)),
+                new VeneerConfigurationLayer { Path = GLOBAL, Configuration = new VeneerConfiguration() }
+            });
+            Assert.That(Names(resolved), Is.EqualTo("only"));
+            Assert.That(resolved.SourceFiles.Length, Is.EqualTo(2));
+        }
     }
 }

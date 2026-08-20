@@ -84,6 +84,59 @@ namespace FlowMatters.Source.Veneer.Addons
 
             return result;
         }
+
+        /// <summary>
+        /// Layers arrive project-first, so "the first layer to specify a field
+        /// wins" is exactly "the project layer beats the global one".
+        ///
+        /// Mutates each addon's `scenario` to push its layer's targetScenario
+        /// down. Safe because Load deserializes a fresh object graph on every
+        /// call; nothing else holds a reference to these addons.
+        /// </summary>
+        public static ResolvedVeneerConfiguration Merge(IList<VeneerConfigurationLayer> layers)
+        {
+            var result = new ResolvedVeneerConfiguration();
+            if (layers == null) return result;
+
+            var addons = new List<VeneerAddon>();
+            var sources = new List<string>();
+            var options = new VeneerOptions();
+
+            foreach (var layer in layers)
+            {
+                if (layer == null || layer.Configuration == null) continue;
+                sources.Add(layer.Path);
+
+                if (layer.Configuration.addons != null)
+                {
+                    foreach (var addon in layer.Configuration.addons)
+                    {
+                        if (addon == null) continue;
+
+                        // Push targetScenario down now, while we still know which
+                        // file this addon came from. Concatenated into one list
+                        // there is no longer any correct single value for it.
+                        if (string.IsNullOrEmpty(addon.scenario))
+                            addon.scenario = layer.Configuration.targetScenario;
+
+                        addons.Add(addon);
+                    }
+                }
+
+                var layerOptions = layer.Configuration.options;
+                if (layerOptions != null)
+                {
+                    if (options.allowScripts == null) options.allowScripts = layerOptions.allowScripts;
+                    if (options.defaultPort == null) options.defaultPort = layerOptions.defaultPort;
+                    if (options.autoStart == null) options.autoStart = layerOptions.autoStart;
+                }
+            }
+
+            result.addons = addons.ToArray();
+            result.options = options;
+            result.SourceFiles = sources.ToArray();
+            return result;
+        }
     }
 
     /// <summary>
@@ -107,5 +160,25 @@ namespace FlowMatters.Source.Veneer.Addons
                 return result.ToArray();
             }
         }
+    }
+
+    public class VeneerConfigurationLayer
+    {
+        public string Path;
+        public VeneerConfiguration Configuration;
+    }
+
+    /// <summary>
+    /// The effective configuration for a project. Has no targetScenario: it was
+    /// pushed into each addon during the merge, and across layers there is no
+    /// correct single value for one. addons and options are never null, so
+    /// consumers can test individual option fields rather than the block.
+    /// </summary>
+    public class ResolvedVeneerConfiguration
+    {
+        public VeneerAddon[] addons = new VeneerAddon[0];
+        public VeneerOptions options = new VeneerOptions();
+        public string[] SourceFiles = new string[0];
+        public string SupersededSidecar;
     }
 }
