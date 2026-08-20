@@ -379,6 +379,9 @@ namespace FlowMatters.Source.Veneer.Tests
         [TestCase("OPERATIONS", "Operations", true)]
         [TestCase("Operations", "Calibration", false)]
         [TestCase("Operations", null, false)]
+        // The refactor swapped a `currentScenario == null` guard for an
+        // IsNullOrEmpty one, so pin the empty case as well as the null case.
+        [TestCase("Operations", "", false)]
         public void AppliesTo_MatchesCaseInsensitively(string filter, string active, bool expected)
         {
             Assert.That(VeneerConfiguration.AppliesTo(Addon("a", filter), active),

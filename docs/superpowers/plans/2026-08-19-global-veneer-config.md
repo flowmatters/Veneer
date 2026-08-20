@@ -20,7 +20,7 @@
 dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo
 ```
 
-**Baseline at commit `f62aa28`: `Passed: 134`, 0 failed** — verified immediately before writing this plan. This plan adds 46 cases, so the expected end state is **180**. Counts below include each `[TestCase]` row separately, which is how the runner counts them. Append `--filter "FullyQualifiedName~VeneerConfigurationResolverTests"` to scope. `MSB3277` reference-version warnings are pre-existing noise.
+**Baseline at commit `f62aa28`: `Passed: 134`, 0 failed** — verified immediately before writing this plan. This plan adds 47 cases, so the expected end state is **181**. Counts below include each `[TestCase]` row separately, which is how the runner counts them. Append `--filter "FullyQualifiedName~VeneerConfigurationResolverTests"` to scope. `MSB3277` reference-version warnings are pre-existing noise.
 
 ### `TreatWarningsAsErrors` is true in Debug
 
@@ -860,7 +860,9 @@ git commit -m "feat: merge .veneer layers with targetScenario push-down"
 - Modify: `FlowMatters.Source.Veneer/VeneerMenu.cs` (the two calls in `PopulateReportMenu`)
 - Modify: `FlowMatters.Source.Veneer/Tests/VeneerConfigurationResolverTests.cs`
 
-**9 new cases (4 tests; two are multi-row `[TestCase]`s). Running total: 173.**
+**10 new cases (4 tests; two are multi-row `[TestCase]`s). Running total: 174.**
+
+The sixth `AppliesTo_MatchesCaseInsensitively` row, `[TestCase("Operations", "", false)]`, was added during Task 5's code review: the refactor swapped a `currentScenario == null` guard for an `IsNullOrEmpty` one, so the empty case deserves pinning alongside the null case. Totals from here on include it.
 
 **This task lands a deliberate one-commit regression.** After it, `AddonAppliesTo`
 no longer consults `config.targetScenario`, but `Load` does not push it down until
@@ -970,7 +972,7 @@ with:
 - [ ] **Step 5: Run to verify it passes**
 
 Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo`
-Expected: `Passed: 173, Failed: 0`
+Expected: `Passed: 174, Failed: 0`
 
 - [ ] **Step 6: Commit**
 
@@ -993,7 +995,7 @@ loaded RiverSystemScenario."
 - Modify: `FlowMatters.Source.Veneer/VeneerMenu.cs` (`ClearMenu`)
 - Modify: `FlowMatters.Source.Veneer/Tests/VeneerConfigurationResolverTests.cs`
 
-**5 new cases (3 tests, one a 3-row `[TestCase]`). Running total: 178.**
+**5 new cases (3 tests, one a 3-row `[TestCase]`). Running total: 179.**
 
 `Load` itself has no unit-test surface — it needs a `RiverSystemProject`. Its one piece of independent logic, per-layer parse isolation, is extracted into `TryParse` and tested there.
 
@@ -1094,7 +1096,7 @@ Add to `VeneerConfigurationResolver`:
 - [ ] **Step 4: Run to verify it passes**
 
 Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo`
-Expected: `Passed: 178, Failed: 0`
+Expected: `Passed: 179, Failed: 0`
 
 - [ ] **Step 5: Rewrite `ConfigurationFilename` and `Load`**
 
@@ -1218,7 +1220,7 @@ In `VeneerMenu.ClearMenu`, find the call to `ClearLoggedProblems()` — or, if `
 - [ ] **Step 7: Run the suite**
 
 Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo`
-Expected: `Passed: 178, Failed: 0`, no compiler errors. The `var config = VeneerConfiguration.Load(...)` call sites need no edit — they already use `var`.
+Expected: `Passed: 179, Failed: 0`, no compiler errors. The `var config = VeneerConfiguration.Load(...)` call sites need no edit — they already use `var`.
 
 - [ ] **Step 8: Commit**
 
@@ -1241,7 +1243,7 @@ on every dropdown open."
 - Modify: `FlowMatters.Source.Veneer/VeneerMenu.cs` (`BuildAddonContext`)
 - Modify: `FlowMatters.Source.Veneer/Tests/AddonEnvironmentTests.cs`
 
-**2 new cases. Running total: 180.**
+**2 new cases. Running total: 181.**
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1309,7 +1311,7 @@ In `DomainActions/AddonEnvironment.BuildEffective`, add below the three existing
 - [ ] **Step 4: Run to verify it passes**
 
 Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo`
-Expected: `Passed: 180, Failed: 0`
+Expected: `Passed: 181, Failed: 0`
 
 - [ ] **Step 5: Populate it from the menu**
 
@@ -1322,7 +1324,7 @@ In `VeneerMenu.BuildAddonContext`, add to the object initialiser:
 - [ ] **Step 6: Re-run the suite**
 
 Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo`
-Expected: `Passed: 180, Failed: 0`
+Expected: `Passed: 181, Failed: 0`
 
 - [ ] **Step 7: Commit**
 
@@ -1338,7 +1340,7 @@ git commit -m "feat: inject %VENEER_CONFIG_DIR% into addon launches"
 **Files:**
 - Modify: `FlowMatters.Source.Veneer/AutoStart/ProjectLoadListener.cs`
 
-**0 new cases. Running total: 180.**
+**0 new cases. Running total: 181.**
 
 No unit-test surface: `ProjectLoadListener` needs `MainForm.Instance`. Verified manually in Task 10.
 
@@ -1394,7 +1396,7 @@ At the end of `ApplyDefaultsFromEnvironmentAndConfig`, after `WebServerStatusCon
 - [ ] **Step 4: Build**
 
 Run: `dotnet test FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo`
-Expected: `Passed: 180, Failed: 0`, no compiler errors.
+Expected: `Passed: 181, Failed: 0`, no compiler errors.
 
 - [ ] **Step 5: Commit**
 
@@ -1411,7 +1413,7 @@ git commit -m "feat: log which .veneer files a project resolved to"
 - Modify: `docs/veneer-file-format.md`
 - Modify: `Samples/addons/README.md`
 
-**0 new cases. Running total: 180.**
+**0 new cases. Running total: 181.**
 
 - [ ] **Step 1: Rewrite "Filename and discovery"**
 
