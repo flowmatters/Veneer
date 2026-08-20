@@ -44,6 +44,10 @@ namespace FlowMatters.Source.Veneer.Addons
         /// The effective project-layer file: the global override if there is one,
         /// otherwise the sidecar, otherwise null. Does not report global.veneer,
         /// which is an additional layer rather than "the" configuration file.
+        ///
+        /// Public with no in-tree caller: Load stopped using it when it grew to
+        /// read every layer. Kept because it is the honest answer to "which file
+        /// is this project's configuration", which the status surface still wants.
         /// </summary>
         public static string ConfigurationFilename(RiverSystemProject project)
         {

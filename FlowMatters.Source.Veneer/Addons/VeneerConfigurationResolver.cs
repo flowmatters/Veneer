@@ -92,6 +92,11 @@ namespace FlowMatters.Source.Veneer.Addons
         /// Mutates each addon's `scenario` to push its layer's targetScenario
         /// down. Safe because Load deserializes a fresh object graph on every
         /// call; nothing else holds a reference to these addons.
+        ///
+        /// That safety is the reason Load does not cache. Caching a layer so it
+        /// outlives one Load call would let this run twice over the same addon,
+        /// or let two callers see a half-mutated list. Anything that adds caching
+        /// has to copy the addons here first.
         /// </summary>
         public static ResolvedVeneerConfiguration Merge(IList<VeneerConfigurationLayer> layers)
         {

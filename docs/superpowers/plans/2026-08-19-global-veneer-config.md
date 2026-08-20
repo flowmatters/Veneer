@@ -1702,7 +1702,8 @@ against `master` — by now `master` has changed all five, so diffing `master` w
 report every one as differing and send you hand-porting the lot.
 
 ```bash
-for f in FlowMatters.Source.Veneer/DomainActions/AddonContext.cs \
+for f in FlowMatters.Source.Veneer/Addons/VeneerConfiguration.cs \
+         FlowMatters.Source.Veneer/DomainActions/AddonContext.cs \
          FlowMatters.Source.Veneer/DomainActions/AddonEnvironment.cs \
          FlowMatters.Source.Veneer/Tests/AddonEnvironmentTests.cs \
          docs/veneer-file-format.md \
