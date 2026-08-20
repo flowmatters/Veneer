@@ -66,32 +66,31 @@ namespace FlowMatters.Source.Veneer.Tests
 
         // Parallel.For alone does not catch a non-atomic check-then-set: its workers arrive
         // at the guard in sequence rather than together, so the window between the read
-        // and the write is never genuinely contended. Releasing many threads from one gate
-        // makes the loss of atomicity observable, but only PROBABILISTICALLY, and the rate
-        // is environment-sensitive -- fewer cores means fewer racers actually overlap.
-        // Measured against the non-atomic mutation (`if (_fired == 1) return; _fired = 1;`
-        // in place of the Interlocked.Exchange): 9/10 standalone runs at 300 rounds, then
-        // independently re-measured at 26/30 (87%) on a 16-core machine and 62% in a
-        // non-NUnit host. 300 rounds keeps the full suite comfortably fast under normal
-        // load; 87% is the honest number that costs, not a rounder one that doesn't.
+        // and the write is never genuinely contended. This test instead parks several
+        // threads and releases them together, over many rounds.
         //
-        // A rewrite onto a System.Threading.Barrier with 8 long-lived Threads (parked at
-        // the barrier and released in lock-step every round, instead of gated via
-        // ManualResetEventSlim + a fresh Task.Run per racer per round) was tried, on the
-        // theory that removing the thread pool's injection throttling would let far more
-        // rounds run for the same wall time and raise the detection rate. An initial,
-        // non-interleaved comparison looked 10-20x slower, but that measurement span
-        // coincided with the host's free memory dropping under heavy background load
-        // (confirmed separately), so it was comparing two different machine states, not
-        // two designs. A controlled back-to-back comparison at equal round counts
-        // afterwards put the two designs within noise of each other, with no consistent
-        // winner. Given a real but unquantified cost (another thread-lifecycle class,
-        // manual Join-on-failure handling) for a benefit that could not be confirmed under
-        // available conditions, the extra complexity was not worth adopting on unproven
-        // grounds -- reverted in favour of keeping this simpler, already-reviewed shape.
-        // Worth re-attempting with cleaner instrumentation (e.g. Stopwatch-based per-round
-        // timing written to a log rather than wall-clock `dotnet test` output) before
-        // concluding either way.
+        // The gate is TWO events on purpose. ManualResetEventSlim by itself gates nothing:
+        // Set() runs a few microseconds after the Task.Run loop, which is not long enough
+        // for the pool to inject and park 8 threads, so several racers reach Wait() after
+        // the event is already set and never race at all. That, not the guard, is what
+        // made the old detection rate so core-count-sensitive. CountdownEvent fixes the
+        // ordering: ready.Wait() returns only once every racer has started and run as far
+        // as its own Signal(). Signal() returns BEFORE gate.Wait() parks, so what this
+        // buys is "every racer exists and is about to block", not a hard barrier -- much
+        // tighter than gate-only, at the cost of one extra event, where a true barrier
+        // would cost a thread-lifecycle class.
+        //
+        // Detection is therefore still PROBABILISTIC. Measured against the non-atomic
+        // mutation (`if (_fired == 1) return; _fired = 1;` in place of the
+        // Interlocked.Exchange), applied to a copy of the tree built and run outside the
+        // repository: 19 of 20 standalone runs of this test detected it, at 300 rounds,
+        // on a machine with 16 logical processors (12 cores). The same measurement against
+        // the gate-only shape this replaced was 26 of 30 (87%).
+        //
+        // Rounds stay at 300, and that is now a measured choice rather than an inherited
+        // one: 19/20 is what 300 rounds delivers WITH this gate, so the earlier proposal
+        // to raise it to 3000 is buying a rate the gate already provides, at 10x the
+        // suite time on every run for everyone.
         [Test]
         public void FinishedIsAtomicUnderContention()
         {
@@ -104,12 +103,14 @@ namespace FlowMatters.Source.Veneer.Tests
                 var once = new OneShotLifecycle(a => Interlocked.Increment(ref calls));
                 var addon = Addon();
 
+                using (var ready = new CountdownEvent(threads))
                 using (var gate = new ManualResetEventSlim(false))
                 {
                     var racers = new Task[threads];
                     for (var i = 0; i < threads; i++)
-                        racers[i] = Task.Run(() => { gate.Wait(); once.Finished(addon); });
+                        racers[i] = Task.Run(() => { ready.Signal(); gate.Wait(); once.Finished(addon); });
 
+                    ready.Wait();
                     gate.Set();
                     Task.WaitAll(racers);
                 }

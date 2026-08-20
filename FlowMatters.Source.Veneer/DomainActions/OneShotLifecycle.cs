@@ -45,7 +45,7 @@ namespace FlowMatters.Source.Veneer.DomainActions
             // ever a wiring bug. Tolerating it would mean a mis-wired LaunchAddon never
             // decrements and greys the menu item forever, silently, which is the exact
             // failure this feature exists to prevent. Fail immediately instead.
-            if (onFinished == null) throw new ArgumentNullException("onFinished");
+            if (onFinished == null) throw new ArgumentNullException(nameof(onFinished));
             _onFinished = onFinished;
         }
 
@@ -59,8 +59,11 @@ namespace FlowMatters.Source.Veneer.DomainActions
             // the check before either sets the flag, so both call through: an
             // undetected double-report. That exact rewrite survived
             // Parallel.For(0, 200, ...) 21 times out of 21 in testing; only a test that
-            // releases many threads from one gate, over many rounds, catches it
-            // reliably (see FinishedIsAtomicUnderContention).
+            // parks many threads on one gate and releases them together, over many
+            // rounds, catches it at all -- and even then only PROBABILISTICALLY, at
+            // about 19 runs in 20 as measured (see FinishedIsAtomicUnderContention,
+            // which documents the measurement). So a green suite is weak evidence that
+            // this line is atomic; the line itself is the evidence. Do not "simplify" it.
             if (Interlocked.Exchange(ref _fired, 1) != 0) return;
             _onFinished(addon);
         }
