@@ -12,6 +12,46 @@
 
 ---
 
+## Execution status
+
+Branch `feature/global-veneer-config` (worktree `C:\src\projects\Veneer-global-config`),
+branched from `2b8a80c`. Port on `port/global-veneer-config`, branched from
+`legacy_ci` at `9be5df0`.
+
+| Task | Commit | Verified |
+|---|---|---|
+| 1 Config directory | `e0cbcab` | 138 pass |
+| 2 Two layers | `bc0c3b6` | 151 pass |
+| 3 Nullable options | `741369d` | 151 pass, compiles under `TreatWarningsAsErrors` |
+| 4 Merge | `622f4c4` | 164 pass |
+| 5 Pure filter | `9856975`, `55220c0` | 174 pass |
+| 6 `Load` adapter | `b8e60e2`, `6a836af` | 179 pass |
+| 7 `%VENEER_CONFIG_DIR%` | `7b00e08` | 181 pass |
+| 8 Configuration chain | `1bf4c06`, `c881535` | compiles; **no unit coverage**, needs Task 10 |
+| 9 Documentation | `03b31b3`, `9b79953` | claims checked against code |
+| 10 Manual GUI verification | — | **NOT DONE — requires a human with Source installed** |
+| 11 Port to `legacy_ci` | `75f41a7` | see below |
+
+**End state on `master`: 181 pass, 0 failed.** Baseline was 134; this plan added
+47 cases (46 planned, plus one added during Task 5's review).
+
+**What is not verified.** Tasks 3, 6, 7 and 8 touch WinForms/RiverSystem statics
+that cannot be constructed in a test. Their unit-testable cores are covered, but
+the GUI wiring is only exercised by Task 10, which has not been run.
+
+**Port verification is weaker than `master`'s, and deliberately so.** `legacy_ci`
+does not build in this environment: pristine `9be5df0` fails with a single
+`error MC1000` in the WPF markup compiler, and the ported tree fails with the same
+single error and no others — so the failure is pre-existing and unrelated.
+`MC1000` aborts before `csc` runs, so **the 181 tests were never run on the port,
+and no C# compiler diagnostics were produced there at all.** C# 7.3 compatibility
+was instead established by compiling the identical sources on `master` with
+`-p:LangVersion=7.3`: the only violations in the whole project are two `CS8703`s in
+`ISourceService.cs`, a master-only file this feature does not touch and the port
+does not copy. Zero language-version errors in any ported file.
+
+---
+
 ## Prerequisites
 
 ### Build and test command
