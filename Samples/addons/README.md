@@ -129,8 +129,17 @@ executable directly.
 ## Output
 
 No console window appears. Output goes to the **Veneer log** in the Web Server
-Monitoring panel, at `Debug` level — lower the Log Level dropdown to see it.
-Errors also go to Source's own log, where they survive the panel being closed.
+Monitoring panel, which is raised on every launch.
+
+Veneer's own lifecycle lines are visible there by default: `Launching '<name>'...`
+and `Addon '<name>' finished` at `Info`, and failures at `Error`. The panel's
+default minimum Log Level is `Info`, so you do not have to change it to see that
+a click was acknowledged and how it ended.
+
+The addon's **own** output is a different matter. Its standard output is written
+at `Debug` and so is hidden until you lower the Log Level dropdown; its standard
+error is written at `Warning`. Errors also go to Source's own log, where they
+survive the panel being closed.
 
 In script mode the log reads as a transcript: each command followed by its
 output. The command echo shows the line **before** `%VAR%` expansion, so you will
@@ -138,8 +147,8 @@ see `cd %VENEER_PROJECT_DIR%` rather than the resolved path.
 
 ## Diagnosing a menu item that does nothing
 
-An entry that is greyed out has a tooltip explaining why, and the same reason is
-written to Source's log once. Causes:
+An entry that is greyed out has a tooltip explaining why. For every cause below
+except the last, the same reason is also written to Source's log once. Causes:
 
 - a scenario filter that does not match the active scenario
 - an unrecognised `type`
@@ -149,3 +158,8 @@ written to Source's log once. Causes:
 - a `url` outside the `http://` / `https://` / `mailto:` allowlist
 - a `url` on an entry whose `type` is not `"url"`
 - none of `path`, `script` or `url` — there is nothing to launch
+- an instance is **already running**. The item reads `<name> (running)` and stays
+  disabled until that instance exits; reopen the menu to pick up the change. Set
+  `"allowMultiple": true` on the addon if running several at once is safe. This
+  one is not written to the log at all: it is not a problem, and the menu is
+  rebuilt every time the dropdown opens, so a log line would repeat endlessly.
