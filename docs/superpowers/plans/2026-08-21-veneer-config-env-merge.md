@@ -296,17 +296,24 @@ In `ResolvedVeneerConfiguration`, delete the line:
 
 - [ ] **Step 6: Drop it from `Load` and redefine `ConfigurationFilename`**
 
-In `Addons/VeneerConfiguration.cs`, in `Load(RiverSystemProject project)`, delete:
+In `Addons/VeneerConfiguration.cs`, in `Load(RiverSystemProject project)`, delete
+**only** the middle line of the tail:
 
 ```csharp
             resolved.SupersededSidecar = candidates.SupersededSidecar;
 ```
 
-so the tail of the method reads:
+The surrounding two lines stay exactly as they are, so the tail becomes:
 
 ```csharp
-            return VeneerConfigurationResolver.Merge(layers);
+            var resolved = VeneerConfigurationResolver.Merge(layers);
+            return resolved;
+        }
 ```
+
+`resolved` is still used, so this compiles with no unused-local warning. Do not
+collapse it to a single `return` — that is a needless diff in a file the
+`legacy_ci` port copies wholesale.
 
 Then replace `ConfigurationFilename(RiverSystemProject project)` and its doc
 comment with:
@@ -736,11 +743,14 @@ git commit -m "feat: pass the merged .veneer env to launching addons"
 The previous feature's documentation describes a two-layer model with a replacing
 project layer. Every part of that is now wrong.
 
-- [ ] **Step 1: Rewrite the layer table**
+The document's current headings are `## Filename and discovery` (line 5),
+`## Global configuration` (34), `### How the layers combine` (48),
+`### Finding out what actually loaded` (70) and `## Top-level structure` (95).
+Steps 1–4 below each edit one place and do not overlap.
 
-In `docs/veneer-file-format.md`, under `## Filename and discovery`, replace the
-two-row table and the paragraph beginning "The project layer is **one slot with
-two candidates**" with:
+- [ ] **Step 1a: Rewrite the layer table under `## Filename and discovery`**
+
+Replace the existing two-row layer table with:
 
 ````markdown
 | # | Layer | Where |
@@ -753,9 +763,17 @@ All three are **additive** — none replaces another. A file in your configurati
 directory that supplies only `env` leaves the sidecar's addons untouched.
 ````
 
-Delete the `## Global configuration` paragraph about "one slot with two
-candidates" and the sentence "your personal entries appear after the project's
-own", which is false for the home project file. Replace the latter with:
+Leave the rest of that section — the worked path example, the exact-match
+sentence, and the re-read-on-menu-open paragraph — alone.
+
+- [ ] **Step 1b: Fix the two false claims under `## Global configuration`**
+
+Delete the paragraph beginning "The project layer is **one slot with two
+candidates**" (line 36) entirely; the new table above now carries its job.
+
+Then replace the sentence "…is unaffected by whatever you have in `~/.veneer` —
+your personal entries appear after the project's own" (around line 57), which is
+false for the home project file, with:
 
 ````markdown
 Layers are listed most specific first, and that one ordering decides both which
@@ -779,7 +797,11 @@ Replace the `### How the layers combine` table with:
 
 - [ ] **Step 3: Document the `env` block**
 
-Add a new `## Shared variables` section after `### How the layers combine`:
+Add a new `## Shared variables` section **immediately before `## Top-level
+structure`** — that is, after the whole of `## Global configuration` including its
+`### Finding out what actually loaded` subsection. Placing it directly after the
+`### How the layers combine` table instead would leave that `###` subsection
+orphaned under the new `##` heading.
 
 ````markdown
 ## Shared variables
@@ -810,7 +832,7 @@ Nothing is reserved, so an `env` block can override `%VENEER_PORT%` and its
 siblings. There is rarely a reason to.
 ````
 
-- [ ] **Step 4: Fix the discovery section's log example**
+- [ ] **Step 4: Fix the log example under `### Finding out what actually loaded`**
 
 In `### Finding out what actually loaded`, delete the "ignoring the sidecar"
 example block and the sentence introducing it. The chain line now simply lists up
