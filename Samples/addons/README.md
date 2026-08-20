@@ -147,8 +147,11 @@ see `cd %VENEER_PROJECT_DIR%` rather than the resolved path.
 
 ## Diagnosing a menu item that does nothing
 
-An entry that is greyed out has a tooltip explaining why. For every cause below
-except the last, the same reason is also written to Source's log once. Causes:
+An entry that is greyed out has a tooltip explaining why. Most causes are also
+written to Source's log, though not all alike: a scenario-filter mismatch is
+logged every time the menu is opened, while the configuration errors are
+de-duplicated and logged once per distinct problem until the project changes.
+The *already running* case is deliberately silent — see that entry. Causes:
 
 - a scenario filter that does not match the active scenario
 - an unrecognised `type`
