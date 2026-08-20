@@ -221,6 +221,7 @@ namespace FlowMatters.Source.Veneer
         internal void ClearLoggedProblems()
         {
             _loggedProblems.Clear();
+            VeneerConfiguration.ClearLoggedProblems();
         }
 
         private void LaunchAddon(VeneerAddon addon)

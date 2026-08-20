@@ -137,6 +137,42 @@ namespace FlowMatters.Source.Veneer.Addons
             result.SourceFiles = sources.ToArray();
             return result;
         }
+
+        /// <summary>
+        /// Never throws. Each layer is parsed in isolation so that one malformed
+        /// file leaves the others working -- and because Load runs on every
+        /// dropdown open, where an exception would surface as a dialog.
+        /// </summary>
+        public static bool TryParse(string json, out VeneerConfiguration config, out string error)
+        {
+            error = null;
+
+            // Guarded rather than left to Newtonsoft: an empty or whitespace file
+            // is a user saying "nothing here", not an error, and this does not
+            // depend on how the parser happens to treat an empty document.
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                config = new VeneerConfiguration();
+                return true;
+            }
+
+            try
+            {
+                config = Newtonsoft.Json.JsonConvert.DeserializeObject<VeneerConfiguration>(json);
+
+                // The literal "null" is valid JSON and deserializes to null.
+                if (config == null)
+                    config = new VeneerConfiguration();
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                config = null;
+                error = ex.Message;
+                return false;
+            }
+        }
     }
 
     /// <summary>

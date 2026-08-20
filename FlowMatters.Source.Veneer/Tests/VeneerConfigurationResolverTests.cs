@@ -387,5 +387,46 @@ namespace FlowMatters.Source.Veneer.Tests
             Assert.That(VeneerConfiguration.AppliesTo(Addon("a", filter), active),
                         Is.EqualTo(expected));
         }
+
+        [Test]
+        public void TryParse_ReadsAValidConfiguration()
+        {
+            VeneerConfiguration config;
+            string error;
+            var ok = VeneerConfigurationResolver.TryParse(
+                "{\"targetScenario\":\"Operations\"}", out config, out error);
+
+            Assert.That(ok, Is.True);
+            Assert.That(error, Is.Null);
+            Assert.That(config.targetScenario, Is.EqualTo("Operations"));
+        }
+
+        // One bad file must not take out the others -- and Load runs on every
+        // dropdown open, so a throw here is a dialog every time the menu opens.
+        [Test]
+        public void TryParse_ReportsMalformedJsonRatherThanThrowing()
+        {
+            VeneerConfiguration config;
+            string error;
+            var ok = VeneerConfigurationResolver.TryParse("{ not json", out config, out error);
+
+            Assert.That(ok, Is.False);
+            Assert.That(config, Is.Null);
+            Assert.That(string.IsNullOrEmpty(error), Is.False);
+        }
+
+        [TestCase("{}")]
+        [TestCase("null")]
+        [TestCase("")]
+        public void TryParse_TreatsAnEmptyDocumentAsAnEmptyConfiguration(string json)
+        {
+            VeneerConfiguration config;
+            string error;
+            var ok = VeneerConfigurationResolver.TryParse(json, out config, out error);
+
+            Assert.That(ok, Is.True);
+            Assert.That(config, Is.Not.Null);
+            Assert.That(config.addons, Is.Null);
+        }
     }
 }
