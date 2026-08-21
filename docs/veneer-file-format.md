@@ -4,13 +4,17 @@ A `.veneer` file is an optional JSON sidecar to a Source `.rsproj` project. It c
 
 ## Filename and discovery
 
-Veneer resolves configuration from **two layers**, merged into one effective
+Veneer resolves configuration from **three layers**, merged into one effective
 configuration. Every file uses the format described below.
 
 | # | Layer | Where |
 |---|-------|-------|
-| 1 | Project | `<configDir>/<project>.rsproj.veneer` **if it exists**, otherwise the sidecar `<projectDir>/<project>.rsproj.veneer` |
-| 2 | Global  | `<configDir>/global.veneer` |
+| 1 | Home project | `<configDir>/<project>.rsproj.veneer` |
+| 2 | Sidecar | `<projectDir>/<project>.rsproj.veneer` |
+| 3 | Global | `<configDir>/global.veneer` |
+
+All three are **additive** — none replaces another. A file in your configuration
+directory that supplies only `env` leaves the sidecar's addons untouched.
 
 `<configDir>` is the `VENEER_CONFIG_DIR` environment variable if set, otherwise
 `%USERPROFILE%\.veneer`. Veneer never creates it; a missing directory simply
@@ -18,9 +22,9 @@ contributes no layers.
 
 ```
 C:\models\ExampleProject.rsproj              the project
-C:\models\ExampleProject.rsproj.veneer       sidecar         (layer 1, candidate 2)
-%USERPROFILE%\.veneer\ExampleProject.rsproj.veneer           (layer 1, candidate 1)
-%USERPROFILE%\.veneer\global.veneer                          (layer 2)
+%USERPROFILE%\.veneer\ExampleProject.rsproj.veneer           (layer 1 — home project)
+C:\models\ExampleProject.rsproj.veneer       sidecar         (layer 2)
+%USERPROFILE%\.veneer\global.veneer                          (layer 3)
 ```
 
 The match is exact: a `.veneer` file's name is the `.rsproj` filename with
@@ -29,14 +33,9 @@ defaults — no addons, default port, scripts disabled, single `Reporting` menu.
 
 Files are loaded from disk every time a relevant menu opens, so edits take effect
 on the next dropdown without restarting Source. A malformed file is logged and
-skipped; the other layer still applies.
+skipped; the other layers still apply.
 
 ## Global configuration
-
-The project layer is **one slot with two candidates**. A file named for the
-project in the configuration directory *replaces* the sidecar entirely — the
-escape hatch for a model whose committed `.veneer` file you do not want. The
-global layer is **additive**: it never replaces anything and is never replaced.
 
 This is what lets a model be shared over git while each modeller keeps their own
 tools: commit the `.rsproj`, and put your own addons in
@@ -49,18 +48,20 @@ different directories share the same `<configDir>/<name>.rsproj.veneer`.
 
 | Field | Rule |
 |---|---|
-| `addons` | Concatenated, **project layer first**, global appended. No de-duplication — two addons with the same name produce two menu items. |
+| `addons` | Concatenated in layer order, most specific first. No de-duplication — two addons with the same name produce two menu items. |
+| `env` | Merged **per key**, most specific layer winning. Overriding one variable does not discard the rest of a layer's block. |
 | `targetScenario` | Applies only to the addons **in its own file**. A `targetScenario` in `global.veneer` never gates the project's addons. |
-| `options` | Merged field by field. The project layer wins where it sets a value; the global layer fills the rest; a field neither sets keeps Veneer's own default. |
+| `options` | Merged field by field, most specific layer winning; a field no layer sets keeps Veneer's own default. |
 
-Because addons are concatenated project-first, a shared model's menu-bar layout
-is unaffected by whatever you have in `~/.veneer` — your personal entries appear
-after the project's own.
+Layers are listed most specific first, and that one ordering decides both which
+layer wins a contested field and the order addons appear in a menu. So a home
+project file's addons appear above the sidecar's, and `global.veneer`'s appear
+last.
 
 **Relative paths still resolve against the project directory**, in every layer.
-That is what makes `<configDir>/<name>.rsproj.veneer` a true stand-in for the
-sidecar. For a tool that lives with your configuration rather than with the
-model, use `%VENEER_CONFIG_DIR%` (see **Injected variables**).
+A `path` in the home project file resolves exactly as it would in the sidecar.
+For a tool that lives with your configuration rather than with the model, use
+`%VENEER_CONFIG_DIR%` (see **Injected variables**).
 
 **In a project that has never been saved**, only the global layer applies, and
 only `type: "url"` addons can actually be launched — `exe` and `script` addons
@@ -69,28 +70,50 @@ program name with no directory to resolve it against.
 
 ### Finding out what actually loaded
 
-Two layers resolving to one menu means "which file did this come from?" is a real
-question. Veneer answers it in Source's log when a project loads:
+Three layers resolving to one menu means "which file did this come from?" is a
+real question. Veneer answers it in Source's log when a project loads:
 
 ```
 Veneer configuration: C:\models\ExampleProject.rsproj.veneer, C:\Users\joel\.veneer\global.veneer
 ```
 
-That line lists the files that contributed, project layer first, and is the only
+That line lists the files that contributed, most specific first, and is the only
 place `<configDir>` is reported as a resolved path rather than a rule — so it is
-also how you confirm where Veneer is looking on a given machine. When a file in
-the configuration directory has displaced a sidecar, the line says so:
+also how you confirm where Veneer is looking on a given machine.
 
-```
-Veneer configuration: C:\Users\joel\.veneer\ExampleProject.rsproj.veneer (ignoring the sidecar C:\models\ExampleProject.rsproj.veneer)
-```
-
-`Veneer configuration: none` means no file was found in either layer. A file that
+`Veneer configuration: none` means no file was found in any layer. A file that
 was found but could not be read or parsed is reported separately, on its own line,
-and does not stop the other layer from applying.
+and does not stop the other layers from applying.
 
 The line is logged once per project rather than on every scenario change, so
 switching scenarios inside one project will not repeat it.
+
+## Shared variables
+
+Any `.veneer` file may carry a top-level `env` block. Its entries apply to **every
+addon in every layer**, not just the file's own, which is what lets a committed
+sidecar name a variable that a personal file defines:
+
+```jsonc
+// ~/.veneer/ExampleProject.rsproj.veneer   (personal, never committed)
+{ "env": { "TOOLS_ROOT": "D:\\my\\tools" } }
+
+// ExampleProject.rsproj.veneer             (committed alongside the model)
+{ "addons": [ { "name": "Calibrate", "type": "exe",
+                "path": "%TOOLS_ROOT%/calibrate.bat" } ] }
+```
+
+These become real environment variables for the launched process, so a script can
+read `%TOOLS_ROOT%` without it being spliced into `args`.
+
+A value may itself use process variables and Veneer's own — for example
+`"TOOLS_ROOT": "%VENEER_CONFIG_DIR%\\tools"`. It may **not** use another `env`
+entry: `"SUB": "%TOOLS_ROOT%\\sub"` is left as written, so a cross-reference is
+visible rather than dependent on file or key order. An addon's own `env` may use
+these values, and wins where both set the same name.
+
+Nothing is reserved, so an `env` block can override `%VENEER_PORT%` and its
+siblings. There is rarely a reason to.
 
 ## Top-level structure
 
@@ -98,17 +121,19 @@ switching scenarios inside one project will not repeat it.
 {
   "targetScenario": "Operations",
   "addons": [ /* see Addons */ ],
-  "options":  { /* see Options */ }
+  "options":  { /* see Options */ },
+  "env":      { /* see Shared variables */ }
 }
 ```
 
-All three top-level fields are optional. An empty object `{}` is valid and equivalent to no file.
+All four top-level fields are optional. An empty object `{}` is valid and equivalent to no file.
 
 | Field            | Type             | Required | Purpose |
 |------------------|------------------|----------|---------|
 | `targetScenario` | string           | no       | Default scenario filter applied to every addon (per-addon `scenario` overrides this). |
 | `addons`         | array of objects | no       | Tools to expose in Source's menu bar. |
 | `options`        | object           | no       | Server-level defaults applied to the Veneer hosting control. |
+| `env`            | object           | no       | Variables supplied to every addon in every layer. See **Shared variables** above. |
 
 ## Addons
 
@@ -267,9 +292,9 @@ menu is first opened.
 }
 ```
 
-Each field is independent. A field a layer omits falls through to the global
-layer, and then to Veneer's default — omitting `allowScripts` no longer forces it
-to `false`.
+Each field is independent. A field a layer omits falls through to the next
+layer, and eventually to Veneer's own default — omitting `allowScripts` no
+longer forces it to `false`.
 
 | Field          | Type | Default | Purpose |
 |----------------|------|---------|---------|
