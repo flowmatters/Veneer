@@ -38,10 +38,13 @@ namespace FlowMatters.Source.Veneer.Addons
         }
 
         /// <summary>
-        /// The project layer is one slot with two candidates: a file named for the
-        /// project in the configuration directory REPLACES the sidecar, which is
-        /// the escape hatch for a repository whose committed sidecar you do not
-        /// want. The global layer is additive and never replaces anything.
+        /// Three additive layers, most specific first: a file named for the
+        /// project in the configuration directory, the sidecar beside the
+        /// .rsproj, then the global wildcard.
+        ///
+        /// One ordering serves twice -- it decides both which layer wins a
+        /// contested field and the order addons are concatenated into menus. That
+        /// is why a home project file's addons appear above the sidecar's.
         /// </summary>
         public static ConfigCandidates Resolve(
             string configDir, string projectFullFilename, Func<string, bool> exists)
@@ -55,24 +58,17 @@ namespace FlowMatters.Source.Veneer.Addons
                 // directory named "models.rsproj" had its directory rewritten too.
                 var projectFileName = Path.GetFileName(projectFullFilename);
                 var directory = Path.GetDirectoryName(projectFullFilename) ?? string.Empty;
+
+                if (configDir != null)
+                {
+                    var homeProject = Path.Combine(configDir, projectFileName + CONFIG_EXTENSION);
+                    if (exists(homeProject))
+                        result.HomeProjectLayer = homeProject;
+                }
+
                 var sidecar = Path.Combine(directory, projectFileName + CONFIG_EXTENSION);
-
-                var globalProject = configDir == null
-                    ? null
-                    : Path.Combine(configDir, projectFileName + CONFIG_EXTENSION);
-
-                if (globalProject != null && exists(globalProject))
-                {
-                    result.ProjectLayer = globalProject;
-                    // Only when a sidecar is actually on disk: this drives a log
-                    // line saying "superseding", which is a lie if nothing was.
-                    if (exists(sidecar))
-                        result.SupersededSidecar = sidecar;
-                }
-                else if (exists(sidecar))
-                {
-                    result.ProjectLayer = sidecar;
-                }
+                if (exists(sidecar))
+                    result.SidecarLayer = sidecar;
             }
 
             if (configDir != null)
@@ -86,8 +82,9 @@ namespace FlowMatters.Source.Veneer.Addons
         }
 
         /// <summary>
-        /// Layers arrive project-first, so "the first layer to specify a field
-        /// wins" is exactly "the project layer beats the global one".
+        /// Layers arrive most specific first, so "the first layer to specify a
+        /// field wins" is exactly the documented precedence: the home project
+        /// file beats the sidecar, which beats global.veneer.
         ///
         /// Mutates each addon's `scenario` to push its layer's targetScenario
         /// down. Safe because Load deserializes a fresh object graph on every
@@ -106,6 +103,7 @@ namespace FlowMatters.Source.Veneer.Addons
             var addons = new List<VeneerAddon>();
             var sources = new List<string>();
             var options = new VeneerOptions();
+            var env = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var layer in layers)
             {
@@ -135,10 +133,23 @@ namespace FlowMatters.Source.Veneer.Addons
                     if (options.defaultPort == null) options.defaultPort = layerOptions.defaultPort;
                     if (options.autoStart == null) options.autoStart = layerOptions.autoStart;
                 }
+
+                var layerEnv = layer.Configuration.env;
+                if (layerEnv != null)
+                {
+                    foreach (var kv in layerEnv)
+                    {
+                        // First layer to set a key wins, decided per key so that a
+                        // home file overriding one variable keeps the rest.
+                        if (!env.ContainsKey(kv.Key))
+                            env[kv.Key] = kv.Value;
+                    }
+                }
             }
 
             result.addons = addons.ToArray();
             result.options = options;
+            result.env = env;
             result.SourceFiles = sources.ToArray();
             return result;
         }
@@ -181,22 +192,23 @@ namespace FlowMatters.Source.Veneer.Addons
     }
 
     /// <summary>
-    /// The files that will be loaded, in resolution order, plus the sidecar a
-    /// global project file displaced -- reported so the user can be told why the
-    /// file next to their .rsproj is being ignored.
+    /// The files that will be loaded, most specific first. All three are
+    /// additive: none replaces another, so a home file supplying only env leaves
+    /// the sidecar's addons in place.
     /// </summary>
     public class ConfigCandidates
     {
-        public string ProjectLayer;
+        public string HomeProjectLayer;
+        public string SidecarLayer;
         public string GlobalLayer;
-        public string SupersededSidecar;
 
         public string[] Paths
         {
             get
             {
                 var result = new List<string>();
-                if (ProjectLayer != null) result.Add(ProjectLayer);
+                if (HomeProjectLayer != null) result.Add(HomeProjectLayer);
+                if (SidecarLayer != null) result.Add(SidecarLayer);
                 if (GlobalLayer != null) result.Add(GlobalLayer);
                 return result.ToArray();
             }
@@ -219,7 +231,8 @@ namespace FlowMatters.Source.Veneer.Addons
     {
         public VeneerAddon[] addons = new VeneerAddon[0];
         public VeneerOptions options = new VeneerOptions();
+        public Dictionary<string, string> env =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         public string[] SourceFiles = new string[0];
-        public string SupersededSidecar;
     }
 }

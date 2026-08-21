@@ -105,5 +105,83 @@ namespace FlowMatters.Source.Veneer.Tests
             Assert.That(AddonEnvironment.Expand(null, env), Is.Null);
             Assert.That(AddonEnvironment.Expand("", env), Is.EqualTo(""));
         }
+
+        private static AddonContext CtxWithEnv(params string[] keysAndValues)
+        {
+            var context = Ctx();
+            context.ConfigEnv = new Dictionary<string, string>();
+            for (var i = 0; i < keysAndValues.Length; i += 2)
+                context.ConfigEnv[keysAndValues[i]] = keysAndValues[i + 1];
+            return context;
+        }
+
+        [Test]
+        public void BuildEffective_InjectsFileLevelEnv()
+        {
+            var env = AddonEnvironment.BuildEffective(
+                CtxWithEnv("TOOLS_ROOT", @"D:\my\tools"), null);
+            Assert.That(env["TOOLS_ROOT"], Is.EqualTo(@"D:\my\tools"));
+        }
+
+        [Test]
+        public void BuildEffective_FileLevelEnvExpandsVeneerVariables()
+        {
+            var env = AddonEnvironment.BuildEffective(
+                CtxWithEnv("TOOLS_ROOT", @"%VENEER_CONFIG_DIR%\tools"), null);
+            Assert.That(env["TOOLS_ROOT"], Is.EqualTo(@"C:\Users\joel\.veneer\tools"));
+        }
+
+        // Both rows insert the referenced key before the referencing one, which
+        // is the ordering that catches the mistake this guards against: expanding
+        // against the live dictionary would resolve %firstKey% here instead of
+        // leaving it literal. The reverse ordering cannot distinguish a correct
+        // implementation from that one -- with the base not yet written, both
+        // leave the value literal -- so it is not worth a third row.
+        [TestCase("AAA", "ZZZ")]
+        [TestCase("ZZZ", "AAA")]
+        public void BuildEffective_FileLevelEnvDoesNotResolveAgainstAnEarlierKey(
+            string firstKey, string secondKey)
+        {
+            var env = AddonEnvironment.BuildEffective(
+                CtxWithEnv(firstKey, @"D:\base", secondKey, "%" + firstKey + @"%\sub"), null);
+            Assert.That(env[secondKey], Is.EqualTo("%" + firstKey + @"%\sub"),
+                        "left literal, so a cross-reference is visible rather than silently resolved");
+        }
+
+        [Test]
+        public void BuildEffective_AddonEnvResolvesAgainstFileLevelEnv()
+        {
+            var addonEnv = new Dictionary<string, string> { { "RUN_DIR", @"%TOOLS_ROOT%\runs" } };
+            var env = AddonEnvironment.BuildEffective(
+                CtxWithEnv("TOOLS_ROOT", @"D:\my\tools"), addonEnv);
+            Assert.That(env["RUN_DIR"], Is.EqualTo(@"D:\my\tools\runs"));
+        }
+
+        [Test]
+        public void BuildEffective_AddonEnvWinsOverFileLevelEnv()
+        {
+            var addonEnv = new Dictionary<string, string> { { "TOOLS_ROOT", @"E:\override" } };
+            var env = AddonEnvironment.BuildEffective(
+                CtxWithEnv("TOOLS_ROOT", @"D:\my\tools"), addonEnv);
+            Assert.That(env["TOOLS_ROOT"], Is.EqualTo(@"E:\override"));
+        }
+
+        // Deliberately permitted rather than reserved. Pinned so that removing the
+        // ability becomes a visible decision rather than an accident.
+        [Test]
+        public void BuildEffective_FileLevelEnvCanOverrideAVeneerVariable()
+        {
+            var env = AddonEnvironment.BuildEffective(CtxWithEnv("VENEER_PORT", "1234"), null);
+            Assert.That(env["VENEER_PORT"], Is.EqualTo("1234"));
+        }
+
+        [Test]
+        public void BuildEffective_NullFileLevelEnvIsHarmless()
+        {
+            var context = Ctx();
+            context.ConfigEnv = null;
+            var env = AddonEnvironment.BuildEffective(context, null);
+            Assert.That(env["VENEER_PORT"], Is.EqualTo("9876"));
+        }
     }
 }

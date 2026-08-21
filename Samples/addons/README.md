@@ -187,7 +187,7 @@ you open, without touching any repository:
 `%VENEER_CONFIG_DIR%` is used for `path` because relative paths resolve against
 the *project* directory, which is not where a personal tool lives.
 
-To override a model's committed sidecar rather than add to it, name the file for
-the project instead — `%USERPROFILE%\.veneer\ExampleProject.rsproj.veneer`. The
-sidecar next to the `.rsproj` is then ignored entirely, and Source's log says so
-on project load.
+To supply machine-specific paths to a model whose `.veneer` file is committed,
+name the file for the project — `%USERPROFILE%\.veneer\ExampleProject.rsproj.veneer` —
+and give it an `env` block. The sidecar keeps providing the addons; your file
+provides the paths they use.

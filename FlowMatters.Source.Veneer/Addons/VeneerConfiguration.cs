@@ -17,6 +17,13 @@ namespace FlowMatters.Source.Veneer.Addons
         public string targetScenario;
 
         /// <summary>
+        /// Variables for every addon in every layer, not just this file's own.
+        /// A committed sidecar can name %TOOLS_ROOT% while a personal home file
+        /// supplies the path, with neither file knowing about the other.
+        /// </summary>
+        public Dictionary<string, string> env;
+
+        /// <summary>
         /// The configuration directory in effect, for %VENEER_CONFIG_DIR% and for
         /// discovery. Null when there is neither VENEER_CONFIG_DIR nor a profile.
         /// </summary>
@@ -41,17 +48,14 @@ namespace FlowMatters.Source.Veneer.Addons
         }
 
         /// <summary>
-        /// The effective project-layer file: the global override if there is one,
-        /// otherwise the sidecar, otherwise null. Does not report global.veneer,
-        /// which is an additional layer rather than "the" configuration file.
-        ///
-        /// Public with no in-tree caller: Load stopped using it when it grew to
-        /// read every layer. Kept because it is the honest answer to "which file
-        /// is this project's configuration", which the status surface still wants.
+        /// The sidecar beside the .rsproj, if it exists. Not "the effective
+        /// configuration file": with three additive layers there is no single
+        /// such file. Public API with no in-tree caller, kept because the
+        /// question it answers is still a real one.
         /// </summary>
         public static string ConfigurationFilename(RiverSystemProject project)
         {
-            return Candidates(project).ProjectLayer;
+            return Candidates(project).SidecarLayer;
         }
 
         public static ResolvedVeneerConfiguration Load(RiverSystemScenario scenario)
@@ -94,7 +98,6 @@ namespace FlowMatters.Source.Veneer.Addons
             }
 
             var resolved = VeneerConfigurationResolver.Merge(layers);
-            resolved.SupersededSidecar = candidates.SupersededSidecar;
             return resolved;
         }
 

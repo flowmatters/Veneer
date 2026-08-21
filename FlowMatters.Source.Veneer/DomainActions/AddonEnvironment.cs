@@ -11,10 +11,10 @@ namespace FlowMatters.Source.Veneer.DomainActions
             new Regex("%([^%]+)%", RegexOptions.Compiled);
 
         /// <summary>
-        /// process environment + Veneer's injected variables + the addon's own env
-        /// (which wins). Values in the addon's env are expanded against everything
-        /// above them, but NOT against each other -- that would make the result
-        /// depend on JSON key order.
+        /// process environment + Veneer's injected variables + the .veneer files'
+        /// file-level env + the addon's own env, each winning over the one before.
+        /// Each layer is expanded against a snapshot of the layers above it, never
+        /// against itself, so no result depends on JSON key order.
         /// </summary>
         public static Dictionary<string, string> BuildEffective(
             AddonContext context, IDictionary<string, string> addonEnv)
@@ -29,15 +29,32 @@ namespace FlowMatters.Source.Veneer.DomainActions
             env["VENEER_PROJECT_FILE"] = context.ProjectFile ?? string.Empty;
             env["VENEER_CONFIG_DIR"] = context.ConfigDirectory ?? string.Empty;
 
-            if (addonEnv != null)
-            {
-                // Snapshot first so addon entries cannot resolve against each other.
-                var baseline = new Dictionary<string, string>(env, StringComparer.OrdinalIgnoreCase);
-                foreach (var kv in addonEnv)
-                    env[kv.Key] = Expand(kv.Value, baseline);
-            }
+            // The .veneer files' own env, then the addon's, which is more specific
+            // and so is applied last.
+            ApplyLayer(env, context.ConfigEnv);
+            ApplyLayer(env, addonEnv);
 
             return env;
+        }
+
+        /// <summary>
+        /// Writes one layer over the accumulated environment, expanding its values
+        /// against a snapshot taken before any of them are written.
+        ///
+        /// The snapshot is the whole point, and it lives here rather than being
+        /// repeated per layer so that it cannot be preserved in one place and lost
+        /// in another. Expanding against the live dictionary instead would let one
+        /// entry resolve against another in the same layer, making the result
+        /// depend on dictionary iteration order.
+        /// </summary>
+        private static void ApplyLayer(
+            Dictionary<string, string> env, IDictionary<string, string> layer)
+        {
+            if (layer == null) return;
+
+            var snapshot = new Dictionary<string, string>(env, StringComparer.OrdinalIgnoreCase);
+            foreach (var kv in layer)
+                env[kv.Key] = Expand(kv.Value, snapshot);
         }
 
         /// <summary>
