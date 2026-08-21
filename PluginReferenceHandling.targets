@@ -68,14 +68,27 @@
   </ItemDefinitionGroup>
 
   <ItemGroup>
-    <_AllowedCopyLocalFiles Include="@(AllowedDuplicates)" DestinationSubPath="%(AllowedDuplicates.Identity)" />
+    <!-- AllowedDuplicates is a property, so it must be dereferenced with $(), not @().
+         Item syntax on a property yields nothing at all, silently.
+
+         Test projects only. These are test-host assemblies that a test project needs beside
+         itself even though the base app also has them; a plugin or executable that ships must
+         not carry them. The distinction only started to matter once the two bugs above were
+         fixed, because until then this list was always empty. -->
+    <_AllowedCopyLocalFiles Condition="'$(IsTestProject)' == 'true'"
+                            Include="$(AllowedDuplicates)" DestinationSubPath="%(Identity)" />
   </ItemGroup>
 
   <!-- Try to prevent copy by marking matching resolved references Private=false -->
   <Target Name="ExcludeReferencesInRootOutDir" Condition="'$(ExcludeDuplicates)' == 'true'">
-    <ItemGroup>
-      <_AllowedCopyLocalPaths Include="@(_AllowedCopyLocalFiles->'$(TargetDir)%(DestinationSubPath)')" />
-    </ItemGroup>
+    <!-- Exclude only ever compares ItemSpec, and ReferenceCopyLocalPaths ItemSpecs are source
+         paths (usually in the NuGet cache), so an allow-list expressed as destination paths can
+         never match one. Test membership against the destination path instead. Both sides are
+         lowercased because String.Contains is ordinal. -->
+    <PropertyGroup>
+      <_AllowedDuplicateList>;@(_AllowedCopyLocalFiles->'%(DestinationSubPath)');</_AllowedDuplicateList>
+      <_AllowedDuplicateList>$(_AllowedDuplicateList.ToLowerInvariant())</_AllowedDuplicateList>
+    </PropertyGroup>
 
     <ItemGroup>
       <!-- Make sure all ReferenceCopyLocalPaths have a DestinationSubDirectory -->
@@ -90,8 +103,7 @@
           DestinationSubPath="%(ReferenceCopyLocalPaths.DestinationSubDirectory)%(ReferenceCopyLocalPaths.FileName)%(ReferenceCopyLocalPaths.Extension)" />
       <_ReferenceCopyLocalPathsExclusions
           Include="@(ReferenceCopyLocalPaths)"
-          Exclude="@(_AllowedCopyLocalPaths)"
-          Condition="Exists('$(_RootOutDir)%(ReferenceCopyLocalPaths.DestinationSubPath)')" />
+          Condition="Exists('$(_RootOutDir)%(ReferenceCopyLocalPaths.DestinationSubPath)') AND !$(_AllowedDuplicateList.Contains($([System.String]::Copy(';%(ReferenceCopyLocalPaths.DestinationSubPath);').ToLowerInvariant())))" />
       <_ReferenceCopyLocalPathsWithoutExclusions Include="@(ReferenceCopyLocalPaths)" Exclude="@(_ReferenceCopyLocalPathsExclusions)" />
     </ItemGroup>
 
@@ -106,10 +118,6 @@
 
     <Message Text="References present in $(_RootOutDir) excluded from copying:%0D%0A@(_ReferenceCopyLocalPathsExclusions, '%0D%0A')" Importance="Normal" />
     <!-- <Message Text="References to be copied:%0D%0A@(_ReferenceCopyLocalPathsWithoutExclusions, '%0D%0A')" Importance="Normal" /> -->
-
-    <ItemGroup>
-      <_AllowedCopyLocalPaths Remove="@(_AllowedCopyLocalPaths" />
-    </ItemGroup>
   </Target>
 
   <!-- Fallback: remove duplicates copied to the plugin output folder -->
@@ -122,8 +130,11 @@
       <!-- all files in plugin output -->
       <_PluginFiles Include="$(_PluginOutDir)**\*.*"
                     Exclude="@(_AllowedCopyLocalPaths)" />
-      <!-- keep only those whose filename also exists in the base app output -->
-      <_Duplicates Include="@(_PluginFiles)" Condition="Exists('$(_RootOutDir)%(Filename)%(Extension)')" />
+      <!-- Keep only those that also exist in the base app output AT THE SAME RELATIVE PATH.
+           %(RecursiveDir) is essential: matching on file name alone would treat
+           runtimes\win-x64\native\Foo.dll as a duplicate of a top-level Foo.dll and delete
+           native assets and satellite resources that have no counterpart in the base output. -->
+      <_Duplicates Include="@(_PluginFiles)" Condition="Exists('$(_RootOutDir)%(RecursiveDir)%(Filename)%(Extension)')" />
     </ItemGroup>
 
     <!-- <Message Text="Plugin files in plugin output:%0D%0A@(_PluginFiles, '%0D%0A')" Importance="Normal" Condition=" '@(_PluginFiles)' != '' " /> -->
@@ -133,7 +144,7 @@
     <Delete Files="@(_Duplicates)" ContinueOnError="false" />
 
     <ItemGroup>
-      <_AllowedCopyLocalPaths Remove="@(_AllowedCopyLocalPaths" />
+      <_AllowedCopyLocalPaths Remove="@(_AllowedCopyLocalPaths)" />
     </ItemGroup>
   </Target>
 </Project>

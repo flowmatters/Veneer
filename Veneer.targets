@@ -14,8 +14,11 @@
 
   <Target Name="RemoveMsCoverageFiles" AfterTargets="AfterBuild">
     <ItemGroup>
-      <MsCoverageFilesToDelete Include="$(OutputPath)*.msCoverageSourceRootsMapping_*" />
-      <MsCoverageFilesToDelete Include="$(OutputPath)CoverletSourceRootsMapping_*" />
+      <!-- OutDir, not OutputPath: Directory.Build.props sets OutDir directly, and OutputPath
+           does not follow it (it stays at bin\$(Configuration)\), so these globs would clean
+           a directory nothing is ever written to. -->
+      <MsCoverageFilesToDelete Include="$(OutDir)*.msCoverageSourceRootsMapping_*" />
+      <MsCoverageFilesToDelete Include="$(OutDir)CoverletSourceRootsMapping_*" />
     </ItemGroup>
     <Delete Files="@(MsCoverageFilesToDelete)" ContinueOnError="true"/>
   </Target>

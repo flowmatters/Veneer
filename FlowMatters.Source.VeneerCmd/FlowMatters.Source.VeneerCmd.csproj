@@ -4,12 +4,12 @@
     <OutputType>Exe</OutputType>
   </PropertyGroup>
   <ItemGroup>
-    <!-- Don't copy local and only include "compile" assets -->
+    <!-- Don't copy local: both projects build to the same shared OutDir, so the file is
+         already there. Runtime assets must stay INCLUDED so the reference is recorded in
+         VeneerCmd's deps.json: a framework-dependent host builds its assembly list from
+         deps.json, not by scanning the app directory. -->
     <ProjectReference Include="..\FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj">
-      <Private>False</Private>
       <CopyLocalSatelliteAssemblies>False</CopyLocalSatelliteAssemblies>
-      <ExcludeAssets>runtime</ExcludeAssets>
-      <IncludeAssets>compile</IncludeAssets>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
@@ -29,6 +29,27 @@
   <ItemGroup>
      <None Update="appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None> 
+    </None>
   </ItemGroup>
+  <!-- Stage the native binaries VeneerCmd needs beside the executable. Source ships these
+       next to Source.exe, but the OS native loader only searches the app directory, so
+       they have to be copied. The set varies by Source version, so ICU and the engine
+       plugin are globbed, and the two Firebird names are Exists-guarded: a literal path
+       still becomes an item when the file is missing, and Copy then fails with MSB3030.
+       Pre-6.0 releases ship none of these, and must remain a clean no-op. Uses OutDir,
+       not OutputPath, because the two diverge once Directory.Build.props sets OutDir. -->
+  <Target Name="CopyNativeDependencies" AfterTargets="Build">
+    <ItemGroup>
+      <VeneerNativeDependency Include="$(RootOutDir)fbclient.dll" Condition="Exists('$(RootOutDir)fbclient.dll')" />
+      <VeneerNativeDependency Include="$(RootOutDir)fbembed.dll" Condition="Exists('$(RootOutDir)fbembed.dll')" />
+      <VeneerNativeDependency Include="$(RootOutDir)icu*.dll" />
+      <!-- Firebird reads its configuration from the application directory. A working
+           directory assembled by copying all of Source's files already has this; copying it
+           keeps a plain build output, and the released zip, self-contained too. -->
+      <VeneerNativeDependency Include="$(RootOutDir)firebird.conf" Condition="Exists('$(RootOutDir)firebird.conf')" />
+      <VeneerNativePlugin Include="$(RootOutDir)Plugins\engine*.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(VeneerNativeDependency)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(VeneerNativePlugin)" DestinationFolder="$(OutDir)Plugins" SkipUnchangedFiles="true" />
+  </Target>
 </Project>
