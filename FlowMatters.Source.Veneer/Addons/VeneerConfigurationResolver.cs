@@ -103,6 +103,7 @@ namespace FlowMatters.Source.Veneer.Addons
             var addons = new List<VeneerAddon>();
             var sources = new List<string>();
             var options = new VeneerOptions();
+            var env = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var layer in layers)
             {
@@ -132,10 +133,23 @@ namespace FlowMatters.Source.Veneer.Addons
                     if (options.defaultPort == null) options.defaultPort = layerOptions.defaultPort;
                     if (options.autoStart == null) options.autoStart = layerOptions.autoStart;
                 }
+
+                var layerEnv = layer.Configuration.env;
+                if (layerEnv != null)
+                {
+                    foreach (var kv in layerEnv)
+                    {
+                        // First layer to set a key wins, decided per key so that a
+                        // home file overriding one variable keeps the rest.
+                        if (!env.ContainsKey(kv.Key))
+                            env[kv.Key] = kv.Value;
+                    }
+                }
             }
 
             result.addons = addons.ToArray();
             result.options = options;
+            result.env = env;
             result.SourceFiles = sources.ToArray();
             return result;
         }
@@ -217,6 +231,8 @@ namespace FlowMatters.Source.Veneer.Addons
     {
         public VeneerAddon[] addons = new VeneerAddon[0];
         public VeneerOptions options = new VeneerOptions();
+        public Dictionary<string, string> env =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         public string[] SourceFiles = new string[0];
     }
 }

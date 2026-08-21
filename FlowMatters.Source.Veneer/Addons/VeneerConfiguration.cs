@@ -17,6 +17,13 @@ namespace FlowMatters.Source.Veneer.Addons
         public string targetScenario;
 
         /// <summary>
+        /// Variables for every addon in every layer, not just this file's own.
+        /// A committed sidecar can name %TOOLS_ROOT% while a personal home file
+        /// supplies the path, with neither file knowing about the other.
+        /// </summary>
+        public Dictionary<string, string> env;
+
+        /// <summary>
         /// The configuration directory in effect, for %VENEER_CONFIG_DIR% and for
         /// discovery. Null when there is neither VENEER_CONFIG_DIR nor a profile.
         /// </summary>

@@ -350,6 +350,85 @@ namespace FlowMatters.Source.Veneer.Tests
             Assert.That(resolved.SourceFiles.Length, Is.EqualTo(2));
         }
 
+        private static VeneerConfigurationLayer EnvLayer(
+            string path, params string[] keysAndValues)
+        {
+            var env = new Dictionary<string, string>();
+            for (var i = 0; i < keysAndValues.Length; i += 2)
+                env[keysAndValues[i]] = keysAndValues[i + 1];
+
+            return new VeneerConfigurationLayer
+            {
+                Path = path,
+                Configuration = new VeneerConfiguration { env = env }
+            };
+        }
+
+        [Test]
+        public void Merge_EnvIsEmptyWhenNoLayerSetsIt()
+        {
+            var resolved = VeneerConfigurationResolver.Merge(new List<VeneerConfigurationLayer>
+            {
+                Layer(SIDECAR, null, Addon("a", null))
+            });
+            Assert.That(resolved.env, Is.Not.Null);
+            Assert.That(resolved.env.Count, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void Merge_EnvTakesTheMostSpecificLayersValue()
+        {
+            var resolved = VeneerConfigurationResolver.Merge(new List<VeneerConfigurationLayer>
+            {
+                EnvLayer(HOME_PROJECT, "TOOLS_ROOT", @"D:\mine"),
+                EnvLayer(SIDECAR, "TOOLS_ROOT", @".\tools")
+            });
+            Assert.That(resolved.env["TOOLS_ROOT"], Is.EqualTo(@"D:\mine"));
+        }
+
+        // Per key, not per block: a home file overriding one variable must not
+        // discard the rest of the sidecar's block.
+        [Test]
+        public void Merge_EnvOverrideIsPerKeyNotPerBlock()
+        {
+            var resolved = VeneerConfigurationResolver.Merge(new List<VeneerConfigurationLayer>
+            {
+                EnvLayer(HOME_PROJECT, "TOOLS_ROOT", @"D:\mine"),
+                EnvLayer(SIDECAR, "TOOLS_ROOT", @".\tools", "MODEL_ID", "example")
+            });
+            Assert.That(resolved.env["TOOLS_ROOT"], Is.EqualTo(@"D:\mine"));
+            Assert.That(resolved.env["MODEL_ID"], Is.EqualTo("example"),
+                        "the key the home file did not mention must survive");
+        }
+
+        // Environment variables are case-insensitive on Windows, and
+        // BuildEffective builds its dictionary that way.
+        [Test]
+        public void Merge_EnvKeysAreCaseInsensitive()
+        {
+            var resolved = VeneerConfigurationResolver.Merge(new List<VeneerConfigurationLayer>
+            {
+                EnvLayer(HOME_PROJECT, "Tools_Root", @"D:\mine"),
+                EnvLayer(SIDECAR, "TOOLS_ROOT", @".\tools")
+            });
+            Assert.That(resolved.env.Count, Is.EqualTo(1));
+            Assert.That(resolved.env["TOOLS_ROOT"], Is.EqualTo(@"D:\mine"));
+        }
+
+        // The motivating case: the layer with the env contributes no addons, and
+        // the layer with the addons contributes no env.
+        [Test]
+        public void Merge_EnvLayerWithNoAddonsStillContributesItsEnv()
+        {
+            var resolved = VeneerConfigurationResolver.Merge(new List<VeneerConfigurationLayer>
+            {
+                EnvLayer(HOME_PROJECT, "TOOLS_ROOT", @"D:\mine"),
+                Layer(SIDECAR, null, Addon("Calibrate", null))
+            });
+            Assert.That(Names(resolved), Is.EqualTo("Calibrate"));
+            Assert.That(resolved.env["TOOLS_ROOT"], Is.EqualTo(@"D:\mine"));
+        }
+
         [Test]
         public void EffectiveFilter_IsTheAddonScenarioAfterPushDown()
         {
