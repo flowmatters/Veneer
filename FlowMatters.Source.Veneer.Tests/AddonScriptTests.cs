@@ -1,7 +1,4 @@
-using System.Collections.Generic;
-using System.Linq;
 using FlowMatters.Source.Veneer.DomainActions;
-using NUnit.Framework;
 
 namespace FlowMatters.Source.Veneer.Tests
 {

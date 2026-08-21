@@ -1,5 +1,3 @@
-using NUnit.Framework;
-
 namespace FlowMatters.Source.Veneer.Tests
 {
     /// <summary>
