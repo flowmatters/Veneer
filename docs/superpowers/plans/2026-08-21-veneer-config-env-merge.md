@@ -40,15 +40,23 @@ RiverSystem statics and cannot be constructed in a test; its behaviour is covere
 only by Task 6. Task 3's coverage stops at `BuildEffective` — that a launched
 process actually receives the variables is also Task 6.
 
-**Port verification is weaker, deliberately.** `legacy_ci` does not build in this
-environment: pristine `9be5df0` and the ported tip both fail with a single
-`error MC1000` in the WPF markup compiler and no others, so the failure is
-pre-existing. `MC1000` aborts before `csc` runs, so **the 194 tests were never run
-on the port and no C# diagnostics were produced there at all.** C# 7.3
-compatibility was established instead by compiling the identical sources on the
-feature branch with `-p:LangVersion=7.3`: the only violations in the whole project
-are two `CS8703`s in `ISourceService.cs`, a file this feature does not touch and
-the port does not copy.
+**Port verification, corrected after the merge.** While this plan was being
+executed, `legacy_ci` did not build here: pristine and ported trees alike failed
+with a single `error MC1000` in the WPF markup compiler, which aborts before `csc`
+runs. That turned out to be the *reference set*, not the branch — two assemblies,
+`TIME.UI.dll` and `RiverSystem.Forms.dll`, were missing from
+`C:\src\projects\Output` after a `compile_all.py` run. With them restored from
+Source 6.10.0.14373, **the ported `legacy_ci` builds cleanly with no errors.**
+
+The tests still have not been run there, for a different and lesser reason: NUnit
+cannot load the built plugin because it lands in `Output\Plugins\CommunityPlugins`
+while its dependencies sit in `Output`, so assembly probing fails. That is an
+environment layout problem, not a defect in the port.
+
+C# 7.3 compatibility was separately established by compiling the identical sources
+on master with `-p:LangVersion=7.3`: the only violations in the whole project are
+two `CS8703`s in `ISourceService.cs`, a file this feature does not touch and the
+port does not copy.
 
 ---
 
