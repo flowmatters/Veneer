@@ -238,8 +238,10 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AbstractSourceServer.cs" />
+    <Compile Include="Addons\AddonMenuItemState.cs" />
     <Compile Include="Addons\AddonUrl.cs" />
     <Compile Include="Addons\MenuLayout.cs" />
+    <Compile Include="Addons\RunningAddons.cs" />
     <Compile Include="Addons\VeneerConfiguration.cs" />
     <Compile Include="CORS\EnableCrossOriginResourceSharingBehavior.cs" />
     <Compile Include="CORS\CORSMessageInspector.cs" />
@@ -251,6 +253,7 @@
     <Compile Include="DomainActions\ShellLink.cs" />
     <Compile Include="DomainActions\InputSets.cs" />
     <Compile Include="DomainActions\ModelTabulator.cs" />
+    <Compile Include="DomainActions\OneShotLifecycle.cs" />
     <Compile Include="DomainActions\ScenarioInvoker.cs" />
     <Compile Include="DomainActions\TimeSeriesFunctions.cs" />
     <Compile Include="DomainActions\TrimNetwork.cs" />
@@ -301,6 +304,9 @@
     <Compile Include="Tests\AddonAssert.cs" />
     <Compile Include="Tests\MenuLayoutTests.cs" />
     <Compile Include="Tests\AddonUrlTests.cs" />
+    <Compile Include="Tests\RunningAddonsTests.cs" />
+    <Compile Include="Tests\AddonMenuItemStateTests.cs" />
+    <Compile Include="Tests\OneShotLifecycleTests.cs" />
     <Compile Include="ExchangeObjects\FunctionValue.cs" />
     <Compile Include="ExchangeObjects\InputSetSummary.cs" />
     <Compile Include="AutoStart\InitialiseOnLoadAttribute.cs" />

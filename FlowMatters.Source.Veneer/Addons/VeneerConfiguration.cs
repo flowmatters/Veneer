@@ -99,6 +99,15 @@ namespace FlowMatters.Source.Veneer.Addons
         public string url { get; set; }
 
         /// <summary>
+        /// Permit more than one instance of this addon to run at once. Default false:
+        /// the restrictive case is the default, so an addon that genuinely supports
+        /// concurrency declares it rather than inheriting it by accident, and every
+        /// .veneer file already deployed keeps single-instance behaviour untouched.
+        /// Meaningless for type "url", which launches no process; harmless there.
+        /// </summary>
+        public bool allowMultiple { get; set; }
+
+        /// <summary>
         /// Returns null when valid, otherwise a human-readable reason. Used to
         /// render a disabled menu item with a tooltip rather than silently
         /// omitting the entry.

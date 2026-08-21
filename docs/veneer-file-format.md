@@ -59,6 +59,7 @@ Each entry in `addons` describes one launchable tool that appears as a menu item
 | `workingDirectory` | string           | no             | Relative to the project directory, and defaults to it. |
 | `menu`             | string           | no             | Where the item appears in the menu bar. Defaults to `Reporting`. See **Menu paths** below. |
 | `scenario`         | string           | no             | Per-addon scenario filter. Overrides `targetScenario`. See **Scenario scoping** below. |
+| `allowMultiple`    | bool             | no             | Permit more than one instance at once. When `false` (the default) the menu item is disabled, and labelled `(running)`, while an instance is running. Ignored for `"url"`. |
 
 `path`, `script` and `url` are three ways of saying what an entry does, and an entry must use **exactly one**. Specifying two renders a disabled item with a tooltip naming the pair that conflicted.
 
@@ -96,7 +97,10 @@ When the user clicks an enabled addon, Veneer:
 2. Resolves the addon's `path` against the project directory unless it is already rooted.
 3. If the path ends in `.bat` or `.cmd`, launches it via `cmd.exe /D /V:OFF /C`, quoting the path and each argument. Otherwise, launches the executable directly with no shell involved.
 4. Sets `VENEER_PORT`, `VENEER_PROJECT_DIR` and `VENEER_PROJECT_FILE` on the child process, plus anything in `env`.
-5. Opens the Veneer panel if it is closed, because that is where addon output is written. `type: "url"` addons do not, since they produce no output.
+5. Opens the Veneer panel if it is closed, because that is where addon output is written. This happens on **every** launch, not merely the first of a session, so a panel the operator has closed comes back with the next click. `type: "url"` addons do not, since they produce no output.
+6. Writes `Launching '<name>'...` to that panel, then `Addon '<name>' finished`, or a failure line, when the child process ends. Veneer's own lifecycle lines are `Info` and its failures `Error`, both of which the panel shows at its default minimum Log Level, so they appear without the operator touching the **Log Level** control. The addon's own standard output stays at `Debug` (hidden until the Log Level is lowered) and its standard error at `Warning`.
+
+While an instance is running, the addon's menu item is disabled and labelled `<name> (running)`, unless the addon sets `allowMultiple: true`. The menu is rebuilt each time its dropdown opens, so that label appears and clears as instances start and exit, but only refreshes when the menu is next opened.
 
 Click handlers are wired regardless of whether the item is enabled — disabled menu items never fire them, so this is safe.
 
@@ -137,7 +141,7 @@ Matching is **case-insensitive** against the active scenario's name (`"operation
 **Behavior when filter does not match the active scenario:**
 
 - The menu item is still added to its menu, but rendered **disabled** (greyed out).
-- Hovering shows the tooltip `Requires scenario '<filter>' to be active`.
+- Hovering shows the tooltip `Requires scenario '<filter>' to be active.`
 - One log line is written via `TIME.Management.Log` per disabled addon per dropdown-open, naming the addon, the required scenario, and the active scenario.
 
 This makes scenario-specific tools discoverable (the user sees the menu item exists) and self-explanatory (the tooltip tells the user how to enable it) without polluting the menu with broken-looking "missing" items.
