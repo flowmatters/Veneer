@@ -12,6 +12,46 @@
 
 ---
 
+## Execution status
+
+Branch `feature/global-veneer-config`, continuing from `03ed6cd`. Port on
+`port/global-veneer-config`, on top of the earlier port commit `75f41a7`.
+
+| Task | Commits | Verified |
+|---|---|---|
+| 1 Three additive layers | `606af69`, `ed5ce62` | 181 pass |
+| 2 File-level `env` merge | `d62fc34` | 186 pass |
+| 3 `env` into launches | `5dc7281`, `489356a` | 194 pass |
+| 4 Populate from the menu | `537cf23` | 194 pass; **no unit-test surface** |
+| 5 Documentation | `fb0b29f`, `cadac06` | every claim checked against code |
+| 6 Manual GUI verification | — | **NOT DONE — requires a human with Source installed** |
+| 7 Port to `legacy_ci` | `c0ebdb7` | see below |
+
+**End state on the feature branch: 194 pass, 0 failed**, from a baseline of 181.
+
+**A verification hazard worth remembering.** Every worktree of this repository
+resolves `OutputPath` to the same physical directory, so a concurrent build in
+another worktree can make `dotnet test` here run *that* branch's assembly. One run
+during Task 1 reported 192 — the `addon-launch-feedback` branch's count. All
+figures above were taken with an isolated `-p:OutputPath`.
+
+**What is not verified.** Task 4 wires `ConfigEnv` from `VeneerMenu`, which reads
+RiverSystem statics and cannot be constructed in a test; its behaviour is covered
+only by Task 6. Task 3's coverage stops at `BuildEffective` — that a launched
+process actually receives the variables is also Task 6.
+
+**Port verification is weaker, deliberately.** `legacy_ci` does not build in this
+environment: pristine `9be5df0` and the ported tip both fail with a single
+`error MC1000` in the WPF markup compiler and no others, so the failure is
+pre-existing. `MC1000` aborts before `csc` runs, so **the 194 tests were never run
+on the port and no C# diagnostics were produced there at all.** C# 7.3
+compatibility was established instead by compiling the identical sources on the
+feature branch with `-p:LangVersion=7.3`: the only violations in the whole project
+are two `CS8703`s in `ISourceService.cs`, a file this feature does not touch and
+the port does not copy.
+
+---
+
 ## Prerequisites
 
 ### Build and test command
