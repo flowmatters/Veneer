@@ -19,7 +19,24 @@
 Run from the worktree root, **always with an absolute path** — a previous session's shell silently reset its working directory and produced a false-positive result from a different repository:
 
 ```
-dotnet test C:\src\projects\Veneer-global-config\FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo
+dotnet test C:\src\projects\Veneer-global-config\FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj --nologo -p:OutputPath=<a scratch directory>\
+```
+
+**The `-p:OutputPath` override is not optional.** Every worktree of this repository
+resolves `OutputPath` to the same physical
+`C:\src\projects\Output\Plugins\CommunityPlugins\Veneer\`, because the csproj
+derives it from `$(MSBuildThisFileDirectory)..\..\`. When a concurrent worktree
+builds, `dotnet test` here will happily run *that* branch's assembly. This is not
+hypothetical: a run during Task 1 reported `Passed: 192` — the
+`addon-launch-feedback` branch's test count — before a rebuild returned it to 181.
+
+Since every gate in this plan is an exact test count, a contended output directory
+can turn a green run into meaningless evidence. Point `OutputPath` somewhere
+private, and if a count ever surprises you, confirm the assembly is yours before
+believing it:
+
+```
+strings <scratch>\FlowMatters.Source.Veneer.dll | grep Resolve_HomeProjectFileAndSidecarBothLoad
 ```
 
 **Baseline: `Passed: 181`, 0 failed.** Confirm this before starting. Counts below

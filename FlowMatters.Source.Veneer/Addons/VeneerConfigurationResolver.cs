@@ -82,8 +82,9 @@ namespace FlowMatters.Source.Veneer.Addons
         }
 
         /// <summary>
-        /// Layers arrive project-first, so "the first layer to specify a field
-        /// wins" is exactly "the project layer beats the global one".
+        /// Layers arrive most specific first, so "the first layer to specify a
+        /// field wins" is exactly the documented precedence: the home project
+        /// file beats the sidecar, which beats global.veneer.
         ///
         /// Mutates each addon's `scenario` to push its layer's targetScenario
         /// down. Safe because Load deserializes a fresh object graph on every

@@ -159,9 +159,9 @@ namespace FlowMatters.Source.Veneer.AutoStart
             // deliberately does not re-apply them.
             //
             // This Load duplicates the one the menu rebuild below performs. Both
-            // are cheap -- two Exists, two small reads -- and this path runs at
-            // human speed, so sharing one result is not worth having the log line
-            // and the menu disagree about what was on disk.
+            // are cheap -- at most three Exists and three small reads -- and this
+            // path runs at human speed, so sharing one result is not worth having
+            // the log line and the menu disagree about what was on disk.
             LogConfigurationChain(VeneerConfiguration.Load(newScenario), newScenario);
 
             var control = WebServerStatusControl.ActiveInstance;
@@ -217,8 +217,9 @@ namespace FlowMatters.Source.Veneer.AutoStart
         private static string _lastLoggedChain;
 
         /// <summary>
-        /// With two files feeding one menu, "where did this item come from?" and
-        /// "why is my sidecar being ignored?" are questions a user will ask.
+        /// With up to three files feeding one menu, "where did this item come
+        /// from?" is a question a user will ask, and the answer is not guessable
+        /// from the menu itself.
         ///
         /// Deduplicated rather than fired once per load, because the Rebind
         /// transition also covers a scenario change within one project, where the
