@@ -326,6 +326,10 @@ namespace FlowMatters.Source.Veneer
                 ProjectDirectory = Scenario?.Project?.FileDirectory,
                 ProjectFile = Scenario?.Project?.FullFilename,
                 ConfigDirectory = VeneerConfiguration.ConfigDirectory(),
+                // Loaded at launch rather than reused from the menu build, so an
+                // edit made after the dropdown opened takes effect -- the same
+                // promise the rest of .veneer loading makes.
+                ConfigEnv = VeneerConfiguration.Load(Scenario).env,
                 // The configured port, not a promise the server is listening --
                 // Port is set independently of Running, and addons may be launched
                 // with the server stopped. Still null on the URL path when no panel
