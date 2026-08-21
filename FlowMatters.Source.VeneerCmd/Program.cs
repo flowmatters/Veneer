@@ -32,14 +32,46 @@ namespace FlowMatters.Source.VeneerCmd
         private static LogLevel _minimumLogLevel = LogLevel.Info;
 
         /// <summary>
+        /// Maximum number of directory levels to walk up from the executable when looking for Source.
+        /// Four covers the deepest supported layout (a deployed Veneer three levels under the Source root).
+        /// </summary>
+        private const int MaxSourceProbeDepth = 4;
+
+        /// <summary>
         /// List of dynamic search paths for RiverSystem related assemblies. This may change depending on the passed in -d argument.
         /// </summary>
-        private static List<string> _dynamicSearchPaths = new()
-                                                          {
-                                                              Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", ".."),  // Output folder
-                                                              Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "Plugins"),  // Output/Plugins folder
-                                                              Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "Plugins", "CommunityPlugins") // Output/Plugins/CommunityPlugins folder
-                                                          };
+        private static List<string> _dynamicSearchPaths = FindDefaultSearchPaths();
+
+        /// <summary>
+        /// Locate the Source installation by walking up from the executable's own directory until a
+        /// directory containing RiverSystem.dll is found.
+        /// </summary>
+        /// <remarks>
+        /// The relative depth varies by layout: Veneer and Source assemblies may be colocated in one
+        /// working directory (zero levels), a development build may sit directly under the staged output
+        /// directory (one level), and a deployed Veneer sits in Plugins\CommunityPlugins\Veneer_for_X
+        /// under the Source root (three levels). Probing for RiverSystem.dll handles all of them without
+        /// hard-coding a depth. Returns an empty list when Source is not found, so the caller reports the
+        /// missing directory and suggests -d rather than silently searching paths that do not exist.
+        /// </remarks>
+        private static List<string> FindDefaultSearchPaths()
+        {
+            var directory = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
+            for (var level = 0; directory != null && level <= MaxSourceProbeDepth; level++, directory = directory.Parent)
+            {
+                if (!File.Exists(Path.Combine(directory.FullName, "RiverSystem.dll")))
+                    continue;
+
+                return new List<string>
+                       {
+                           directory.FullName,
+                           Path.Combine(directory.FullName, "Plugins"),
+                           Path.Combine(directory.FullName, "Plugins", "CommunityPlugins")
+                       };
+            }
+
+            return new List<string>();
+        }
 
         static void Main(string[] args)
         {
