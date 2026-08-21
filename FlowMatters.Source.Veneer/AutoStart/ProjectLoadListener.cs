@@ -238,11 +238,6 @@ namespace FlowMatters.Source.Veneer.AutoStart
                 ? "none"
                 : String.Join(", ", config.SourceFiles);
 
-            // Which file is doing the superseding is not obvious from a bare
-            // "superseding X" -- name the loser and say it is being ignored.
-            if (config.SupersededSidecar != null)
-                chain += " (ignoring the sidecar " + config.SupersededSidecar + ")";
-
             var key = scenario?.RiverSystemProject?.FullFilename + " -> " + chain;
             if (key == _lastLoggedChain) return;
             _lastLoggedChain = key;

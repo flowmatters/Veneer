@@ -44,7 +44,7 @@ namespace FlowMatters.Source.Veneer.Tests
         private const string CONFIG = @"C:\Users\joel\.veneer";
         private const string PROJECT = @"C:\models\ExampleProject.rsproj";
         private const string SIDECAR = @"C:\models\ExampleProject.rsproj.veneer";
-        private const string GLOBAL_PROJECT = @"C:\Users\joel\.veneer\ExampleProject.rsproj.veneer";
+        private const string HOME_PROJECT = @"C:\Users\joel\.veneer\ExampleProject.rsproj.veneer";
         private const string GLOBAL = @"C:\Users\joel\.veneer\global.veneer";
 
         private static Func<string, bool> Existing(params string[] paths)
@@ -59,44 +59,50 @@ namespace FlowMatters.Source.Veneer.Tests
         }
 
         [Test]
+        public void Resolve_FindsAllThreeLayersMostSpecificFirst()
+        {
+            var c = VeneerConfigurationResolver.Resolve(
+                CONFIG, PROJECT, Existing(SIDECAR, HOME_PROJECT, GLOBAL));
+            Assert.That(Chain(c), Is.EqualTo(HOME_PROJECT + " | " + SIDECAR + " | " + GLOBAL));
+        }
+
+        // The whole point of the change: a home file that supplies only env must
+        // leave the sidecar's addons in place rather than replacing them.
+        [Test]
+        public void Resolve_HomeProjectFileAndSidecarBothLoad()
+        {
+            var c = VeneerConfigurationResolver.Resolve(
+                CONFIG, PROJECT, Existing(SIDECAR, HOME_PROJECT));
+            Assert.That(Chain(c), Is.EqualTo(HOME_PROJECT + " | " + SIDECAR));
+        }
+
+        [Test]
         public void Resolve_SidecarOnly()
         {
             var c = VeneerConfigurationResolver.Resolve(CONFIG, PROJECT, Existing(SIDECAR));
             Assert.That(Chain(c), Is.EqualTo(SIDECAR));
-            Assert.That(c.SupersededSidecar, Is.Null);
+            Assert.That(c.HomeProjectLayer, Is.Null);
         }
 
         [Test]
-        public void Resolve_GlobalProjectFileReplacesTheSidecar()
+        public void Resolve_HomeProjectFileOnly()
         {
-            var c = VeneerConfigurationResolver.Resolve(
-                CONFIG, PROJECT, Existing(SIDECAR, GLOBAL_PROJECT));
-            Assert.That(Chain(c), Is.EqualTo(GLOBAL_PROJECT),
-                        "the sidecar must not also appear -- the project layer is one slot");
-            Assert.That(c.SupersededSidecar, Is.EqualTo(SIDECAR));
+            var c = VeneerConfigurationResolver.Resolve(CONFIG, PROJECT, Existing(HOME_PROJECT));
+            Assert.That(Chain(c), Is.EqualTo(HOME_PROJECT));
+            Assert.That(c.SidecarLayer, Is.Null);
         }
 
-        // SupersededSidecar drives a log line that says "superseding". With no
-        // sidecar on disk nothing was displaced and the line would be a lie.
         [Test]
-        public void Resolve_GlobalProjectFileAloneSupersedesNothing()
+        public void Resolve_GlobalOnly()
         {
-            var c = VeneerConfigurationResolver.Resolve(CONFIG, PROJECT, Existing(GLOBAL_PROJECT));
-            Assert.That(Chain(c), Is.EqualTo(GLOBAL_PROJECT));
-            Assert.That(c.SupersededSidecar, Is.Null);
+            var c = VeneerConfigurationResolver.Resolve(CONFIG, PROJECT, Existing(GLOBAL));
+            Assert.That(Chain(c), Is.EqualTo(GLOBAL));
+            Assert.That(c.HomeProjectLayer, Is.Null);
+            Assert.That(c.SidecarLayer, Is.Null);
         }
 
         [Test]
-        public void Resolve_NoFilesAtAll()
-        {
-            var c = VeneerConfigurationResolver.Resolve(CONFIG, PROJECT, Existing());
-            Assert.That(Chain(c), Is.EqualTo(""));
-            Assert.That(c.ProjectLayer, Is.Null);
-            Assert.That(c.GlobalLayer, Is.Null);
-        }
-
-        [Test]
-        public void Resolve_GlobalIsAppendedAfterTheProjectLayer()
+        public void Resolve_SidecarAndGlobalWithoutHomeProject()
         {
             var c = VeneerConfigurationResolver.Resolve(
                 CONFIG, PROJECT, Existing(SIDECAR, GLOBAL));
@@ -104,37 +110,29 @@ namespace FlowMatters.Source.Veneer.Tests
         }
 
         [Test]
-        public void Resolve_GlobalIsAppendedAfterAGlobalProjectFileToo()
+        public void Resolve_NoFilesAtAll()
         {
-            var c = VeneerConfigurationResolver.Resolve(
-                CONFIG, PROJECT, Existing(SIDECAR, GLOBAL_PROJECT, GLOBAL));
-            Assert.That(Chain(c), Is.EqualTo(GLOBAL_PROJECT + " | " + GLOBAL));
-            Assert.That(c.SupersededSidecar, Is.EqualTo(SIDECAR));
+            var c = VeneerConfigurationResolver.Resolve(CONFIG, PROJECT, Existing());
+            Assert.That(Chain(c), Is.EqualTo(""));
+            Assert.That(c.HomeProjectLayer, Is.Null);
+            Assert.That(c.SidecarLayer, Is.Null);
+            Assert.That(c.GlobalLayer, Is.Null);
         }
 
-        [Test]
-        public void Resolve_GlobalAlone()
-        {
-            var c = VeneerConfigurationResolver.Resolve(CONFIG, PROJECT, Existing(GLOBAL));
-            Assert.That(Chain(c), Is.EqualTo(GLOBAL));
-            Assert.That(c.ProjectLayer, Is.Null);
-        }
-
-        // An unsaved project has no project layer but must still receive the
-        // wildcard file -- that is the point of a wildcard file.
+        // An unsaved project has no project-specific layer but must still receive
+        // the wildcard file -- that is the point of a wildcard file.
         [TestCase(null)]
         [TestCase("")]
         [TestCase("   ")]
         public void Resolve_WithoutAProjectFileStillFindsGlobal(string projectFile)
         {
             var c = VeneerConfigurationResolver.Resolve(
-                CONFIG, projectFile, Existing(SIDECAR, GLOBAL_PROJECT, GLOBAL));
+                CONFIG, projectFile, Existing(SIDECAR, HOME_PROJECT, GLOBAL));
             Assert.That(Chain(c), Is.EqualTo(GLOBAL));
-            Assert.That(c.SupersededSidecar, Is.Null);
         }
 
         [Test]
-        public void Resolve_WithoutAConfigDirectoryFallsBackToTheSidecar()
+        public void Resolve_WithoutAConfigDirectoryFindsOnlyTheSidecar()
         {
             var c = VeneerConfigurationResolver.Resolve(null, PROJECT, Existing(SIDECAR, GLOBAL));
             Assert.That(Chain(c), Is.EqualTo(SIDECAR));
@@ -154,11 +152,11 @@ namespace FlowMatters.Source.Veneer.Tests
         }
 
         [Test]
-        public void Resolve_GlobalProjectFileIsNamedForTheProjectFileOnly()
+        public void Resolve_HomeProjectFileIsNamedForTheProjectFileOnly()
         {
             var c = VeneerConfigurationResolver.Resolve(
-                CONFIG, @"D:\elsewhere\ExampleProject.rsproj", Existing(GLOBAL_PROJECT));
-            Assert.That(Chain(c), Is.EqualTo(GLOBAL_PROJECT),
+                CONFIG, @"D:\elsewhere\ExampleProject.rsproj", Existing(HOME_PROJECT));
+            Assert.That(Chain(c), Is.EqualTo(HOME_PROJECT),
                         "matching is by file name, so a project of the same name anywhere matches");
         }
 

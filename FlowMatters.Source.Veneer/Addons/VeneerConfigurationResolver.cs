@@ -38,10 +38,13 @@ namespace FlowMatters.Source.Veneer.Addons
         }
 
         /// <summary>
-        /// The project layer is one slot with two candidates: a file named for the
-        /// project in the configuration directory REPLACES the sidecar, which is
-        /// the escape hatch for a repository whose committed sidecar you do not
-        /// want. The global layer is additive and never replaces anything.
+        /// Three additive layers, most specific first: a file named for the
+        /// project in the configuration directory, the sidecar beside the
+        /// .rsproj, then the global wildcard.
+        ///
+        /// One ordering serves twice -- it decides both which layer wins a
+        /// contested field and the order addons are concatenated into menus. That
+        /// is why a home project file's addons appear above the sidecar's.
         /// </summary>
         public static ConfigCandidates Resolve(
             string configDir, string projectFullFilename, Func<string, bool> exists)
@@ -55,24 +58,17 @@ namespace FlowMatters.Source.Veneer.Addons
                 // directory named "models.rsproj" had its directory rewritten too.
                 var projectFileName = Path.GetFileName(projectFullFilename);
                 var directory = Path.GetDirectoryName(projectFullFilename) ?? string.Empty;
+
+                if (configDir != null)
+                {
+                    var homeProject = Path.Combine(configDir, projectFileName + CONFIG_EXTENSION);
+                    if (exists(homeProject))
+                        result.HomeProjectLayer = homeProject;
+                }
+
                 var sidecar = Path.Combine(directory, projectFileName + CONFIG_EXTENSION);
-
-                var globalProject = configDir == null
-                    ? null
-                    : Path.Combine(configDir, projectFileName + CONFIG_EXTENSION);
-
-                if (globalProject != null && exists(globalProject))
-                {
-                    result.ProjectLayer = globalProject;
-                    // Only when a sidecar is actually on disk: this drives a log
-                    // line saying "superseding", which is a lie if nothing was.
-                    if (exists(sidecar))
-                        result.SupersededSidecar = sidecar;
-                }
-                else if (exists(sidecar))
-                {
-                    result.ProjectLayer = sidecar;
-                }
+                if (exists(sidecar))
+                    result.SidecarLayer = sidecar;
             }
 
             if (configDir != null)
@@ -181,22 +177,23 @@ namespace FlowMatters.Source.Veneer.Addons
     }
 
     /// <summary>
-    /// The files that will be loaded, in resolution order, plus the sidecar a
-    /// global project file displaced -- reported so the user can be told why the
-    /// file next to their .rsproj is being ignored.
+    /// The files that will be loaded, most specific first. All three are
+    /// additive: none replaces another, so a home file supplying only env leaves
+    /// the sidecar's addons in place.
     /// </summary>
     public class ConfigCandidates
     {
-        public string ProjectLayer;
+        public string HomeProjectLayer;
+        public string SidecarLayer;
         public string GlobalLayer;
-        public string SupersededSidecar;
 
         public string[] Paths
         {
             get
             {
                 var result = new List<string>();
-                if (ProjectLayer != null) result.Add(ProjectLayer);
+                if (HomeProjectLayer != null) result.Add(HomeProjectLayer);
+                if (SidecarLayer != null) result.Add(SidecarLayer);
                 if (GlobalLayer != null) result.Add(GlobalLayer);
                 return result.ToArray();
             }
@@ -220,6 +217,5 @@ namespace FlowMatters.Source.Veneer.Addons
         public VeneerAddon[] addons = new VeneerAddon[0];
         public VeneerOptions options = new VeneerOptions();
         public string[] SourceFiles = new string[0];
-        public string SupersededSidecar;
     }
 }

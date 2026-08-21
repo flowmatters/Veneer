@@ -41,17 +41,14 @@ namespace FlowMatters.Source.Veneer.Addons
         }
 
         /// <summary>
-        /// The effective project-layer file: the global override if there is one,
-        /// otherwise the sidecar, otherwise null. Does not report global.veneer,
-        /// which is an additional layer rather than "the" configuration file.
-        ///
-        /// Public with no in-tree caller: Load stopped using it when it grew to
-        /// read every layer. Kept because it is the honest answer to "which file
-        /// is this project's configuration", which the status surface still wants.
+        /// The sidecar beside the .rsproj, if it exists. Not "the effective
+        /// configuration file": with three additive layers there is no single
+        /// such file. Public API with no in-tree caller, kept because the
+        /// question it answers is still a real one.
         /// </summary>
         public static string ConfigurationFilename(RiverSystemProject project)
         {
-            return Candidates(project).ProjectLayer;
+            return Candidates(project).SidecarLayer;
         }
 
         public static ResolvedVeneerConfiguration Load(RiverSystemScenario scenario)
@@ -94,7 +91,6 @@ namespace FlowMatters.Source.Veneer.Addons
             }
 
             var resolved = VeneerConfigurationResolver.Merge(layers);
-            resolved.SupersededSidecar = candidates.SupersededSidecar;
             return resolved;
         }
 
