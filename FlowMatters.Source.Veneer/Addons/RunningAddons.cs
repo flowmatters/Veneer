@@ -86,8 +86,8 @@ namespace FlowMatters.Source.Veneer.Addons
         /// `MarkRunning` (e.g. a watcher that observes the same process exit twice).
         /// That decrements one instance too many, under-counting a still-running
         /// addon and potentially re-enabling its menu item early, with nothing here
-        /// to detect it. Nothing at this commit prevents that double fire -- see the
-        /// class-level note.
+        /// to detect it. Preventing that double fire is `OneShotLifecycle`'s job, not
+        /// this method's -- see the class-level note.
         /// </summary>
         public void Finished(VeneerAddon addon)
         {
