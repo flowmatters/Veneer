@@ -187,13 +187,13 @@ The `menu` field is a pipe-delimited path. The first segment names a top-level e
 |--------------------------|--------|
 | absent / empty / whitespace / `"\|"` | Item appears under the default `Reporting` menu. |
 | `"Reporting"`            | Same as default. |
-| `"Models"`               | A new top-level `Models` menu is created; the item appears in it. Its position in the menu bar follows the order menus first appear in the file — see below. |
+| `"Models"`               | A new top-level `Models` menu is created; the item appears in it. Its position in the menu bar follows the order menus first appear across the merged layers — see below. |
 | `"Models|Calibration"`   | Item appears under `Models → Calibration`. |
 | `"Models|Calibration|Daily"` | Item appears under `Models → Calibration → Daily`. Arbitrary nesting depth is supported. |
 
-Top-level menus are created up-front based on every `menu` value in the file, so menu-bar layout is stable regardless of which scenario is currently active — an addon that is greyed out by a scenario filter still contributes its menu, in its usual position.
+Top-level menus are created up-front based on every `menu` value in every layer, so menu-bar layout is stable regardless of which scenario is currently active — an addon that is greyed out by a scenario filter still contributes its menu, in its usual position.
 
-They appear in the menu bar **in the order they first appear in the file**. An addon with no `menu` counts as targeting `Reporting` for this purpose, so a menuless addon at the top of the file puts `Reporting` first. `Reporting` is appended after all file-specified menus when no addon targets it — which happens when it exists only to hold discovered HTML reports.
+They appear in the menu bar **in the order they first appear across the merged addon list** — which is the layer order above, most specific first. An addon with no `menu` counts as targeting `Reporting` for this purpose, so a menuless addon first in that list puts `Reporting` first. `Reporting` is appended after all configured menus when no addon targets it — which happens when it exists only to hold discovered HTML reports.
 
 Naming a menu that Source itself already owns (`Tools`, `File`, and so on) is **not supported**: Veneer binds to the existing menu wherever Source placed it, and addons under that name are not populated.
 
