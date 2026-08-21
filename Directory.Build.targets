@@ -1,0 +1,50 @@
+<Project>
+  <!-- Import parent targets if it exists -->
+  <!--<PropertyGroup>
+    <ParentTargets>$([MSBuild]::GetPathOfFileAbove(Directory.Build.targets, $(MSBuildThisFileDirectory)..))</ParentTargets>
+  </PropertyGroup>
+  <Import Project="$(ParentTargets)" Condition="'$(ParentTargets)' != ''" />-->
+
+  <PropertyGroup>
+    <!-- Should be the same as TargetDir, but may have an additional slash -->
+    <FullTargetDir>$([MSBuild]::NormalizeDirectory('$(TargetDir)'))</FullTargetDir>
+    <FullRootOutDir>$([MSBuild]::NormalizeDirectory('$(RootOutDir)'))</FullRootOutDir>
+    <FullSharedOutDir>$([MSBuild]::NormalizeDirectory('$(SharedOutDir)'))</FullSharedOutDir>
+    <TargetDirIsRelative>$(FullTargetDir.Contains($(FullRootOutDir)))</TargetDirIsRelative>
+    <OutputSearchPaths>$(FullRootOutDir)</OutputSearchPaths>
+    <OutputSearchPaths Condition="'$(FullTargetDir)' != '$(FullSharedOutDir)'">$(OutputSearchPaths);$(FullSharedOutDir)</OutputSearchPaths>
+    <OutputSearchPaths Condition="'$(TargetDirIsRelative)' == 'true' AND '$(FullTargetDir)' != '$(FullRootOutDir)' AND '$(FullTargetDir)' != '$(FullSharedOutDir)'">$(OutputSearchPaths);$(FullTargetDir)</OutputSearchPaths>
+    <!-- Resolve references to core Source files -->
+    <AssemblySearchPaths>$(AssemblySearchPaths);$(OutputSearchPaths)</AssemblySearchPaths>
+
+    <!-- Test project? -->
+    <IsTestProject Condition="'$(IsTestProject)' == '' AND '$(AssemblyName)' != '' AND $(AssemblyName.EndsWith('.Tests'))">true</IsTestProject>
+  </PropertyGroup>
+
+  <!-- Import Source targets -->
+  <ImportGroup Condition="'$(UseSourceImports)' == 'true'">
+    <Import Project="$(RootPath)RiverSystem\Solutions\SDK.build.targets" />
+    <Import Project="$(RootPath)RiverSystem\Solutions\NormalisePdbBuildRoot.targets" />
+  </ImportGroup>
+
+  <!-- Override Source CopyReferences target from SDK.Build.targets which is outdated and no longer needed. -->
+  <Target Name="CopyReferences" />
+  
+  <!-- Or import Veneer.targets instead (e.g. when building against files from a Source release) -->
+  <Import Condition="'$(UseVeneerImports)' == 'true'" Project="Veneer.targets" />
+  
+  <!-- Use a smarter approach for handling references in plugins (instead of CopyReferences) -->
+  <!-- Test projects will need all references copied (since the unit test assembly loading project was removed?!?) -->
+  <PropertyGroup Condition="$(IsTestProject) == 'true'">
+    <!-- If building to an output directory under the root output then still need to exclude duplicates -->
+    <ExcludeDuplicates Condition="'$(TargetDirIsRelative)' == 'false'">false</ExcludeDuplicates>
+  </PropertyGroup>
+  <Import Project="PluginReferenceHandling.targets" Condition="'$(TargetDir)' != '$(RootOutDir)'"/>
+ 
+  <!-- Make internals visible to test projects -->
+  <ItemGroup Condition="'$(IsTestProject)' != 'true'">
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>$(AssemblyName).Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+</Project>

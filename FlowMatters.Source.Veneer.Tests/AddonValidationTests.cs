@@ -1,5 +1,4 @@
 using FlowMatters.Source.Veneer.Addons;
-using NUnit.Framework;
 
 namespace FlowMatters.Source.Veneer.Tests
 {
@@ -25,8 +24,10 @@ namespace FlowMatters.Source.Veneer.Tests
         {
             var addon = new VeneerAddon
             {
-                name = "a", type = "script",
-                path = "tools/x.bat", script = new[] { "echo hi" }
+                name = "a",
+                type = "script",
+                path = "tools/x.bat",
+                script = new[] { "echo hi" }
             };
             AddonAssert.Contains(VeneerAddon.Validate(addon), "both");
         }
@@ -80,7 +81,9 @@ namespace FlowMatters.Source.Veneer.Tests
         {
             var addon = new VeneerAddon
             {
-                name = "a", type = "exe", path = "tools/calib.exe",
+                name = "a",
+                type = "exe",
+                path = "tools/calib.exe",
                 args = new[] { "--port", "%VENEER_PORT%" },
                 workingDirectory = "tools"
             };
@@ -99,8 +102,10 @@ namespace FlowMatters.Source.Veneer.Tests
         {
             var addon = new VeneerAddon
             {
-                name = "a", type = "url",
-                url = "https://wiki.example.org", path = "tools/x.bat"
+                name = "a",
+                type = "url",
+                url = "https://wiki.example.org",
+                path = "tools/x.bat"
             };
             AddonAssert.Contains(VeneerAddon.Validate(addon), "mutually exclusive");
         }
@@ -110,8 +115,10 @@ namespace FlowMatters.Source.Veneer.Tests
         {
             var addon = new VeneerAddon
             {
-                name = "a", type = "url",
-                url = "https://wiki.example.org", script = new[] { "echo hi" }
+                name = "a",
+                type = "url",
+                url = "https://wiki.example.org",
+                script = new[] { "echo hi" }
             };
             AddonAssert.Contains(VeneerAddon.Validate(addon), "mutually exclusive");
         }
@@ -124,8 +131,10 @@ namespace FlowMatters.Source.Veneer.Tests
             // rule and "present" for another in the same method.
             var addon = new VeneerAddon
             {
-                name = "a", type = "url",
-                url = "https://wiki.example.org", script = new string[0]
+                name = "a",
+                type = "url",
+                url = "https://wiki.example.org",
+                script = new string[0]
             };
             AddonAssert.Contains(VeneerAddon.Validate(addon), "mutually exclusive");
         }
