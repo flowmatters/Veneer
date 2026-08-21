@@ -1773,10 +1773,25 @@ leaving a window where it is null on the first click. **`legacy_ci`'s `Scenario`
 setter is synchronous** (`StartServer(); PopulateMenu();` inline), so `Control` is
 assigned before the setter returns and the fallback would cover nothing.
 
-**`MC1000` did not occur — this plan's Step 3 is out of date.** The branch builds
-clean: `MSBuild -t:Rebuild -p:Configuration=Debug`, 0 warnings 0 errors, under
-`/warnaserror+` and `/langversion:7.3`. Whatever caused the markup-compiler
-failure during the url-addons work is gone.
+**`MC1000` depends on what is staged in `..\Output`, and Step 3 was right after
+all.** The port built clean at the time — `MSBuild -t:Rebuild -p:Configuration=Debug`,
+0 warnings 0 errors, under `/warnaserror+` and `/langversion:7.3` — and this
+entry first recorded that the markup-compiler failure was "gone". **That was
+wrong, and it was disproved within the hour.** Re-running the Source 6.x restage
+from Prerequisites (needed to repair `master` after the legacy build clobbered
+`..\Output`) and then rebuilding `legacy_ci` reproduces it exactly:
+
+```
+error MC1000: Unknown build error, 'Could not load type
+'System.Runtime.Versioning.TargetPlatformAttribute' from assembly
+'System.Runtime, Version=4.1.2.0, ...'
+```
+
+So `MC1000` is not a property of the branch — it is what a **net48 markup
+compile against the Source 6.x (net8-era) reference set** produces. The port
+succeeded because `..\Output` still held legacy-compatible assemblies at that
+moment. The two branches need different reference sets in the same shared
+directory, and whichever was staged last decides which branch can build.
 
 **Tests ran on this branch**: 192 total, **190 passed, 2 failed**. Both failures
 are pre-existing and unrelated — `ScriptMode_PersistsStateAcrossLinesAndStripsScaffolding`
@@ -1792,10 +1807,25 @@ build was **3.13.2**, not the 2.6.4 floor, so 2.6.4 portability is established b
 inspection rather than execution; and **nothing was verified in a running Source**
 on this branch — the menu behaviour has GUI coverage on `master` only.
 
-> **`..\Output` hosts one branch's reference set at a time.** Building `legacy_ci`
-> (net48) leaves `master` failing with the `CS0234` above until the Source 6.x
-> restage in Prerequisites is re-run, and the reverse also holds. Both happened
-> during this task. Re-run the restage after any `legacy_ci` build.
+> **`..\Output` hosts one branch's reference set at a time, and this is the single
+> biggest trap in this repository.** Building `legacy_ci` (net48) leaves `master`
+> failing with the `CS0234` above until the Source 6.x restage in Prerequisites is
+> re-run; re-running that restage then leaves `legacy_ci` failing with the
+> `MC1000` above. There is no state in which both branches build. Both directions
+> were hit during this task, in that order, and the second one produced a
+> confidently wrong plan entry before it was caught.
+>
+> Decide which branch you need working, stage for it, and expect the other to be
+> broken until you stage back. A build failure on either branch is far more likely
+> to be the wrong reference set than a real defect — check that first.
+
+**Follow-up ported 2026-08-21**: `d5f2123` (strengthening
+`SeparatorCannotBeConfusedWithMenuPipes`) is cherry-picked here as `df1bf11`.
+**Not built or tested on this branch** — `..\Output` was staged for `master` by
+then, so a legacy build could only produce the `MC1000` above. The change is two
+string literals in one assertion plus comments, with no C# 7.3 or NUnit
+portability surface, but it is unverified here and should be built the next time
+`legacy_ci` is staged.
 
 ---
 
