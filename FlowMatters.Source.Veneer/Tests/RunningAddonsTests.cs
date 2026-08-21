@@ -89,13 +89,26 @@ namespace FlowMatters.Source.Veneer.Tests
         public void SeparatorCannotBeConfusedWithMenuPipes()
         {
             // "|" already delimits menu segments (see NestedMenuPathsAreDistinguished),
-            // so it cannot double as the menu/name separator without risking two
-            // different (menu, name) pairs producing the same key. Key uses "\0"
-            // instead, which cannot appear in either side.
+            // so it cannot double as the menu/name separator without two different
+            // (menu, name) pairs producing the same key. Key uses "\0" instead, which
+            // cannot appear in either side.
+            //
+            // The pipe must go in the NAME for this to bite. An earlier version paired
+            // ("Models", "Calibration") against ("Models|Calibration", ""), whose keys
+            // differ under BOTH separators -- "Models\0Calibration" vs
+            // "Models|Calibration\0", and "Models|Calibration" vs "Models|Calibration|"
+            // -- so it passed whichever separator Key used and never guarded the thing
+            // it is named for. The pair below collides on "|" and only on "|":
+            //
+            //   "\0" -> "Models\0Calibration|Extra" vs "Models|Calibration\0Extra" (differ)
+            //   "|"  -> "Models|Calibration|Extra"  vs "Models|Calibration|Extra"  (SAME)
+            //
+            // Only the menu is split and rejoined; the name is used verbatim, which is
+            // what lets a name carry a literal pipe into the key.
             var running = new RunningAddons();
-            running.MarkRunning(Addon("Models", "Calibration"));
+            running.MarkRunning(Addon("Models", "Calibration|Extra"));
 
-            Assert.That(running.RunningCount(Addon("Models|Calibration", "")), Is.EqualTo(0));
+            Assert.That(running.RunningCount(Addon("Models|Calibration", "Extra")), Is.EqualTo(0));
         }
 
         [Test]
