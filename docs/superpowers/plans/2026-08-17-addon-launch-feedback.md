@@ -1744,11 +1744,58 @@ csc /langversion:7.3 /warnaserror /t:library Addons\RunningAddons.cs Addons\Addo
 
 and **say plainly in the commit message that the tests were not run there**, rather than implying they passed.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git commit -m "feat: port addon launch feedback to legacy_ci"
 ```
+
+### Execution status
+
+Ported at `948ec7f` on `legacy_ci` (parent `9be5df0`), 2026-08-21, as one squashed
+commit: `git cherry-pick 9bb7792^..c8d912a` then `reset --soft` and re-commit.
+
+**Only two files had diverged** between the feature's merge-base and `legacy_ci`
+— `VeneerMenu.cs` and `WebServerStatusControl.xaml.cs`. Fifteen of sixteen commits
+applied clean.
+
+**The one textual conflict**, in `3c19b27`: `legacy_ci` declares `SourceAddonLog`
+*before* `ControlAddonLog`, master *after*, so the pick tried to insert master's
+rewritten class at master's position and leave legacy's copy standing — two
+`SourceAddonLog` classes. Resolved by keeping `legacy_ci`'s ordering and editing
+the existing class in place.
+
+**`EffectiveControl` was deliberately NOT back-ported.** Master has
+`Control ?? WebServerStatusControl.ActiveInstance`, which is master-only work
+outside these sixteen commits. It exists because master's `ChangeScenarioAsync`
+assigns `Control` on an async continuation after an awaited `StartServer`,
+leaving a window where it is null on the first click. **`legacy_ci`'s `Scenario`
+setter is synchronous** (`StartServer(); PopulateMenu();` inline), so `Control` is
+assigned before the setter returns and the fallback would cover nothing.
+
+**`MC1000` did not occur — this plan's Step 3 is out of date.** The branch builds
+clean: `MSBuild -t:Rebuild -p:Configuration=Debug`, 0 warnings 0 errors, under
+`/warnaserror+` and `/langversion:7.3`. Whatever caused the markup-compiler
+failure during the url-addons work is gone.
+
+**Tests ran on this branch**: 192 total, **190 passed, 2 failed**. Both failures
+are pre-existing and unrelated — `ScriptMode_PersistsStateAcrossLinesAndStripsScaffolding`
+and `ScriptMode_StopsAtFirstFailureAndAttributesTheLine`. Confirmed by building a
+throwaway detached worktree at the parent commit and running the same command
+there: **134 total, 132 passed, the same 2 failing.** Root cause is this machine's
+console encoding prefixing the batch text written to `cmd`'s stdin with a UTF-8
+BOM, so `cmd` rejects `@echo off` and exits 9009. Nothing in this feature touches
+stdin generation. The port therefore adds 58 tests, all passing.
+
+Two caveats, both carried in the commit message: the NUnit that resolved for the
+build was **3.13.2**, not the 2.6.4 floor, so 2.6.4 portability is established by
+inspection rather than execution; and **nothing was verified in a running Source**
+on this branch — the menu behaviour has GUI coverage on `master` only.
+
+> **`..\Output` hosts one branch's reference set at a time.** Building `legacy_ci`
+> (net48) leaves `master` failing with the `CS0234` above until the Source 6.x
+> restage in Prerequisites is re-run, and the reverse also holds. Both happened
+> during this task. Re-run the restage after any `legacy_ci` build.
 
 ---
 
