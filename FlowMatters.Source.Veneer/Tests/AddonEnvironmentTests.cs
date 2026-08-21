@@ -109,9 +109,9 @@ namespace FlowMatters.Source.Veneer.Tests
         private static AddonContext CtxWithEnv(params string[] keysAndValues)
         {
             var context = Ctx();
-            context.Env = new Dictionary<string, string>();
+            context.ConfigEnv = new Dictionary<string, string>();
             for (var i = 0; i < keysAndValues.Length; i += 2)
-                context.Env[keysAndValues[i]] = keysAndValues[i + 1];
+                context.ConfigEnv[keysAndValues[i]] = keysAndValues[i + 1];
             return context;
         }
 
@@ -131,17 +131,21 @@ namespace FlowMatters.Source.Veneer.Tests
             Assert.That(env["TOOLS_ROOT"], Is.EqualTo(@"C:\Users\joel\.veneer\tools"));
         }
 
-        // Asserted in both key orders: the result must not depend on which entry
-        // the dictionary happens to yield first.
+        // Both rows insert the referenced key before the referencing one, which
+        // is the ordering that catches the mistake this guards against: expanding
+        // against the live dictionary would resolve %firstKey% here instead of
+        // leaving it literal. The reverse ordering cannot distinguish a correct
+        // implementation from that one -- with the base not yet written, both
+        // leave the value literal -- so it is not worth a third row.
         [TestCase("AAA", "ZZZ")]
         [TestCase("ZZZ", "AAA")]
-        public void BuildEffective_FileLevelEnvDoesNotResolveAgainstItself(
+        public void BuildEffective_FileLevelEnvDoesNotResolveAgainstAnEarlierKey(
             string firstKey, string secondKey)
         {
             var env = AddonEnvironment.BuildEffective(
                 CtxWithEnv(firstKey, @"D:\base", secondKey, "%" + firstKey + @"%\sub"), null);
             Assert.That(env[secondKey], Is.EqualTo("%" + firstKey + @"%\sub"),
-                        "left literal, so a cross-reference is visible rather than order-dependent");
+                        "left literal, so a cross-reference is visible rather than silently resolved");
         }
 
         [Test]
@@ -175,7 +179,7 @@ namespace FlowMatters.Source.Veneer.Tests
         public void BuildEffective_NullFileLevelEnvIsHarmless()
         {
             var context = Ctx();
-            context.Env = null;
+            context.ConfigEnv = null;
             var env = AddonEnvironment.BuildEffective(context, null);
             Assert.That(env["VENEER_PORT"], Is.EqualTo("9876"));
         }

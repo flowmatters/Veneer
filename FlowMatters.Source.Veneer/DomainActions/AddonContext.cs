@@ -16,10 +16,12 @@ namespace FlowMatters.Source.Veneer.DomainActions
         public int Port { get; set; }
 
         /// <summary>
-        /// The file-level env merged from every .veneer layer. Distinct from an
-        /// addon's own env, which is more specific and wins.
+        /// The file-level env merged from every .veneer layer, shared by every
+        /// addon. Named ConfigEnv rather than Env because it is passed alongside
+        /// an addon's own `env`, which is more specific and wins; two members
+        /// differing only by case in the same argument list invites misreading.
         /// </summary>
-        public Dictionary<string, string> Env { get; set; }
+        public Dictionary<string, string> ConfigEnv { get; set; }
     }
 
     // Every call site compares these with == only, never <, >, <= or >= (verified by

@@ -70,9 +70,9 @@ that way. A case-sensitive merge would let `Path` and `PATH` coexist.
 |---|---|---|
 | `Addons/VeneerConfigurationResolver.cs` | Pure resolution and merging | `Resolve` reshaped to three layers; `ConfigCandidates` re-slotted; `Merge` gains `env`; `SupersededSidecar` removed |
 | `Addons/VeneerConfiguration.cs` | I/O adapter and DTOs | `env` field added; `ConfigurationFilename` redefined; `SupersededSidecar` assignment removed |
-| `DomainActions/AddonContext.cs` | Launch inputs, primitives only | Gains `Env` |
+| `DomainActions/AddonContext.cs` | Launch inputs, primitives only | Gains `ConfigEnv` |
 | `DomainActions/AddonEnvironment.cs` | Environment assembly and expansion | `BuildEffective` gains a layer |
-| `VeneerMenu.cs` | Menu integration | `BuildAddonContext` populates `Env` |
+| `VeneerMenu.cs` | Menu integration | `BuildAddonContext` populates `ConfigEnv` |
 | `AutoStart/ProjectLoadListener.cs` | Load-time defaults and diagnostics | Superseding clause removed |
 | `Tests/VeneerConfigurationResolverTests.cs` | Resolver tests | Resolve block rewritten; `env` merge tests added |
 | `Tests/AddonEnvironmentTests.cs` | Environment tests | File-level `env` tests added |
@@ -725,7 +725,7 @@ against `BuildEffective`, and observed for real in Task 6.
 In `VeneerMenu.BuildAddonContext`, add below the `ConfigDirectory` line:
 
 ```csharp
-                Env = VeneerConfiguration.Load(Scenario).env,
+                ConfigEnv = VeneerConfiguration.Load(Scenario).env,
 ```
 
 This is a fifth `Load` call site, at launch rather than menu-open. That is
@@ -978,7 +978,7 @@ branch-identical apart from this feature.
 
 `legacy_ci`'s `VeneerMenu.cs` differs genuinely — it uses `Control` where the
 feature branch uses `EffectiveControl` — so do **not** copy it. Apply Task 4's
-`Env = VeneerConfiguration.Load(Scenario).env,` line to `BuildAddonContext`.
+`ConfigEnv = VeneerConfiguration.Load(Scenario).env,` line to `BuildAddonContext`.
 
 No other `VeneerMenu.cs` change is needed; the four edits from the previous port
 are unaffected.

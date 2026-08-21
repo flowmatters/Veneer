@@ -29,25 +29,32 @@ namespace FlowMatters.Source.Veneer.DomainActions
             env["VENEER_PROJECT_FILE"] = context.ProjectFile ?? string.Empty;
             env["VENEER_CONFIG_DIR"] = context.ConfigDirectory ?? string.Empty;
 
-            // The .veneer files' own env, beneath the addon's. Snapshot first so
-            // these cannot resolve against each other -- the result must not
-            // depend on JSON key order or on which layer a key came from.
-            if (context.Env != null)
-            {
-                var injected = new Dictionary<string, string>(env, StringComparer.OrdinalIgnoreCase);
-                foreach (var kv in context.Env)
-                    env[kv.Key] = Expand(kv.Value, injected);
-            }
-
-            if (addonEnv != null)
-            {
-                // Snapshot first so addon entries cannot resolve against each other.
-                var baseline = new Dictionary<string, string>(env, StringComparer.OrdinalIgnoreCase);
-                foreach (var kv in addonEnv)
-                    env[kv.Key] = Expand(kv.Value, baseline);
-            }
+            // The .veneer files' own env, then the addon's, which is more specific
+            // and so is applied last.
+            ApplyLayer(env, context.ConfigEnv);
+            ApplyLayer(env, addonEnv);
 
             return env;
+        }
+
+        /// <summary>
+        /// Writes one layer over the accumulated environment, expanding its values
+        /// against a snapshot taken before any of them are written.
+        ///
+        /// The snapshot is the whole point, and it lives here rather than being
+        /// repeated per layer so that it cannot be preserved in one place and lost
+        /// in another. Expanding against the live dictionary instead would let one
+        /// entry resolve against another in the same layer, making the result
+        /// depend on dictionary iteration order.
+        /// </summary>
+        private static void ApplyLayer(
+            Dictionary<string, string> env, IDictionary<string, string> layer)
+        {
+            if (layer == null) return;
+
+            var snapshot = new Dictionary<string, string>(env, StringComparer.OrdinalIgnoreCase);
+            foreach (var kv in layer)
+                env[kv.Key] = Expand(kv.Value, snapshot);
         }
 
         /// <summary>
