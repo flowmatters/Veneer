@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using FlowMatters.Source.Veneer.Addons;
 
 namespace FlowMatters.Source.Veneer.DomainActions
@@ -13,6 +14,12 @@ namespace FlowMatters.Source.Veneer.DomainActions
         public string ProjectFile { get; set; }
         public string ConfigDirectory { get; set; }
         public int Port { get; set; }
+
+        /// <summary>
+        /// The file-level env merged from every .veneer layer. Distinct from an
+        /// addon's own env, which is more specific and wins.
+        /// </summary>
+        public Dictionary<string, string> Env { get; set; }
     }
 
     // Every call site compares these with == only, never <, >, <= or >= (verified by

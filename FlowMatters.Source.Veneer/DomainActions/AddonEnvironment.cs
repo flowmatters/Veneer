@@ -11,10 +11,10 @@ namespace FlowMatters.Source.Veneer.DomainActions
             new Regex("%([^%]+)%", RegexOptions.Compiled);
 
         /// <summary>
-        /// process environment + Veneer's injected variables + the addon's own env
-        /// (which wins). Values in the addon's env are expanded against everything
-        /// above them, but NOT against each other -- that would make the result
-        /// depend on JSON key order.
+        /// process environment + Veneer's injected variables + the .veneer files'
+        /// file-level env + the addon's own env, each winning over the one before.
+        /// Each layer is expanded against a snapshot of the layers above it, never
+        /// against itself, so no result depends on JSON key order.
         /// </summary>
         public static Dictionary<string, string> BuildEffective(
             AddonContext context, IDictionary<string, string> addonEnv)
@@ -28,6 +28,16 @@ namespace FlowMatters.Source.Veneer.DomainActions
             env["VENEER_PROJECT_DIR"] = context.ProjectDirectory ?? string.Empty;
             env["VENEER_PROJECT_FILE"] = context.ProjectFile ?? string.Empty;
             env["VENEER_CONFIG_DIR"] = context.ConfigDirectory ?? string.Empty;
+
+            // The .veneer files' own env, beneath the addon's. Snapshot first so
+            // these cannot resolve against each other -- the result must not
+            // depend on JSON key order or on which layer a key came from.
+            if (context.Env != null)
+            {
+                var injected = new Dictionary<string, string>(env, StringComparer.OrdinalIgnoreCase);
+                foreach (var kv in context.Env)
+                    env[kv.Key] = Expand(kv.Value, injected);
+            }
 
             if (addonEnv != null)
             {
