@@ -5,7 +5,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageVersion Include="CommandLineParser" Version="2.9.1" />
-    <PackageVersion Include="CoreWCF.WebHttp" Version="1.7.0" />
+    <PackageVersion Include="CoreWCF.WebHttp" Version="1.9.1" />
     <PackageVersion Include="coverlet.collector" Version="6.0.2" />
     <PackageVersion Include="FirebirdSql.Data.FirebirdClient" Version="10.3.1" />
     <PackageVersion Include="IronPython" Version="3.4.2" />
@@ -26,12 +26,11 @@
     <!-- Required to match RiverSystem.Controls.UI-->
     <PackageVersion Include="System.Drawing.Common" Version="9.0.0" />
     <PackageVersion Include="System.Resources.Extensions" Version="10.0.0"/>
-    <PackageVersion Include="System.ServiceModel.Duplex" Version="6.0.0" />
     <PackageVersion Include="System.ServiceModel.Federation" Version="8.1.2" />
+    <PackageVersion Include="System.Security.Cryptography.Xml" Version="8.0.4" />
     <PackageVersion Include="System.ServiceModel.Http" Version="8.1.2" />
     <PackageVersion Include="System.ServiceModel.NetTcp" Version="8.1.2" />
     <PackageVersion Include="System.ServiceModel.Primitives" Version="8.1.2" />
-    <PackageVersion Include="System.ServiceModel.Security" Version="6.0.0" />
     <PackageVersion Include="System.Text.Encoding.CodePages" Version="8.0.0" />
   </ItemGroup>
 </Project>
