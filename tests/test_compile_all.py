@@ -197,3 +197,11 @@ def test_report_results_any_nonzero_returncode_is_a_failure(tmp_path):
 
 def test_report_results_no_versions_is_success(tmp_path):
 	assert compile_all.report_results({}, {}, str(tmp_path / 'f.txt')) == 0
+
+def test_select_versions_matches_shortname_glob():
+	info = [('/a', 'Veneer_for_Source_6.10.0', True),
+	        ('/b', 'Veneer_for_Source_6.1.0', True),
+	        ('/c', 'Source_5.30.0', True)]
+	assert compile_all.select_versions(info, ['Veneer_for_Source_6.10*']) == [info[0]]
+	assert compile_all.select_versions(info, ['*6.1.0', 'Source_5*']) == [info[1], info[2]]
+	assert compile_all.select_versions(info, ['nomatch']) == []

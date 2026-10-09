@@ -77,6 +77,11 @@ def unique_versions(all_versions:List[str], num_elements:int, prefix:str) -> Lis
 		uniq_versions[v_num] = v
 	return sorted(uniq_versions.values())
 
+def select_versions(version_info: list, patterns: List[str]) -> list:
+	"""Keep only the (fullpath, shortname, custom) entries whose shortname matches any glob in
+	`patterns`. Backs the --only switch; order is preserved."""
+	return [v for v in version_info if any(fnmatch.fnmatch(v[1], p) for p in patterns)]
+
 MAX_VERSION = [7, 99, 4]
 
 def valid_version(components):
@@ -633,6 +638,9 @@ def main():
 	parser.add_argument('--reference-subdir', default='',
 		help='Subdirectory inside each version dir holding the main Source DLLs. Empty = flat (installed layout); pass e.g. "Source" for a binaries-repo layout.')
 	parser.add_argument('--fail','-f',help="Fail fast: Stop after first failure",action='store_true',default=False)
+	parser.add_argument('--only', action='append', default=[], metavar='GLOB',
+			  help='Build only the versions whose short name matches GLOB (repeatable, e.g. --only Veneer_for_Source_6.10.0). '
+			       'Leaves that version\'s references staged in --refpath, so dotnet build/test work directly afterwards.')
 	parser.add_argument('--keep','-k',help='Keep references in output directory',action='store_true',default=False)
 	parser.add_argument('--copy_to_source','-c',help='Copy outputs to Source directory WHEN COMPILING AGAINST CUSTOM VERSION OF SOURCE',action='store_true',default=False)
 	parser.add_argument('--wcf-branch',help='Git branch for WCF (legacy) builds',default='legacy_ci')
@@ -696,6 +704,14 @@ def main():
 	shortnames = [os.path.basename(v) for v in versions_to_compile]
 	version_info = list(zip(versions_to_compile,shortnames,[False]*len(versions_to_compile)))
 	version_info += include_patterns
+
+	if args.only:
+		version_info = select_versions(version_info, args.only)
+		logger.info("*** --only SELECTED %d VERSION(S) ***" % len(version_info))
+		logger.info("\n".join(v[1] for v in version_info))
+		if not version_info:
+			logger.error("No Source version matches --only %s" % ' '.join(args.only))
+			raise SystemExit(1)
 
 	previous_fails = [v for v in version_info if v[1] in fails_previous_run]
 	previous_success = [v for v in version_info if not v[1] in fails_previous_run]
