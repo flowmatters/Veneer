@@ -23,7 +23,10 @@ namespace FlowMatters.Source.Veneer
 {
     public class SourceRESTfulService : AbstractSourceServer
     {
-        private static readonly HttpClient _httpClient = new HttpClient();
+        // Short timeout because this client only ever fetches the optional announcement
+        // banner at STATUS_URL. A filtering proxy that black-holes the request instead of
+        // answering it would otherwise hold the task open for HttpClient's 100 second default.
+        private static readonly HttpClient _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
         public const int DEFAULT_PORT = 9876;
         public const string STATUS_URL = "https://www.flowmatters.com.au/veneer/status.json";
         private IWebHost _host;
@@ -154,20 +157,23 @@ namespace FlowMatters.Source.Veneer
                 await _host.StartAsync();
 
                 Log("Veneer, by Flow Matters: https://www.flowmatters.com.au");
-                try
-                {
-                    RetrieveVeneerStatus();
-                }
-                catch
-                {
-                    // Pass
-                }
 
                 Log(AllowSsl
                         ? $"Started Source RESTful Service on https port:{_port}"
                         : $"Started Source RESTful Service on http port:{_port}");
 
                 Running = true;
+
+                // Fire and forget, and deliberately AFTER `Running = true`. This fetches an
+                // optional announcement banner over the internet; it is not part of starting
+                // Veneer, and nothing below depends on it. Awaited here it sat on the path that
+                // WebServerStatusControl.StartServer's `while (!server.Running)` spin waits on --
+                // and therefore ahead of the addon menu population that follows it -- so an
+                // unreachable flowmatters.com.au delayed the addon menu. It also put the fetch's
+                // outcome in the log ABOVE the line saying Veneer had started, which is the
+                // order an operator reads. RetrieveVeneerStatus never throws, so the task needs
+                // no continuation and the old try/catch around it was already dead.
+                _ = RetrieveVeneerStatus();
 
                 await _host.WaitForShutdownAsync();
             }
@@ -255,18 +261,35 @@ namespace FlowMatters.Source.Veneer
             Log($"COULD NOT START VENEER ON PORT {_port}", LogLevel.Error);
         }
 
-        private void RetrieveVeneerStatus()
+        /// <summary>
+        /// Fetches the optional announcement messages published at <see cref="STATUS_URL"/>.
+        ///
+        /// Best-effort by design, and never throws: the messages are informational, and Veneer
+        /// is already started and serving before this runs.
+        ///
+        /// Failure is logged at Debug, NOT Warning. Behind a filtering proxy this request fails
+        /// on every single start, and at Warning it cleared the panel's default minimum level,
+        /// so operators always saw it. Worded as a Veneer status failure and sitting in a panel
+        /// the addon menu had just opened, directly beneath the addon they had launched, it read
+        /// as the addon's failure -- and got reported instead of whatever had actually gone
+        /// wrong. Debug keeps it available for diagnosis without volunteering it.
+        /// </summary>
+        private async Task RetrieveVeneerStatus()
         {
             try
             {
-                var response = _httpClient.GetStringAsync(STATUS_URL).GetAwaiter().GetResult();
+                var response = await _httpClient.GetStringAsync(STATUS_URL);
                 dynamic status = JsonConvert.DeserializeObject(response);
                 JArray messages = status.message;
                 messages.Reverse().Select(e=>e.ToString()).ForEachItem(m => Log(m));
             }
             catch (Exception ex)
             {
-                Log($"Failed to retrieve Veneer status: {ex.Message}", LogLevel.Warning);
+                // Names the remote fetch, not "Veneer status", and says outright that the
+                // server is fine -- the whole failure mode here was a message that could be
+                // mistaken for Veneer being broken.
+                Log($"Could not fetch Veneer announcements from {STATUS_URL}: {ex.Message}. " +
+                    "This is an optional online message and does not affect Veneer.", LogLevel.Debug);
             }
         }
 
