@@ -133,7 +133,7 @@ namespace FlowMatters.Source.Veneer.Tests
         {
             var running = new RunningAddons();
 
-            Assert.DoesNotThrow(() => running.MarkRunning(null));
+            Assert.DoesNotThrow((Action)(() => running.MarkRunning(null)));
             Assert.That(running.RunningCount(null), Is.EqualTo(1));
         }
 
@@ -143,7 +143,7 @@ namespace FlowMatters.Source.Veneer.Tests
             var running = new RunningAddons();
             running.MarkRunning(null);
 
-            Assert.DoesNotThrow(() => running.Finished(null));
+            Assert.DoesNotThrow((Action)(() => running.Finished(null)));
             Assert.That(running.RunningCount(null), Is.EqualTo(0));
         }
 
@@ -161,12 +161,12 @@ namespace FlowMatters.Source.Veneer.Tests
             var running = new RunningAddons();
             var addon = Addon("Reporting", "Tool");
 
-            Assert.DoesNotThrow(() => running.Finished(addon));
+            Assert.DoesNotThrow((Action)(() => running.Finished(addon)));
             Assert.That(running.RunningCount(addon), Is.EqualTo(0));
 
             running.MarkRunning(addon);
             running.Finished(addon);
-            Assert.DoesNotThrow(() => running.Finished(addon));
+            Assert.DoesNotThrow((Action)(() => running.Finished(addon)));
             Assert.That(running.RunningCount(addon), Is.EqualTo(0));
         }
 
