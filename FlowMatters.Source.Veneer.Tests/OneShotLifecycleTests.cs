@@ -123,7 +123,7 @@ namespace FlowMatters.Source.Veneer.Tests
         [Test]
         public void ANullCallbackThrows()
         {
-            Assert.Throws<ArgumentNullException>(() => new OneShotLifecycle(null));
+            Assert.Throws<ArgumentNullException>((Action)(() => new OneShotLifecycle(null)));
         }
     }
 }

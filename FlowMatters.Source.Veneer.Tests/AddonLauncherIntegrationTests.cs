@@ -224,7 +224,7 @@ namespace FlowMatters.Source.Veneer.Tests
             var context = new AddonContext { ProjectDirectory = null, Port = 1 };
 
             var log = new FakeLog();
-            Assert.DoesNotThrow(() => AddonLauncher.Launch(addon, context, log, new FakeLifecycle()),
+            Assert.DoesNotThrow((Action)(() => AddonLauncher.Launch(addon, context, log, new FakeLifecycle())),
                                 "Launch runs on the menu Click handler and must never throw");
             Assert.That(log.Lines.Length, Is.EqualTo(1), log.Dump());
             AddonAssert.Contains(log.Lines[0], "no project directory");
