@@ -18,8 +18,6 @@
     <AppendPlatformToOutputPath>false</AppendPlatformToOutputPath>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
 
-    <ServerGarbageCollection>true</ServerGarbageCollection>
-
     <!-- Use a common output directory -->
     <RootPath>$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)..\'))</RootPath>
     <RootOutDir>$(RootPath)Output\</RootOutDir>
