@@ -53,13 +53,17 @@ namespace FlowMatters.Source.VeneerCmd
         /// under the Source root (three levels). Probing for RiverSystem.dll handles all of them without
         /// hard-coding a depth. Returns an empty list when Source is not found, so the caller reports the
         /// missing directory and suggests -d rather than silently searching paths that do not exist.
+        ///
+        /// Skip the Plugins and CommunityPlugins folders. They are not the Source folder, but in a
+        /// development build they can contain a copy of RiverSystem.dll. If we picked one of them,
+        /// Source would look for fbclient.dll there and fail to open the project.
         /// </remarks>
         private static List<string> FindDefaultSearchPaths()
         {
             var directory = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
             for (var level = 0; directory != null && level <= MaxSourceProbeDepth; level++, directory = directory.Parent)
             {
-                if (!File.Exists(Path.Combine(directory.FullName, "RiverSystem.dll")))
+                if (IsPluginsDirectory(directory) || !File.Exists(Path.Combine(directory.FullName, "RiverSystem.dll")))
                     continue;
 
                 return new List<string>
@@ -73,16 +77,17 @@ namespace FlowMatters.Source.VeneerCmd
             return new List<string>();
         }
 
+        private static bool IsPluginsDirectory(DirectoryInfo directory)
+        {
+            return string.Equals(directory.Name, "Plugins", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(directory.Name, "CommunityPlugins", StringComparison.OrdinalIgnoreCase);
+        }
+
         static void Main(string[] args)
         {
             // Required for log4net used in RiverSystem.Persistence
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
-            // Set up configuration (no RiverSystem dependencies here)
-            _configuration = new ConfigurationBuilder()
-                .SetBasePath(AppDomain.CurrentDomain.BaseDirectory)
-                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-                .Build();
 
             // Parse command line arguments (no RiverSystem dependencies)
             var result = Parser.Default.ParseArguments<Options>(args);
@@ -108,6 +113,15 @@ namespace FlowMatters.Source.VeneerCmd
 
                 // Catch any assemblies that fail to load and try them in the Source directory itself
                 AppDomain.CurrentDomain.AssemblyResolve += CurrentDomain_AssemblyResolve;
+
+                // Keep this after the AssemblyResolve handler. Reading JSON needs System.Text.Json,
+                // which only the handler can load (from the Source folder), so moving this earlier fails.
+
+                // Set up configuration (no RiverSystem dependencies here)
+                _configuration = new ConfigurationBuilder()
+                    .SetBasePath(AppDomain.CurrentDomain.BaseDirectory)
+                    .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+                    .Build();
 
                 // NOW call the method that has RiverSystem dependencies
                 // This is where assembly loading will happen, but now paths are set up
