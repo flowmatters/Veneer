@@ -563,6 +563,36 @@ def build_version(branch_key, fullpath, version, custom, solution, effective_ref
 
 	return returncode, build_errors
 
+# --- Results summary ---
+
+def report_results(results, build_failures, fails_fn=LAST_FAILS_FN):
+	"""Log the per-version results and return the process exit code: 1 if any
+	version failed, else 0, so CI can fail the run. Failures are recorded in
+	fails_fn for the next run to retry first; a run with no failures removes it,
+	so a retry pass that fixes everything leaves no stale list behind."""
+	failures = sorted([k for (k, v) in results.items() if v != 0])
+	successes = sorted([k for (k, v) in results.items() if v == 0])
+	logger.info("\n*** RESULTS ***")
+	logger.info("%d successful builds out of %d versions" % (len(successes), len(results)))
+	if not failures:
+		if os.path.exists(fails_fn):
+			os.remove(fails_fn)
+		return 0
+	logger.info("FAILED TO BUILD AGAINST %d VERSIONS" % (len(failures)))
+	logger.info("\n".join(failures))
+	with open(fails_fn, 'w') as f:
+		f.write('\n'.join(failures))
+	logger.info("\n*** FAILURE DETAILS ***")
+	for v in failures:
+		excerpt = build_failures.get(v)
+		logger.info("--- %s ---" % v)
+		if excerpt:
+			for line in excerpt:
+				logger.info("    %s" % line)
+		else:
+			logger.info("    (no error lines captured; see full build log above)")
+	return 1
+
 def main():
 	logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 	parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -731,25 +761,7 @@ def main():
 			if created_temp and not args.keep_temp_worktrees:
 				subprocess.run(['git', 'worktree', 'remove', '--force', wt])
 
-	# --- Results summary ---
-	failures = sorted([k for (k, v) in results.items() if v > 0])
-	successes = sorted([k for (k, v) in results.items() if v == 0])
-	logger.info("\n*** RESULTS ***")
-	logger.info("%d successful builds out of %d versions" % (len(successes), len(results)))
-	if failures:
-		logger.info("FAILED TO BUILD AGAINST %d VERSIONS" % (len(failures)))
-		logger.info("\n".join(failures))
-		open(LAST_FAILS_FN, 'w').writelines('\n'.join(failures))
-		logger.info("\n*** FAILURE DETAILS ***")
-		for v in failures:
-			excerpt = build_failures.get(v)
-			logger.info("--- %s ---" % v)
-			if excerpt:
-				for line in excerpt:
-					logger.info("    %s" % line)
-			else:
-				logger.info("    (no error lines captured; see full build log above)")
-
+	return report_results(results, build_failures)
 
 if __name__ == '__main__':
-	main()
+	sys.exit(main())

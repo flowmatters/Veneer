@@ -173,3 +173,27 @@ def test_extract_build_errors_fallback_to_tail_when_no_diagnostics():
 	out = compile_all.extract_build_errors(lines, max_lines=2)
 	# no coded diagnostics -> last 2 non-empty lines
 	assert out == ["Segmentation fault", "make: *** [all] Error 1"]
+
+def test_report_results_failure_returns_nonzero_and_records_fails(tmp_path):
+	fails_fn = tmp_path / '_last_fails.txt'
+	code = compile_all.report_results({'6.0.0': 1, '5.60.0': 0, '6.2.0': 1},
+		{'6.0.0': ['error X']}, str(fails_fn))
+	assert code != 0
+	assert fails_fn.read_text().splitlines() == ['6.0.0', '6.2.0']
+
+def test_report_results_all_success_returns_zero_and_clears_stale_fails(tmp_path):
+	# A retry pass that fixes every earlier failure must not leave the earlier
+	# pass's list behind, or the next run would treat them as still failing.
+	fails_fn = tmp_path / '_last_fails.txt'
+	fails_fn.write_text('6.0.0')
+	code = compile_all.report_results({'6.0.0': 0, '6.2.0': 0}, {}, str(fails_fn))
+	assert code == 0
+	assert not fails_fn.exists()
+
+def test_report_results_any_nonzero_returncode_is_a_failure(tmp_path):
+	# Windows crash codes can be large or negative; anything but 0 is a failure.
+	code = compile_all.report_results({'6.0.0': -1}, {}, str(tmp_path / 'f.txt'))
+	assert code != 0
+
+def test_report_results_no_versions_is_success(tmp_path):
+	assert compile_all.report_results({}, {}, str(tmp_path / 'f.txt')) == 0
