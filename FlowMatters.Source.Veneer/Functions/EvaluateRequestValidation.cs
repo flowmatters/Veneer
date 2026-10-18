@@ -9,9 +9,10 @@ namespace FlowMatters.Source.Veneer.Functions
     /// The request-level checks for POST /functions/evaluate — the conditions that answer 400 for
     /// the whole batch rather than an error on one item. Pure and Source-free so it is
     /// unit-testable. Everything else (bindings, context, parse, evaluation) is a per-item error
-    /// that never fails the batch. Every error names the item: by its zero-based index when it
-    /// is null or lacks an id or an expression, otherwise (a bad date) by its id. Duplicate ids are accepted; results come back
-    /// in request order, so a client can tell duplicates apart by position.
+    /// that never fails the batch. Every per-item error names the item: by its zero-based index
+    /// when it is null or lacks an id or an expression, otherwise (a bad date) by its id.
+    /// Duplicate ids are accepted; results come back in request order, so a client can tell
+    /// duplicates apart by position.
     /// </summary>
     public static class EvaluateRequestValidation
     {

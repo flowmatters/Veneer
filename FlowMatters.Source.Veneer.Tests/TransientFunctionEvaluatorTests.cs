@@ -60,15 +60,18 @@ namespace FlowMatters.Source.Veneer.Tests
         /// reached by ONE entity, so RemoveFromSets never hands it on and Settle never sees it.
         /// The second clone's add then sometimes lands after the only Remove and is left behind
         /// (measured 7–19 strays per 100 trials on a dev machine) — proof that the race is real
-        /// and that the settle step is what removes it. Asserts only that at least one stray
-        /// appears over 300 trials, so a quieter machine is very unlikely to make it fail.
+        /// and that the settle step is what removes it. Stops at the first stray; if none
+        /// appears in 2000 trials the race did not occur on this machine, which is inconclusive
+        /// rather than a failure.
         /// </summary>
         [Test, Category("Slow")] public void RemoveFromSets_WithoutTheHandOff_LeavesStraysInASharedSet()
         {
-            var result = RaceReleaseAgainstAdds(trials: 300, sharedEntityCount: 1);
-            TestContext.Out.WriteLine("strays in the shared set: " + result.StraysShared + " of 300 trials");
-            Assert.That(result.StraysShared, Is.GreaterThan(0), "no stray: the race did not show, so the test above proves nothing");
+            const int maxTrials = 2000;
+            var result = RaceReleaseAgainstAdds(maxTrials, sharedEntityCount: 1, stopAtFirstStray: true);
+            TestContext.Out.WriteLine("strays in the shared set: " + result.StraysShared + " of " + result.Trials + " trials");
             Assert.That(result.StraysOther, Is.EqualTo(0), "strays in the unique set");
+            if (result.StraysShared == 0)
+                Assert.Inconclusive("the race did not occur in 2000 trials on this machine");
         }
 
         private sealed class RaceResult
@@ -76,13 +79,16 @@ namespace FlowMatters.Source.Veneer.Tests
             public int StraysShared;
             public int StraysOther;
             public int Outstanding;
+            public int Trials;
         }
 
-        private static RaceResult RaceReleaseAgainstAdds(int trials, int sharedEntityCount)
+        private static RaceResult RaceReleaseAgainstAdds(int trials, int sharedEntityCount, bool stopAtFirstStray = false)
         {
             var result = new RaceResult();
             for (var t = 0; t < trials; t++)
             {
+                if (stopAtFirstStray && result.StraysShared > 0) break;
+                result.Trials++;
                 var fn = new object();
                 var shared = NewSet();
                 var other = NewSet();

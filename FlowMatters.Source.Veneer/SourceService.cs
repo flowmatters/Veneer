@@ -357,18 +357,6 @@ namespace FlowMatters.Source.Veneer
         {
             Log("Triggering a run.");
 
-            lock (_runLock)
-            {
-                if (_currentScenarioInvoker?.IsRunning == true)
-                {
-                    throw new WebFaultException<SimulationFault>(
-                        new SimulationFault(new InvalidOperationException("A simulation is already running. Cancel the current run before starting a new one.")),
-                        HttpStatusCode.Conflict);
-                }
-
-                _currentScenarioInvoker = new ScenarioInvoker { Scenario = Scenario };
-            }
-
             ConcurrentQueue<string> messages = new ConcurrentQueue<string>();
             object stackTraceLock = new object();
             string lastStackTrace = null;
@@ -385,17 +373,32 @@ namespace FlowMatters.Source.Veneer
                     }
                 }
             };
-            TIME.Management.Log.MessageRecieved += runLogger;
+            HashSet<int> runNumbersBefore = null;
 
-            // Snapshot the existing runs so we can detect whether this invocation actually
-            // produced a new one. RunManager.Execute() can return without throwing yet abort the
-            // simulation internally (e.g. a data file fails to load), reporting the cause only
-            // through the log stream captured above.
-            var runNumbersBefore = new HashSet<int>(
-                Scenario.Project.ResultManager.AllRuns().Select(run => run.RunNumber));
+            lock (_runLock)
+            {
+                if (_currentScenarioInvoker?.IsRunning == true)
+                {
+                    throw new WebFaultException<SimulationFault>(
+                        new SimulationFault(new InvalidOperationException("A simulation is already running. Cancel the current run before starting a new one.")),
+                        HttpStatusCode.Conflict);
+                }
+
+                // Nothing that can throw between here and the try: the finally is what releases this claim, and evaluate refuses while it is set.
+                _currentScenarioInvoker = new ScenarioInvoker { Scenario = Scenario };
+            }
 
             try
             {
+                TIME.Management.Log.MessageRecieved += runLogger;
+
+                // Snapshot the existing runs so we can detect whether this invocation actually
+                // produced a new one. RunManager.Execute() can return without throwing yet abort the
+                // simulation internally (e.g. a data file fails to load), reporting the cause only
+                // through the log stream captured above.
+                runNumbersBefore = new HashSet<int>(
+                    Scenario.Project.ResultManager.AllRuns().Select(run => run.RunNumber));
+
                 _currentScenarioInvoker.RunScenario(parameters, RunningInGUI, _sharedLogGenerator);
             }
             catch (Exception e)
