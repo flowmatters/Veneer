@@ -44,7 +44,9 @@ def served_model(tmp_path_factory):
         pytest.skip(f"{MODEL} is missing; generate it with tests/fixtures/build_evaluate_model.py")
     port = int(os.environ.get("VENEER_TEST_PORT", "9890"))
     if port_in_use(port):
-        pytest.skip(f"port {port} is already in use; set VENEER_TEST_PORT to a free port")
+        # A failure, not a skip: something else is listening where the tests would talk, and a
+        # green run that tested nothing must not be mistaken for a pass.
+        pytest.fail(f"port {port} is already in use; set VENEER_TEST_PORT to a free port")
 
     from veneer import manage
     log_dir = tmp_path_factory.mktemp("veneer-log")

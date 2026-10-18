@@ -141,8 +141,8 @@ def test_leak_free_after_a_mixed_batch(veneer):
 
 # Everything evaluate could conceivably write: every function's Value and each of its usage
 # targets' current value, every variable's Value / SingleValue, each lookup table's interpolator
-# (identity and size), and the function manager's run time step (set only by
-# FunctionManager.Reset). One line per entry.
+# (identity and size, on its own "L|" line), and the function manager's run time step (set only
+# by FunctionManager.Reset). One line per entry.
 STATE_SCRIPT = '''
 import System
 from System.Reflection import BindingFlags
@@ -168,10 +168,10 @@ for v in fm.Variables:
             p = None
         if p is not None:
             parts.append("%s=%s" % (name, read(lambda: p.GetValue(v))))
-    if v.GetType().Name == "LinearVariable":
-        parts.append("LF=%s" % read(lambda: RuntimeHelpers.GetHashCode(v.LinearFunction)))
-        parts.append("LFCount=%s" % read(lambda: v.LinearFunction.Count))
     out.append("V|%s|%s" % (v.FullName, ";".join(parts)))
+    if v.GetType().Name == "LinearVariable":
+        out.append("L|%s|%s|%s" % (v.FullName, read(lambda: RuntimeHelpers.GetHashCode(v.LinearFunction)),
+                                   read(lambda: v.LinearFunction.Count)))
 rts = fm.GetType().GetProperty("RunTimeStep", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
 out.append("RTS|%s" % read(lambda: rts.GetValue(fm)))
 result = "\\n".join(out)
@@ -180,6 +180,15 @@ result = "\\n".join(out)
 
 def model_state(base_url):
     return run_script(base_url, STATE_SCRIPT).split("\n")
+
+
+def assert_usage_target_untouched(state):
+    """The once-per-run usage target still holds its own value: FunctionManager.Reset (never to
+    be called) would have written 0 there."""
+    usage_lines = [line for line in state if line.startswith(f"U|{USAGE_FUNCTION}|")]
+    assert usage_lines, ("the model has no usage of " + USAGE_FUNCTION
+                         + "; regenerate it with tests/fixtures/build_evaluate_model.py")
+    assert any(float(line.split("|")[3]) == USAGE_VALUE for line in usage_lines), usage_lines
 
 
 def run_state(base_url):
@@ -195,10 +204,7 @@ def test_evaluate_changes_nothing_in_the_model(veneer):
     FunctionManager.Reset was not called: it would have written 0 into the usage target."""
     base_url = veneer.base_url
     before, runs_before = model_state(base_url), run_state(base_url)
-    usage_lines = [line for line in before if line.startswith(f"U|{USAGE_FUNCTION}|")]
-    assert usage_lines, ("the model has no usage of " + USAGE_FUNCTION
-                         + "; regenerate it with tests/fixtures/build_evaluate_model.py")
-    assert any(float(line.split("|")[3]) == USAGE_VALUE for line in usage_lines), usage_lines
+    assert_usage_target_untouched(before)
 
     results = only_result(veneer,
                           make_item("lit", "1 + 1"),
@@ -213,8 +219,10 @@ def test_evaluate_changes_nothing_in_the_model(veneer):
                           make_item("mv", "$v_StorageA_Volume + 1"),
                           make_item("ts", "$v_Demand + 1"),
                           make_item("parse", "1 + * 2"),
-                          make_item("nan", "0 / 0"))
+                          make_item("nan", "0 / 0"),
+                          *builtin_items(base_url))
     by_id = {r["id"]: r for r in results}
+    assert_builtin_results(by_id)
     assert by_id["lit"]["value"] == 2 and by_id["lk"]["value"] == 2.5
     assert by_id["bound"]["value"] == 7
     for key in ("fn", "mv", "ts", "parse", "nan"):
@@ -224,6 +232,42 @@ def test_evaluate_changes_nothing_in_the_model(veneer):
     changed = sorted(set(before) ^ set(after))
     assert before == after, "model state changed:\n" + "\n".join(changed)
     assert runs_before == runs_after
+
+
+def input_set_name(base_url) -> str:
+    input_sets = requests.get(f"{base_url}/inputSets", timeout=60).json()
+    assert len(input_sets) == 1, input_sets  # the generator makes exactly one
+    return input_sets[0]["Name"]
+
+
+# The pattern variable (month m -> 10 * m) and $ActiveInputSet (the model's one input set is
+# selected: index 0).
+def builtin_items(base_url):
+    name = input_set_name(base_url)
+    return [
+        make_item("pat_leaf", "$pat_Season", "2001-07-01", context="$WhatIf.f_Pattern"),
+        make_item("pat_full", "$WhatIf.pat_Season + 1", "2001-03-15"),
+        make_item("pat_bare", "$pat_Season", "2001-07-01"),
+        make_item("ais", "$ActiveInputSet + 1"),
+        make_item("ais_is", f'$ActiveInputSet == "{name}"'),
+        make_item("ais_if", f'IF($ActiveInputSet == "{name}", 5, 6)'),
+    ]
+
+
+def assert_builtin_results(by_id):
+    assert by_id["pat_leaf"]["value"] == 70, by_id["pat_leaf"]
+    assert by_id["pat_full"]["value"] == 31, by_id["pat_full"]
+    # Without a context the leaf name does not resolve: Source's own parse error.
+    assert_item_error(by_id["pat_bare"])
+    assert "PAT_SEASON" in by_id["pat_bare"]["error"].upper()
+    assert by_id["ais"]["value"] == 1, by_id["ais"]
+    assert by_id["ais_is"]["value"] == 1, by_id["ais_is"]
+    assert by_id["ais_if"]["value"] == 5, by_id["ais_if"]
+
+
+def test_pattern_and_active_input_set(veneer):
+    results = only_result(veneer, *builtin_items(veneer.base_url))
+    assert_builtin_results({r["id"]: r for r in results})
 
 
 def test_cancelled_request_leaves_no_strays(veneer):
@@ -309,8 +353,10 @@ def test_cold_now_honours_the_items_date(veneer_cold):
 
 
 def test_cold_batch(veneer_cold):
-    first = only_result(veneer_cold, *COLD_BATCH)
+    batch = COLD_BATCH + builtin_items(veneer_cold.base_url)
+    first = only_result(veneer_cold, *batch)
     by_id = {r["id"]: r for r in first}
+    assert_builtin_results(by_id)
     assert by_id["now"] == {"id": "now", "value": 701}
     assert by_id["start"] == {"id": "start", "value": 20000101}
     assert by_id["end"] == {"id": "end", "value": 31}
@@ -322,7 +368,7 @@ def test_cold_batch(veneer_cold):
     assert by_id["ts_bound"] == {"id": "ts_bound", "value": 3}
     assert by_id["fn_bound"] == {"id": "fn_bound", "value": 3.5}
     # The lookup table is now built; the same batch answers identically.
-    assert only_result(veneer_cold, *COLD_BATCH) == first
+    assert only_result(veneer_cold, *batch) == first
     assert stray_count(veneer_cold.base_url) == 0
 
 
@@ -337,3 +383,27 @@ def test_cold_evaluate_leaves_the_per_run_state_alone(veneer_cold):
     assert float(max_value) == 0, "a built-in date variable recorded a value"
     assert unset == "True", "FunctionManager.Reset has run"
     assert int(curve_points) > 0, "the lookup table was not built"
+
+
+def test_cold_evaluate_changes_nothing_else_in_the_model(veneer_cold):
+    """The warm no-mutation check on a never-run scenario, less the lookup tables (the one
+    thing evaluate may build there) and the run results (there are none)."""
+    base_url = veneer_cold.base_url
+
+    def state():
+        return [line for line in model_state(base_url) if not line.startswith("L|")]
+
+    def runs():
+        r = requests.get(f"{base_url}/runs", timeout=60)
+        assert r.status_code == 200, r.text
+        return r.json()
+
+    before, runs_before = state(), runs()
+    assert_usage_target_untouched(before)
+    results = only_result(veneer_cold, *COLD_BATCH, *builtin_items(base_url),
+                          make_item("parse", "1 + * 2"), make_item("nan", "0 / 0"))
+    assert any("value" in r for r in results) and any("error" in r for r in results)
+    after = state()
+    changed = sorted(set(before) ^ set(after))
+    assert before == after, "model state changed:\n" + "\n".join(changed)
+    assert runs() == runs_before

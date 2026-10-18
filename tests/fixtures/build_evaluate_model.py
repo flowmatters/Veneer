@@ -23,13 +23,14 @@ from tests.live import (USAGE_FUNCTION, USAGE_NODE, USAGE_PARAMETER,  # noqa: E4
 PORT = int(os.environ.get("VENEER_TEST_PORT", "9890"))
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "evaluate-model.rsproj")
 
-# Inflow A -> StorageA -> Gauge 1 -> Inflow B -> Inflow C -> Inflow D. The three downstream
-# inflow nodes exist only to give functions per-timestep usages (see USAGES).
+# Inflow A -> StorageA -> Gauge 1 -> Inflow B -> Inflow C -> Inflow D -> Inflow E. The four
+# downstream inflow nodes exist only to give functions per-timestep usages (see USAGES).
 NODES = [("Inflow A", "inflow"), ("StorageA", "storage"), ("Gauge 1", "gauge"),
-         ("Inflow B", "inflow"), ("Inflow C", "inflow"), ("Inflow D", "inflow")]
+         ("Inflow B", "inflow"), ("Inflow C", "inflow"), ("Inflow D", "inflow"),
+         ("Inflow E", "inflow")]
 LINKS = [("Inflow A", "StorageA", "Link A"), ("StorageA", "Gauge 1", "Link B"),
          ("Gauge 1", "Inflow B", "Link C"), ("Inflow B", "Inflow C", "Link D"),
-         ("Inflow C", "Inflow D", "Link E")]
+         ("Inflow C", "Inflow D", "Link E"), ("Inflow D", "Inflow E", "Link F")]
 CURVE = pd.DataFrame({"Lookup": [0.0, 10.0, 20.0], "Result": [0.0, 5.0, 20.0]})
 FUNCTIONS = [
     ("$f_Const", "10"),
@@ -37,7 +38,24 @@ FUNCTIONS = [
     ("$f_Lagged", "$f_Lagged + 1"),
     ("$f_Lookup", "lookup($pw_Curve, $f_Const)"),
     ("$f_Demand2", "$v_Demand * 2"),
+    # References the pattern variable by its LEAF name, from the same folder.
+    ("$f_Pattern", "$pat_Season * 1"),
 ]
+# A monthly pattern variable in the $WhatIf folder: month m (1-12) has the value 10 * m.
+PATTERN = "$WhatIf.pat_Season"
+PATTERN_SCRIPT = '''
+import System
+from RiverSystem.Functions.Variables import PatternVariable
+fm = scenario.Network.FunctionManager
+folder = [f for f in fm.Folders if f.Name == "WhatIf" and f.Parent is None][0]
+p = PatternVariable()
+p.Name = "$pat_Season"
+p.Parent = folder
+for m in range(1, 13):
+    p.TimeSeries.TimeSeries[System.DateTime(2000, m, 1)] = 10.0 * m
+fm.Variables.Add(p)
+result = ",".join(repr(p.TimeSeries.TimeSeries[System.DateTime(2001, m, 15)]) for m in range(1, 13))
+'''
 # Source evaluates a function during a run only when something uses it, so every function drives a
 # model input (node, parameter); otherwise its recorded series is all zeros. These are per-timestep
 # inflows, so each function's result unit is a flow (Source refuses a run whose usages have
@@ -50,10 +68,12 @@ USAGES = [
     ("$WhatIf.f_Release", "Inflow B", "Flow"),
     ("$WhatIf.f_Lagged", "Inflow C", "Flow"),
     ("$WhatIf.f_Lookup", "Inflow D", "Flow"),
+    ("$WhatIf.f_Pattern", "Inflow E", "Flow"),
 ]
 # What each function's recorded series must look like after the run: "varies", or the constant.
 EXPECTED_SERIES = {"$WhatIf.f_Const": 10.0, "$WhatIf.f_Lookup": 5.0, "$WhatIf.f_Release": "varies",
-                   "$WhatIf.f_Lagged": "varies", "$WhatIf.f_Demand2": "varies"}
+                   "$WhatIf.f_Lagged": "varies", "$WhatIf.f_Demand2": "varies",
+                   "$WhatIf.f_Pattern": 10.0}  # January only: 10 * 1
 # Every function usage: one "<function>|<target type>|<member>|<target's current value>" line each.
 USAGES_SCRIPT = '''
 fm = scenario.Network.FunctionManager
@@ -66,7 +86,7 @@ for f in fm.Functions:
 result = "\\n".join(sorted(out))
 '''
 VARIABLE_TYPES = {"$v_StorageA_Volume": "ModelledVariable", "$v_Demand": "TimeSeriesVariable",
-                  "$pw_Curve": "LinearVariable"}
+                  "$pw_Curve": "LinearVariable", PATTERN: "PatternVariable"}
 
 
 def require(ok, what, got) -> None:
@@ -126,6 +146,11 @@ def build(v, base_url) -> None:
     require(curve.get("Entries") == CURVE.values.tolist(), "filling $pw_Curve", curve)
 
     for name, expression in FUNCTIONS:
+        if name == "$f_Pattern":
+            # veneer-py has no pattern variable creator; the $WhatIf folder exists by now.
+            months = run_script(base_url, PATTERN_SCRIPT)
+            require(months == ",".join(repr(10.0 * m) for m in range(1, 13)),
+                    f"creating {PATTERN}", months)
         created = v.model.functions.create_functions([name], expression, params=[()],
                                                      function_path="WhatIf")
         require(isinstance(created, dict) and not created.get("failed"),
@@ -155,6 +180,11 @@ def build(v, base_url) -> None:
         require(isinstance(applied, dict) and applied.get("success") == 1,
                 f"applying {function} to {node}.{parameter}", applied)
     check_usages(base_url, "after applying them")
+
+    # The tests read the selected input set's name from GET /inputSets: keep exactly one.
+    input_sets = requests.get(f"{base_url}/inputSets", timeout=60).json()
+    require(len(input_sets) == 1, "the model's single input set", input_sets)
+    print("input set:", input_sets[0].get("Name"))
 
     # create_modelled_variable reports "created" even for a name it skipped, so confirm the
     # final state independently.
