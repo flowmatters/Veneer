@@ -85,6 +85,109 @@ namespace FlowMatters.Source.Veneer.Tests
                 + "$f_Other is a function reference: Source holds only its last evaluated value, not its value at the item's date; bind it"));
         }
 
+        // ---- ResolveBuiltInTokens: names resolve as Source resolves them
+
+        private static TransientFunctionEvaluator.BuiltInToken Token(string fullName, string name, bool inContext, double value) =>
+            new TransientFunctionEvaluator.BuiltInToken(fullName, name, inContext, value);
+
+        private static HashSet<string> Names(params string[] names) =>
+            new HashSet<string>(names, StringComparer.OrdinalIgnoreCase);
+
+        private static Dictionary<string, double> Resolve(TransientFunctionEvaluator.BuiltInToken[] builtIns,
+            HashSet<string> functionTokens = null, HashSet<string> variableFullNames = null) =>
+            TransientFunctionEvaluator.ResolveBuiltInTokens(builtIns, functionTokens ?? Names(), variableFullNames ?? Names());
+
+        [Test] public void Resolve_FullNamesAlwaysAndLeafNamesOnlyInTheContextFolder()
+        {
+            var values = Resolve(new[]
+            {
+                Token("$Now.Day", "$Day", false, 5),
+                Token("$WhatIf.pat_Season", "$pat_Season", true, 7),
+            });
+            Assert.That(values, Is.EquivalentTo(new Dictionary<string, double>
+            {
+                { "$Now.Day", 5 }, { "$WhatIf.pat_Season", 7 }, { "$pat_Season", 7 },
+            }));
+        }
+
+        [Test] public void Resolve_ALeafNameIsNeverSubstitutedForAVariableWithThatFullName()
+        {
+            // A top-level time series variable $pat_Season: Source resolves "$pat_Season" to it
+            // (full name before leaf name), so it must reach Parse and the guard untouched.
+            var values = Resolve(new[] { Token("$WhatIf.pat_Season", "$pat_Season", true, 7) },
+                variableFullNames: Names("$WhatIf.pat_Season", "$PAT_SEASON"));
+            Assert.That(values.Keys, Is.EquivalentTo(new[] { "$WhatIf.pat_Season" }));
+        }
+
+        [Test] public void Resolve_ALeafNameIsNeverSubstitutedForAFunctionThatAnswersToIt()
+        {
+            var values = Resolve(new[] { Token("$WhatIf.pat_Season", "$pat_Season", true, 7) },
+                functionTokens: Names("$pat_season"));
+            Assert.That(values.Keys, Is.EquivalentTo(new[] { "$WhatIf.pat_Season" }));
+        }
+
+        [Test] public void Resolve_AFullNameIsNotSubstitutedWhenAFunctionAnswersToIt()
+        {
+            var values = Resolve(new[] { Token("$WhatIf.pat_Season", "$pat_Season", false, 7) },
+                functionTokens: Names("$WhatIf.pat_Season"));
+            Assert.That(values, Is.Empty);
+        }
+
+        [Test] public void Resolve_ALeafNameNeverPreEmptsAnotherBuiltInsFullName()
+        {
+            // The first built-in's leaf name is the second's full name: the full name wins,
+            // whatever the order.
+            var values = Resolve(new[]
+            {
+                Token("$Ctx.x", "$Top", true, 1),
+                Token("$Top", "$Top", false, 2),
+            });
+            Assert.That(values, Is.EquivalentTo(new Dictionary<string, double> { { "$Ctx.x", 1 }, { "$Top", 2 } }));
+        }
+
+        [Test] public void Resolve_SkipsUnreadableNames()
+        {
+            var values = Resolve(new[] { Token("?", "?", true, 1), Token("$", "$", true, 2), Token(null, null, true, 3) });
+            Assert.That(values, Is.Empty);
+        }
+
+        // ---- FillLookupTables: builds only an unbuilt table that has entries
+
+        private static LinearVariable Table(params double[] xy)
+        {
+            var table = new LinearVariable();
+            for (var i = 0; i < xy.Length; i += 2)
+                table.Entries.Add(new LinearFunctionVariableEntry { X = xy[i], Y = xy[i + 1] });
+            return table;
+        }
+
+        [Test] public void FillLookupTables_BuildsAnUnbuiltTableFromItsEntries()
+        {
+            var table = Table(0, 0, 10, 5, 20, 20);
+            Assert.That(table.LinearFunction.Count, Is.EqualTo(0));
+            TransientFunctionEvaluator.FillLookupTables(new AbstractFunctionVariable[] { table, table });
+            Assert.That(table.LinearFunction.Count, Is.EqualTo(3));
+            Assert.That(table.LinearFunction.f(5), Is.EqualTo(2.5));
+            Assert.That(table.Entries.Count, Is.EqualTo(3), "entries untouched");
+        }
+
+        [Test] public void FillLookupTables_NeverReplacesABuiltTable()
+        {
+            var table = Table(0, 0, 10, 5);
+            table.Reset();
+            var built = table.LinearFunction;
+            TransientFunctionEvaluator.FillLookupTables(new AbstractFunctionVariable[] { table });
+            Assert.That(table.LinearFunction, Is.SameAs(built));
+        }
+
+        [Test] public void FillLookupTables_LeavesATableWithNoEntriesAlone()
+        {
+            var table = Table();
+            var original = table.LinearFunction;
+            TransientFunctionEvaluator.FillLookupTables(new AbstractFunctionVariable[] { table, new BilinearVariable() });
+            Assert.That(table.LinearFunction, Is.SameAs(original));
+        }
+
         [Test] public void UnboundReferences_ReportsABuiltInLeftUnsubstituted()
         {
             var now = new NowVariable { NowVariableEnum = NowVariableEnum.Day };

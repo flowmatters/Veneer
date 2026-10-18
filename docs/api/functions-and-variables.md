@@ -90,7 +90,11 @@ on this endpoint's request/response bodies are **lowercase** (`token`, `id`, `it
   (a comparison such as `$ActiveInputSet == "Wet"` is left for Source to rewrite, as it does
   for a run); and each pattern variable as its pattern's value at the item's `date` (by full
   name, and by leaf name relative to `context`). These do not depend on the scenario having
-  run, and a binding you supply always takes precedence.
+  run, and a binding you supply always takes precedence. Names resolve as Source resolves
+  them: functions before variables, and each by **full name before leaf name** — so a leaf
+  name in `context`'s folder means the built-in only when no function answers to it and no
+  variable has that full name (otherwise it means that function or variable, which is then
+  subject to the rule below).
 - **Unbound references are item errors.** Source keeps no value for these at an arbitrary
   date, so instead of evaluating against whatever is in memory (a function's *last* evaluated
   value, a time series variable's last-played value, current model state — or 0 on a scenario
@@ -111,6 +115,10 @@ on this endpoint's request/response bodies are **lowercase** (`token`, `id`, `it
   start of a run) is built on demand from its stored points — the one change evaluate makes,
   to a derived cache that is not saved and that the next run rebuilds identically. Bilinear
   tables need nothing.
+- **Known limit: plugin custom functions.** A custom function supplied by a plugin that reads
+  run state itself (for example through `ICustomFunctionContext.CurrentTimeStep`) sees
+  whatever the last run left behind, or nothing on a scenario that has not run; Veneer can
+  neither supply that state nor detect that the function uses it.
 - **Apart from that cache, nothing in the model is reset or changed.** Evaluate never calls Source's per-run reset of
   the function manager, because that reset also writes default values into the model
   parameters that functions drive.
