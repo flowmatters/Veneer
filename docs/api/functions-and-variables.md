@@ -75,15 +75,45 @@ on this endpoint's request/response bodies are **lowercase** (`token`, `id`, `it
   textual: each `token` is replaced by its `value` (an invariant-culture numeric literal,
   parenthesised if negative) wherever it appears as a **whole token**, matched
   case-insensitively, after `//` and `/* ... */` comments are stripped from the expression
-  (these are assumed to be Source's own function-language comment forms). A reference that
-  isn't bound evaluates against the scenario's current in-Source state — other functions,
-  variables, lookup tables, and date builtins (`Now`, `Start`, `End`) all resolve normally.
-  Every `token` must start with `$` and every `value` must be finite; otherwise that item gets
+  (these are assumed to be Source's own function-language comment forms). What happens to a
+  reference you do **not** bind is described below. Every `token` must start with `$` and every `value` must be finite; otherwise that item gets
   an error (`binding token must start with '$': ...` / `binding $X: non-finite value`), never
   a request-level failure. A null or empty `token` in a binding is silently dropped rather
   than erroring. `token` and `value` are themselves required fields of each binding object —
   if either is missing, deserialisation of the whole request fails and the framework answers
   its own `400 Bad Request`, not a `SimulationFault`.
+- **Built-ins are supplied by Veneer.** For every built-in token you do not bind, Veneer
+  substitutes a literal before parsing, computed as Source computes it during a run:
+  `$Now.*` (`Day`, `Month`, `Year`, `Hour`, `DayOfYear`, `DaysInMonth`) from the item's
+  `date`; `$Start.*` / `$End.*` from the start / end date of the scenario's current run
+  configuration; `$ActiveInputSet` as the index of the configuration's selected input set
+  (a comparison such as `$ActiveInputSet == "Wet"` is left for Source to rewrite, as it does
+  for a run); and each pattern variable as its pattern's value at the item's `date` (by full
+  name, and by leaf name relative to `context`). These do not depend on the scenario having
+  run, and a binding you supply always takes precedence.
+- **Unbound references are item errors.** Source keeps no value for these at an arbitrary
+  date, so instead of evaluating against whatever is in memory (a function's *last* evaluated
+  value, a time series variable's last-played value, current model state — or 0 on a scenario
+  that has not run), the item fails with a message naming the reference (`{name}` is its full
+  name). Bind the reference to evaluate it:
+  - `{name} is a function reference: Source holds only its last evaluated value, not its value at the item's date; bind it`
+  - `{name} is a modelled variable: it has no value outside a run; bind it`
+  - `{name} is a context variable: it only has a value at a function usage during a run; bind it`
+  - `{name} is a time series variable: Veneer cannot read it at the item's date; bind it`
+  - `could not bind built-in {name}` — a built-in Veneer could not compute (e.g. the run
+    configuration could not be read, or a pattern value is not finite).
+  - `{name} is a {type}, which Veneer cannot evaluate outside a run; bind it` — any other
+    variable type.
+
+  When several references are unbound, the messages are joined with `"; "`.
+- **Lookup tables work on any scenario**, including one loaded but never run: a piecewise
+  linear variable whose in-memory interpolator has not been built yet (Source builds it at the
+  start of a run) is built on demand from its stored points — the one change evaluate makes,
+  to a derived cache that is not saved and that the next run rebuilds identically. Bilinear
+  tables need nothing.
+- **Apart from that cache, nothing in the model is reset or changed.** Evaluate never calls Source's per-run reset of
+  the function manager, because that reset also writes default values into the model
+  parameters that functions drive.
 - **`context`** (optional) is the `Name` or `FullName` of an existing function, as returned by
   `GET /functions` — **not** a folder path. The expression is evaluated as if placed inside
   that function's own folder, so unqualified (leaf) names used in `expression` resolve

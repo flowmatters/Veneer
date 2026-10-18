@@ -1,5 +1,7 @@
+using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Text.RegularExpressions;
 
 namespace FlowMatters.Source.Veneer.Functions
@@ -50,20 +52,71 @@ namespace FlowMatters.Source.Veneer.Functions
             foreach (var kv in bindings)
             {
                 if (string.IsNullOrEmpty(kv.Key)) continue;
-
-                // Not preceded by a word char, '.', or '$'; not followed by a word char or '.'.
-                var pattern = @"(?<![\w.$])" + Regex.Escape(kv.Key) + @"(?![\w.])";
-                var literal = kv.Value.ToString("R", CultureInfo.InvariantCulture);
-                // Parenthesise from the formatted text, not kv.Value < 0: on .NET Core 3.0+ -0.0
-                // formats as "-0" but is not < 0, so checking the sign of the double would miss it.
-                // (On .NET Framework 4.8, "R" formats -0.0 as "0", which needs no parentheses.)
-                // Indexer, not StartsWith(char): that overload doesn't exist on .NET Framework
-                // 4.8 / C# 7.3, which the legacy_ci port (Task 6) compiles against. "R" output
-                // is never empty, so literal[0] is safe.
-                if (literal[0] == '-') literal = "(" + literal + ")";
-                text = Regex.Replace(text, pattern, literal, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+                text = Replace(text, kv.Key, kv.Value, string.Empty);
             }
             return text;
+        }
+
+        /// <summary>The token Source rewrites itself when it is compared with an input set's
+        /// name (<c>$ActiveInputSet == "Wet"</c> becomes <c>1=1</c> or <c>1=0</c> during
+        /// Parse).</summary>
+        public const string ActiveInputSetToken = "$ActiveInputSet";
+
+        // Source's own comparison form (ActiveInputSetVariable's FIND_PARAM): the token, then
+        // "=" or "==", then a double-quoted name. Matched as a lookahead so a built-in value is
+        // never substituted there: 2 == "Wet" would no longer parse, and Source answers
+        // that form itself.
+        private const string InputSetComparison = @"(?!\s*(=|==)\s*"")";
+
+        /// <summary>
+        /// <see cref="Apply(string, IDictionary{string, double})"/> for the caller's
+        /// <paramref name="bindings"/>, then substitutes each of <paramref name="builtIns"/> —
+        /// values Veneer supplies for Source's built-in variables — but ONLY for a token the caller
+        /// did not bind (compared case-insensitively, as substitution matches). Same whole-token,
+        /// case-insensitive matching and literal formatting as Apply, with one exception for the
+        /// built-in <see cref="ActiveInputSetToken"/>: an occurrence compared with an input set's
+        /// name is left for Source to rewrite. Same preconditions as Apply: keys begin with '$'
+        /// and values are finite.
+        /// </summary>
+        public static string Apply(string expression, IDictionary<string, double> bindings, IDictionary<string, double> builtIns)
+        {
+            var text = Apply(expression, bindings);
+            foreach (var kv in Unbound(bindings, builtIns))
+            {
+                var extra = string.Equals(kv.Key, ActiveInputSetToken, StringComparison.OrdinalIgnoreCase)
+                    ? InputSetComparison
+                    : string.Empty;
+                text = Replace(text, kv.Key, kv.Value, extra);
+            }
+            return text;
+        }
+
+        /// <summary>The entries of <paramref name="builtIns"/> whose token is not among
+        /// <paramref name="bindings"/>' keys (case-insensitively), in their original order. Null
+        /// or empty keys are dropped.</summary>
+        public static List<KeyValuePair<string, double>> Unbound(IDictionary<string, double> bindings, IDictionary<string, double> builtIns)
+        {
+            var bound = new HashSet<string>(
+                (bindings ?? new Dictionary<string, double>()).Keys.Where(k => !string.IsNullOrEmpty(k)),
+                StringComparer.OrdinalIgnoreCase);
+            return (builtIns ?? new Dictionary<string, double>())
+                .Where(kv => !string.IsNullOrEmpty(kv.Key) && !bound.Contains(kv.Key))
+                .ToList();
+        }
+
+        private static string Replace(string text, string token, double value, string extraLookahead)
+        {
+            // Not preceded by a word char, '.', or '$'; not followed by a word char or '.'.
+            var pattern = @"(?<![\w.$])" + Regex.Escape(token) + @"(?![\w.])" + extraLookahead;
+            var literal = value.ToString("R", CultureInfo.InvariantCulture);
+            // Parenthesise from the formatted text, not value < 0: on .NET Core 3.0+ -0.0
+            // formats as "-0" but is not < 0, so checking the sign of the double would miss it.
+            // (On .NET Framework 4.8, "R" formats -0.0 as "0", which needs no parentheses.)
+            // Indexer, not StartsWith(char): that overload doesn't exist on .NET Framework
+            // 4.8 / C# 7.3, which the legacy_ci port (Task 6) compiles against. "R" output
+            // is never empty, so literal[0] is safe.
+            if (literal[0] == '-') literal = "(" + literal + ")";
+            return Regex.Replace(text, pattern, literal, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
         }
     }
 }

@@ -14,6 +14,14 @@
   <ItemGroup>
     <ProjectReference Include="..\FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj" />
   </ItemGroup>
+
+  <!-- Compile-time Source references, for tests that use Source's own types (e.g. the built-in
+       variable classes, whose parameterless constructors need no scenario). Resolved like the
+       Veneer project's; copied to the output as before. -->
+  <ItemGroup>
+    <Reference Include="RiverSystem" />
+    <Reference Include="TIME" />
+  </ItemGroup>
   
   <ItemGroup>
     <PackageReference Include="coverlet.collector">

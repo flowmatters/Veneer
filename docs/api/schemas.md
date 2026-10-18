@@ -253,7 +253,7 @@ legal XML name, which every `$`-prefixed token is.
 | `date` | string | `yyyy-MM-dd`. Required. |
 | `context` | string \| omitted | `Name` or `FullName` of an existing function whose folder the expression is evaluated in, so leaf names resolve relative to it. Omitted → no containing folder (only full names resolve). |
 | `expression` | string | The Source function expression to evaluate. Required. |
-| `bindings` | [EvaluateBinding](#evaluatebinding)[] \| omitted | Tokens to substitute before evaluation; everything else resolves against current in-Source state. |
+| `bindings` | [EvaluateBinding](#evaluatebinding)[] \| omitted | Tokens to substitute before evaluation. Unbound built-ins are supplied by Veneer and lookup tables resolve; any other unbound reference is an item error (see [functions-and-variables.md](functions-and-variables.md#post-functionsevaluate)). |
 
 ### EvaluateRequest
 `ExchangeObjects/FunctionEvaluation.cs` · request body of `POST /functions/evaluate`

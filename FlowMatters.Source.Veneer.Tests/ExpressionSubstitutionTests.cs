@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.RegularExpressions;
 using FlowMatters.Source.Veneer.Functions;
 using NUnit.Framework;
@@ -80,5 +81,68 @@ namespace FlowMatters.Source.Veneer.Tests
 
         [Test] public void EmptyKeyIsIgnored() =>
             Assert.That(Apply("1 + 2", ("", 9)), Is.EqualTo("1 + 2"));
+
+        // ---- built-ins: values Veneer supplies, merged only for tokens the caller did not bind
+
+        private static Dictionary<string, double> D(params (string, double)[] b)
+        {
+            var d = new Dictionary<string, double>();
+            foreach (var (k, v) in b) d[k] = v;
+            return d;
+        }
+
+        [Test] public void BuiltInsFillTokensTheCallerDidNotBind() =>
+            Assert.That(ExpressionSubstitution.Apply("$Now.Day + $v_X", D(("$v_X", 1)), D(("$Now.Day", 5))),
+                Is.EqualTo("5 + 1"));
+
+        [Test] public void ACallerBindingWinsOverABuiltIn() =>
+            Assert.That(ExpressionSubstitution.Apply("$Now.Day * 2", D(("$Now.Day", 9)), D(("$Now.Day", 5))),
+                Is.EqualTo("9 * 2"));
+
+        [Test] public void ACallerBindingWinsOverABuiltInCaseInsensitively() =>
+            // A plain (case-sensitive) dictionary: the merge itself must compare ignoring case.
+            Assert.That(ExpressionSubstitution.Apply("$NOW.day * 2", D(("$now.DAY", 9)), D(("$Now.Day", 5))),
+                Is.EqualTo("9 * 2"));
+
+        [Test] public void BuiltInsMatchWholeTokensCaseInsensitively() =>
+            Assert.That(ExpressionSubstitution.Apply("$NOW.DAY + $Now.DayOfYear + $A.Now.Day", null, D(("$Now.Day", 5))),
+                Is.EqualTo("5 + $Now.DayOfYear + $A.Now.Day"));
+
+        [Test] public void BuiltInsAreNotSubstitutedInsideComments() =>
+            Assert.That(ExpressionSubstitution.Apply("/* $Start.Year */ $Start.Year", null, D(("$Start.Year", 2000))),
+                Is.EqualTo("  2000"));
+
+        [Test] public void ANegativeBuiltInIsParenthesised() =>
+            Assert.That(ExpressionSubstitution.Apply("1 - $ActiveInputSet", null, D(("$ActiveInputSet", -1))),
+                Is.EqualTo("1 - (-1)"));
+
+        [Test] public void NullOrEmptyBuiltInsLeaveApplyUnchanged()
+        {
+            Assert.That(ExpressionSubstitution.Apply("$v_X + $Now.Day", D(("$v_X", 1)), null), Is.EqualTo("1 + $Now.Day"));
+            Assert.That(ExpressionSubstitution.Apply("$v_X + $Now.Day", D(("$v_X", 1)), D()), Is.EqualTo("1 + $Now.Day"));
+        }
+
+        [Test] public void TheActiveInputSetBuiltInLeavesSourcesComparisonFormAlone() =>
+            // Source rewrites `$ActiveInputSet == "name"` (or `=`) itself during Parse; a number
+            // in its place would no longer parse.
+            Assert.That(ExpressionSubstitution.Apply(
+                    "$ActiveInputSet + ($ActiveInputSet == \"Wet\") + ($activeinputset=\"Dry\") + ($ActiveInputSet > 1)",
+                    null, D(("$ActiveInputSet", 2))),
+                Is.EqualTo("2 + ($ActiveInputSet == \"Wet\") + ($activeinputset=\"Dry\") + (2 > 1)"));
+
+        [Test] public void Unbound_KeepsOnlyBuiltInsTheCallerDidNotBindInOrder()
+        {
+            var unbound = ExpressionSubstitution.Unbound(
+                D(("$now.day", 1), ("$v_X", 2)),
+                D(("$Now.Day", 5), ("$Start.Year", 2000), ("", 3), ("$End.Day", 31)));
+            Assert.That(unbound.Select(kv => kv.Key), Is.EqualTo(new[] { "$Start.Year", "$End.Day" }));
+            Assert.That(unbound.Select(kv => kv.Value), Is.EqualTo(new[] { 2000.0, 31.0 }));
+        }
+
+        [Test] public void Unbound_ToleratesNulls()
+        {
+            Assert.That(ExpressionSubstitution.Unbound(null, null), Is.Empty);
+            Assert.That(ExpressionSubstitution.Unbound(null, D(("$Now.Day", 5))).Count, Is.EqualTo(1));
+        }
     }
 }

@@ -12,10 +12,9 @@ namespace FlowMatters.Source.Veneer.Tests
     [TestFixture]
     public class TransientFunctionEvaluatorTests
     {
-        // The REAL TIME.Collections.AsyncObservableSet<object>, reached by reflection: the test
-        // project has no compile-time TIME reference (TIME.dll is in its output only as a
-        // runtime dependency of Veneer), and RemoveFromSets is generic over the set type so it
-        // needs none.
+        // The REAL TIME.Collections.AsyncObservableSet<object>, reached by reflection (written
+        // before the test project had a compile-time TIME reference; RemoveFromSets is generic
+        // over the set type so it needs none).
         private static readonly Lazy<Type[]> SetTypes = new Lazy<Type[]>(() =>
         {
             var time = Assembly.Load("TIME");
