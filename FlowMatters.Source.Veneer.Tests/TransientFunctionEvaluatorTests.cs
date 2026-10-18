@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
@@ -12,24 +12,13 @@ namespace FlowMatters.Source.Veneer.Tests
     [TestFixture]
     public class TransientFunctionEvaluatorTests
     {
-        [Test] public void ParseIsoDate_AcceptsIsoDate()
-        {
-            Assert.That(TransientFunctionEvaluator.ParseIsoDate("2025-11-01"), Is.EqualTo(new DateTime(2025, 11, 1)));
-        }
-
-        [Test] public void ParseIsoDate_RejectsOtherFormats()
-        {
-            Assert.Throws<FormatException>((Action)(() => TransientFunctionEvaluator.ParseIsoDate("01/11/2025")));
-            Assert.Throws<FormatException>((Action)(() => TransientFunctionEvaluator.ParseIsoDate("2025-11-01T00:00:00")));
-        }
-
         // The REAL TIME.Collections.AsyncObservableSet<object>, reached by reflection: the test
         // project has no compile-time TIME reference (TIME.dll is in its output only as a
         // runtime dependency of Veneer), and RemoveFromSets is generic over the set type so it
         // needs none.
         private static readonly Lazy<Type[]> SetTypes = new Lazy<Type[]>(() =>
         {
-            var time = Assembly.LoadFrom(Path.Combine(AppContext.BaseDirectory, "TIME.dll"));
+            var time = Assembly.Load("TIME");
             return new[]
             {
                 time.GetType("TIME.Collections.AsyncObservableSet`1", true).MakeGenericType(typeof(object)),
@@ -55,15 +44,43 @@ namespace FlowMatters.Source.Veneer.Tests
         /// one set) and one unrelated variable — while Release runs concurrently, followed by the
         /// batch's settle window (here immediately, the tightest case: in the endpoint other items
         /// run in between). Without the settle step a reviewer's probe left the shared set holding
-        /// the transient in over a third of trials; forcing the shared set's entity count to 1
-        /// (so it is never settled) must make strays appear.
+        /// the transient in over a third of trials; the companion test below disables the
+        /// hand-off and shows strays do appear then.
         /// </summary>
         [Test, Category("Slow")] public void RemoveFromSets_ThenSettle_LeavesNoStrayWhenTwoEntitiesShareASet()
         {
-            const int trials = 100;
-            var straysShared = 0;
-            var straysOther = 0;
-            var outstandingReported = 0;
+            var result = RaceReleaseAgainstAdds(trials: 100, sharedEntityCount: 2);
+            Assert.That(result.StraysShared, Is.EqualTo(0), "strays in the shared set");
+            Assert.That(result.StraysOther, Is.EqualTo(0), "strays in the unique set");
+            Assert.That(result.Outstanding, Is.EqualTo(0), "sets reported outstanding");
+        }
+
+        /// <summary>
+        /// The control for the test above: the same race, but the shared set is declared as
+        /// reached by ONE entity, so RemoveFromSets never hands it on and Settle never sees it.
+        /// The second clone's add then sometimes lands after the only Remove and is left behind
+        /// (measured 7–19 strays per 100 trials on a dev machine) — proof that the race is real
+        /// and that the settle step is what removes it. Asserts only that at least one stray
+        /// appears over 300 trials, so a quieter machine is very unlikely to make it fail.
+        /// </summary>
+        [Test, Category("Slow")] public void RemoveFromSets_WithoutTheHandOff_LeavesStraysInASharedSet()
+        {
+            var result = RaceReleaseAgainstAdds(trials: 300, sharedEntityCount: 1);
+            TestContext.Out.WriteLine("strays in the shared set: " + result.StraysShared + " of 300 trials");
+            Assert.That(result.StraysShared, Is.GreaterThan(0), "no stray: the race did not show, so the test above proves nothing");
+            Assert.That(result.StraysOther, Is.EqualTo(0), "strays in the unique set");
+        }
+
+        private sealed class RaceResult
+        {
+            public int StraysShared;
+            public int StraysOther;
+            public int Outstanding;
+        }
+
+        private static RaceResult RaceReleaseAgainstAdds(int trials, int sharedEntityCount)
+        {
+            var result = new RaceResult();
             for (var t = 0; t < trials; t++)
             {
                 var fn = new object();
@@ -74,7 +91,7 @@ namespace FlowMatters.Source.Veneer.Tests
 
                 List<(object set, int entityCount, int removals)> unsettled;
                 var outstanding = TransientFunctionEvaluator.RemoveFromSets(
-                    new List<(object set, int entityCount)> { (shared, 2), (other, 1) },
+                    new List<(object set, int entityCount)> { (shared, sharedEntityCount), (other, 1) },
                     s => Remove(s, fn),
                     waitForAdds: true,
                     wait: TimeSpan.FromSeconds(2),
@@ -86,13 +103,11 @@ namespace FlowMatters.Source.Veneer.Tests
                     (s, e) => Assert.Fail("Remove threw: " + e));
 
                 Assert.That(addTask.Wait(TimeSpan.FromSeconds(10)), Is.True, "add task did not finish");
-                outstandingReported += outstanding.Count;
-                if (Contains(shared, fn)) straysShared++;
-                if (Contains(other, fn)) straysOther++;
+                result.Outstanding += outstanding.Count;
+                if (Contains(shared, fn)) result.StraysShared++;
+                if (Contains(other, fn)) result.StraysOther++;
             }
-            Assert.That(straysShared, Is.EqualTo(0), "strays in the shared set");
-            Assert.That(straysOther, Is.EqualTo(0), "strays in the unique set");
-            Assert.That(outstandingReported, Is.EqualTo(0), "sets reported outstanding");
+            return result;
         }
 
         private static TransientFunctionEvaluator.SettleEntry Entry(Func<bool> remove, int entities, int removals) =>
@@ -158,7 +173,7 @@ namespace FlowMatters.Source.Veneer.Tests
         {
             var calls = 0;
             var entry = Entry(() => ++calls == 3, entities: 2, removals: 1);   // the re-add is found on the 3rd look
-            var clock = System.Diagnostics.Stopwatch.StartNew();
+            var clock = Stopwatch.StartNew();
 
             var strays = TransientFunctionEvaluator.Settle(new[] { entry }, TimeSpan.FromSeconds(5), null);
 
@@ -227,7 +242,7 @@ namespace FlowMatters.Source.Veneer.Tests
         {
             var fn = new object();
             var never = NewSet();
-            var started = DateTime.UtcNow;
+            var clock = Stopwatch.StartNew();
 
             var outstanding = TransientFunctionEvaluator.RemoveFromSets(
                 new List<(object set, int entityCount)> { (never, 1) },
@@ -240,7 +255,7 @@ namespace FlowMatters.Source.Veneer.Tests
             // Is.SameAs, not Is.EqualTo: NUnit would compare the sets as (empty) collections.
             Assert.That(outstanding.Count, Is.EqualTo(1));
             Assert.That(outstanding[0], Is.SameAs(never));
-            Assert.That(DateTime.UtcNow - started, Is.LessThan(TimeSpan.FromSeconds(2)));
+            Assert.That(clock.Elapsed, Is.LessThan(TimeSpan.FromSeconds(2)));
         }
 
         [Test] public void RemoveFromSets_ReportsAThrowingRemoveAndCarriesOn()
@@ -263,6 +278,33 @@ namespace FlowMatters.Source.Veneer.Tests
             Assert.That(errors[0], Is.SameAs(bad));
             Assert.That(Contains(good, fn), Is.False);
             Assert.That(outstanding, Is.Empty);
+        }
+
+        [TestCase("$f_veneer_evaluate: Unknown variable $x", "Unknown variable $x")]
+        [TestCase("Error in $f_veneer_evaluate: Unknown variable $x", "Unknown variable $x")]
+        [TestCase("Unknown variable $x", "Unknown variable $x")]
+        [TestCase("Error in $other: oops", "Error in $other: oops")]
+        public void StripNamePrefix_RemovesEitherFormOfTheTransientsName(string error, string expected)
+        {
+            Assert.That(TransientFunctionEvaluator.StripNamePrefix(error, TransientFunctionEvaluator.TRANSIENT_NAME), Is.EqualTo(expected));
+        }
+
+        [Test] public void GroupBySet_CountsEntitiesPerSetAndSkipsNullSets()
+        {
+            var shared = new object();
+            var single = new object();
+            var groups = TransientFunctionEvaluator.GroupBySet(new List<(object set, string name)>
+            {
+                (shared, "$v"), (single, "$f"), (shared, "$v"), (null, "$none"),
+            });
+
+            Assert.That(groups.Count, Is.EqualTo(2));
+            Assert.That(groups[0].set, Is.SameAs(shared));
+            Assert.That(groups[0].entityCount, Is.EqualTo(2));
+            Assert.That(groups[0].names, Is.EqualTo("$v"));
+            Assert.That(groups[1].set, Is.SameAs(single));
+            Assert.That(groups[1].entityCount, Is.EqualTo(1));
+            Assert.That(groups[1].names, Is.EqualTo("$f"));
         }
     }
 }

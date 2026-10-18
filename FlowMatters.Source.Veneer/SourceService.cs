@@ -749,7 +749,7 @@ namespace FlowMatters.Source.Veneer
         /// <summary>
         /// POST /functions/evaluate: evaluate a batch of expressions in-process against the loaded
         /// scenario, without adding anything to its FunctionManager. Request-level problems answer
-        /// 409 (no scenario, or a run in progress) or 400 (over the item cap, malformed); every
+        /// 409 (no scenario, or a run claimed or in progress via Veneer) or 400 (over the item cap, malformed); every
         /// per-item problem is an error on that item and never fails the batch.
         /// </summary>
         public EvaluateResponse EvaluateFunctions(EvaluateRequest request)
@@ -763,8 +763,15 @@ namespace FlowMatters.Source.Veneer
             Log("Evaluating " + parsed.Count + " expression(s)");
             lock (_runLock)
             {
-                // Holding _runLock also keeps TriggerRun from starting a run mid-batch.
-                if (_currentScenarioInvoker?.IsRunning == true)
+                // TriggerRun sets _currentScenarioInvoker under _runLock BEFORE it starts the run
+                // (outside the lock) and nulls it under _runLock in its finally, so non-null means a
+                // run is claimed or in progress — including the gap before IsRunning turns true,
+                // while the run parameters (TimeStep among them) are being applied. Holding
+                // _runLock for the whole batch keeps TriggerRun from claiming a run mid-batch; it
+                // also delays TriggerRun, GetRunStatus and CancelRun (they take the same lock),
+                // which is acceptable because batches are short. A run started from the Source GUI
+                // (not via Veneer) never sets _currentScenarioInvoker and is not detected here.
+                if (_currentScenarioInvoker != null)
                     throw Fault(HttpStatusCode.Conflict, new InvalidOperationException("A simulation is running; evaluate after it finishes."));
                 var evaluator = new TransientFunctionEvaluator(Scenario,
                     msg => Log(msg, msg.StartsWith("WARNING", StringComparison.Ordinal) ? LogLevel.Warning : LogLevel.Info));
@@ -777,10 +784,13 @@ namespace FlowMatters.Source.Veneer
                 }
                 finally
                 {
-                    // Runs even if the batch is abandoned mid-way (client disconnect, exception).
+                    // Runs even if an item throws out of Evaluate and abandons the batch mid-way.
                     // Both log their own warnings; do not log again here. Each is guarded so a
                     // throw (e.g. the GUI mutating a collection mid-snapshot) neither skips the
-                    // other nor replaces the batch's results.
+                    // other nor replaces the batch's results. Best effort: a re-add to a shared set
+                    // that lands after the settle window AND after this sweep stays registered on
+                    // the real entity until the NEXT batch's SweepStrays; this batch does not
+                    // clean it up.
                     try { evaluator.SettlePending(); }
                     catch (Exception e) when (!(e is OutOfMemoryException))
                     {

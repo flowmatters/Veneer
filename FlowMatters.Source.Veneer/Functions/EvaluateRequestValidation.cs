@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using FlowMatters.Source.Veneer.DomainActions;
+using System.Globalization;
 using FlowMatters.Source.Veneer.ExchangeObjects;
 
 namespace FlowMatters.Source.Veneer.Functions
@@ -9,7 +9,9 @@ namespace FlowMatters.Source.Veneer.Functions
     /// The request-level checks for POST /functions/evaluate — the conditions that answer 400 for
     /// the whole batch rather than an error on one item. Pure and Source-free so it is
     /// unit-testable. Everything else (bindings, context, parse, evaluation) is a per-item error
-    /// that never fails the batch.
+    /// that never fails the batch. Every error names the item: by its zero-based index when it
+    /// is null or lacks an id or an expression, otherwise (a bad date) by its id. Duplicate ids are accepted; results come back
+    /// in request order, so a client can tell duplicates apart by position.
     /// </summary>
     public static class EvaluateRequestValidation
     {
@@ -37,16 +39,17 @@ namespace FlowMatters.Source.Veneer.Functions
                 return null;
             }
 
-            foreach (var item in items)
+            for (var i = 0; i < items.Count; i++)
             {
+                var item = items[i];
                 if (item == null)
                 {
-                    problem = "items must not contain null";
+                    problem = "item[" + i + "] must not be null";
                     return null;
                 }
                 if (string.IsNullOrEmpty(item.Id) || string.IsNullOrEmpty(item.Expression))
                 {
-                    problem = "every item needs an id and an expression";
+                    problem = "item[" + i + "] needs an id and an expression";
                     return null;
                 }
                 DateTime date;
@@ -61,6 +64,12 @@ namespace FlowMatters.Source.Veneer.Functions
             return parsed;
         }
 
+        /// <summary>Exactly yyyy-MM-dd, invariant culture; throws FormatException otherwise.</summary>
+        public static DateTime ParseIsoDate(string text) =>
+            DateTime.ParseExact(text, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None);
+
+        /// <summary>The reason is a fixed English string, never a (localised) exception message:
+        /// "missing", "not yyyy-MM-dd" or "not a calendar date".</summary>
         private static bool TryParseDate(string text, out DateTime date, out string reason)
         {
             date = default(DateTime);
@@ -70,16 +79,38 @@ namespace FlowMatters.Source.Veneer.Functions
                 reason = "missing";
                 return false;
             }
-            try
+            if (!HasIsoDateShape(text))
             {
-                date = TransientFunctionEvaluator.ParseIsoDate(text);
-                return true;
-            }
-            catch (FormatException e)
-            {
-                reason = e.Message;
+                reason = "not yyyy-MM-dd";
                 return false;
             }
+            try
+            {
+                date = ParseIsoDate(text);
+                return true;
+            }
+            catch (FormatException)
+            {
+                // The right shape but no such day (e.g. 2025-02-30, month 13, year 0000).
+                reason = "not a calendar date";
+                return false;
+            }
+        }
+
+        /// <summary>Four ASCII digits, '-', two digits, '-', two digits.</summary>
+        private static bool HasIsoDateShape(string text)
+        {
+            if (text.Length != 10) return false;
+            for (var i = 0; i < text.Length; i++)
+            {
+                var c = text[i];
+                if (i == 4 || i == 7)
+                {
+                    if (c != '-') return false;
+                }
+                else if (c < '0' || c > '9') return false;
+            }
+            return true;
         }
     }
 }

@@ -55,17 +55,17 @@ namespace FlowMatters.Source.Veneer.Tests
             var request = new EvaluateRequest { Items = new List<EvaluateItem> { Item("a"), null } };
             string problem;
             Assert.That(Parse(request, out problem), Is.Null);
-            Assert.That(problem, Does.Contain("null"));
+            Assert.That(problem, Is.EqualTo("item[1] must not be null"));
         }
 
         [Test] public void AMissingIdIsRejected()
         {
             foreach (var id in new[] { null, "" })
             {
-                var request = new EvaluateRequest { Items = new List<EvaluateItem> { Item(id) } };
+                var request = new EvaluateRequest { Items = new List<EvaluateItem> { Item("ok"), Item(id) } };
                 string problem;
                 Assert.That(Parse(request, out problem), Is.Null);
-                Assert.That(problem, Is.EqualTo("every item needs an id and an expression"));
+                Assert.That(problem, Is.EqualTo("item[1] needs an id and an expression"));
             }
         }
 
@@ -76,19 +76,44 @@ namespace FlowMatters.Source.Veneer.Tests
                 var request = new EvaluateRequest { Items = new List<EvaluateItem> { Item("a", expression: expression) } };
                 string problem;
                 Assert.That(Parse(request, out problem), Is.Null);
-                Assert.That(problem, Is.EqualTo("every item needs an id and an expression"));
+                Assert.That(problem, Is.EqualTo("item[0] needs an id and an expression"));
             }
         }
 
-        [Test] public void ABadDateIsRejectedNamingTheItem()
+        [TestCase("01/11/2025", "not yyyy-MM-dd")]
+        [TestCase("2025-11-01T00:00:00", "not yyyy-MM-dd")]
+        [TestCase("2025-1-01", "not yyyy-MM-dd")]
+        [TestCase("2025-02-30", "not a calendar date")]
+        [TestCase("2025-13-01", "not a calendar date")]
+        [TestCase("", "missing")]
+        [TestCase(null, "missing")]
+        public void ABadDateIsRejectedNamingTheItem(string date, string reason)
         {
-            foreach (var date in new[] { "01/11/2025", "2025-11-01T00:00:00", "2025-02-30", "", null })
-            {
-                var request = new EvaluateRequest { Items = new List<EvaluateItem> { Item("ok"), Item("bad-date", date) } };
-                string problem;
-                Assert.That(Parse(request, out problem), Is.Null, "date " + (date ?? "null"));
-                Assert.That(problem, Does.StartWith("item bad-date: date must be yyyy-MM-dd ("), "date " + (date ?? "null"));
-            }
+            var request = new EvaluateRequest { Items = new List<EvaluateItem> { Item("ok"), Item("bad-date", date) } };
+            string problem;
+            Assert.That(Parse(request, out problem), Is.Null);
+            Assert.That(problem, Is.EqualTo("item bad-date: date must be yyyy-MM-dd (" + reason + ")"));
+        }
+
+        [Test] public void DuplicateIdsAreAcceptedInRequestOrder()
+        {
+            var first = Item("same", "2025-11-01");
+            var second = Item("same", "2025-11-02");
+            string problem;
+            var parsed = Parse(new EvaluateRequest { Items = new List<EvaluateItem> { first, second } }, out problem);
+            Assert.That(problem, Is.Null);
+            Assert.That(parsed.Select(p => p.Item), Is.EqualTo(new[] { first, second }));
+        }
+
+        [Test] public void ParseIsoDate_AcceptsIsoDate()
+        {
+            Assert.That(EvaluateRequestValidation.ParseIsoDate("2025-11-01"), Is.EqualTo(new DateTime(2025, 11, 1)));
+        }
+
+        [Test] public void ParseIsoDate_RejectsOtherFormats()
+        {
+            Assert.Throws<FormatException>((Action)(() => EvaluateRequestValidation.ParseIsoDate("01/11/2025")));
+            Assert.Throws<FormatException>((Action)(() => EvaluateRequestValidation.ParseIsoDate("2025-11-01T00:00:00")));
         }
 
         [Test] public void AValidRequestParsesInOrderWithItsDates()

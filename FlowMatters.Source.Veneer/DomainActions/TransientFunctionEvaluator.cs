@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
@@ -23,13 +22,20 @@ namespace FlowMatters.Source.Veneer.DomainActions
     /// ReferencingFunctions, and nothing else undoes it.
     /// One instance per batch: Evaluate each item, then — in a finally — SettlePending, then
     /// SweepStrays.
+    /// Release is best-effort against a race it cannot see the end of: a re-add to a shared set
+    /// (clones of one ModelledVariable) that lands after the 50 ms settle window AND after this
+    /// batch's SweepStrays stays registered on the real entity until the NEXT batch's
+    /// SweepStrays removes it; this batch does not clean it up.
     /// </summary>
     public class TransientFunctionEvaluator
     {
         public const string TRANSIENT_NAME = "$f_veneer_evaluate";
 
-        /// <summary>How long Release waits for Parse's background registrations to land: they
-        /// normally land within a thread-pool hop; 2 s caps a starved pool.</summary>
+        /// <summary>How long Release keeps retrying for Parse's background registrations to land:
+        /// they normally land within a thread-pool hop. Not a firm cap: the deadline is checked
+        /// only between passes, and each TIME AsyncObservableSet.Remove is itself a Task.Run plus
+        /// a blocking Wait(100) loop, so it needs a pool thread too — a starved pool can overrun
+        /// this by one pass.</summary>
         private static readonly TimeSpan RegistrationWait = TimeSpan.FromSeconds(2);
 
         /// <summary>How long SettlePending keeps removing from the sets reached by more than one
@@ -46,6 +52,7 @@ namespace FlowMatters.Source.Veneer.DomainActions
         private readonly Action<string> _log;
         private bool _loggedTimeStepFallback;
         private readonly List<SettleEntry> _pendingSettle = new List<SettleEntry>();
+        private List<Function> _functionsSnapshot;
 
         public TransientFunctionEvaluator(RiverSystemScenario scenario, Action<string> log)
         {
@@ -122,7 +129,10 @@ namespace FlowMatters.Source.Veneer.DomainActions
             }
             catch (Exception e) when (!(e is OutOfMemoryException))
             {
-                return Error(item, e.GetBaseException().Message);
+                // Function.Parse can also THROW ("Error in <FullName>: …"); never show the
+                // transient's internal name to the client.
+                var message = e.GetBaseException().Message;
+                return Error(item, fn == null ? message : StripNamePrefix(message, SafeName(() => fn.FullName)));
             }
             finally
             {
@@ -142,12 +152,16 @@ namespace FlowMatters.Source.Veneer.DomainActions
         private static EvaluateResultItem Error(EvaluateItem item, string message) =>
             new EvaluateResultItem { Id = item.Id, Error = message };
 
-        /// <summary>Source prefixes parse errors with the function's FullName and ": ", which
-        /// here would be the transient's internal name.</summary>
-        private static string StripNamePrefix(string error, string fullName)
+        /// <summary>Source prefixes parse errors with the function's FullName and ": " (returned
+        /// errors) or "Error in " + FullName + ": " (thrown ones), which here would be the
+        /// transient's internal name. Strips either prefix; anything else is returned
+        /// unchanged.</summary>
+        internal static string StripNamePrefix(string error, string fullName)
         {
-            var prefix = fullName + ": ";
-            return error.StartsWith(prefix, StringComparison.Ordinal) ? error.Substring(prefix.Length) : error;
+            if (error == null || string.IsNullOrEmpty(fullName)) return error;
+            foreach (var prefix in new[] { "Error in " + fullName + ": ", fullName + ": " })
+                if (error.StartsWith(prefix, StringComparison.Ordinal)) return error.Substring(prefix.Length);
+            return error;
         }
 
         /// <summary>
@@ -180,13 +194,11 @@ namespace FlowMatters.Source.Veneer.DomainActions
             // Group the DISTINCT entities (the same reference equality Parse's Except uses, so one
             // entity = one TryAddAsync) by the set they reach: a ModelledVariable clone's
             // ReferencingFunctions is its original's, so clones of one variable share a set.
-            var groups = fn.Functions.Distinct().Select(f => new { Set = f.ReferencingFunctions, Name = SafeName(() => f.FullName) })
-                .Concat(fn.Variables.Distinct().Select(v => new { Set = v.ReferencingFunctions, Name = SafeName(() => v.FullName) }))
-                .Where(x => x.Set != null)
-                .GroupBy(x => x.Set)
-                .ToList();
-            var names = groups.ToDictionary(g => g.Key, g => string.Join(", ", g.Select(x => x.Name).Distinct()));
-            var sets = groups.Select(g => (g.Key, g.Count())).ToList();
+            var groups = GroupBySet(
+                fn.Functions.Distinct().Select(f => (f.ReferencingFunctions, SafeName(() => f.FullName)))
+                    .Concat(fn.Variables.Distinct().Select(v => (v.ReferencingFunctions, SafeName(() => v.FullName)))));
+            var names = groups.ToDictionary(g => g.set, g => g.names);
+            var sets = groups.Select(g => (g.set, g.entityCount)).ToList();
 
             List<(AsyncObservableSet<Function> set, int entityCount, int removals)> unsettled;
             var outstanding = RemoveFromSets(sets, s => s.Remove(fn), registrationLaunched, RegistrationWait,
@@ -206,6 +218,23 @@ namespace FlowMatters.Source.Veneer.DomainActions
             if (registrationLaunched && outstanding.Count > 0)
                 _log("WARNING: evaluate item " + item.Id + ": release timed out with registration(s) outstanding on "
                      + string.Join("; ", outstanding.Select(s => names[s])) + " — SweepStrays should catch them");
+        }
+
+        /// <summary>
+        /// Release's grouping: one row per distinct non-null set, with how many of the given
+        /// entities reach it and their distinct names joined with ", ", in first-seen order. The
+        /// caller passes each entity once (already Distinct), so the count is the number of
+        /// TryAddAsync calls that target the set. Generic over the set type so it is testable
+        /// without Source.
+        /// </summary>
+        internal static List<(TSet set, int entityCount, string names)> GroupBySet<TSet>(IEnumerable<(TSet set, string name)> entities)
+            where TSet : class
+        {
+            return entities
+                .Where(x => x.set != null)
+                .GroupBy(x => x.set)
+                .Select(g => (g.Key, g.Count(), string.Join(", ", g.Select(x => x.name).Distinct())))
+                .ToList();
         }
 
         /// <summary>
@@ -238,8 +267,11 @@ namespace FlowMatters.Source.Veneer.DomainActions
         /// Parse does not register synchronously: it starts fire-and-forget Task.Run loops that
         /// await TryAddAsync once per entity, with a thread-pool hop between, so a single
         /// immediate Remove pass can run before an add. When <paramref name="waitForAdds"/>, keep
-        /// removing until every set has had a successful Remove, bounded by
-        /// <paramref name="wait"/>. A set reached by more than one entity (clones of one
+        /// removing until every set has had a successful Remove, or until <paramref name="wait"/>
+        /// has elapsed. That bound is checked only between passes, and the real TIME
+        /// AsyncObservableSet.Remove is a Task.Run plus a blocking Wait(100) loop — each Remove
+        /// needs a pool thread and blocks this caller — so a starved pool can overrun
+        /// <paramref name="wait"/> by one pass. A set reached by more than one entity (clones of one
         /// ModelledVariable) gets more than one add, and a later add can re-insert after the
         /// first Remove; such sets, once removed from, are returned in
         /// <paramref name="unsettled"/> (with their removal count so far) for Settle to finish —
@@ -413,10 +445,11 @@ namespace FlowMatters.Source.Veneer.DomainActions
         /// built-in Now/Start/End), and top-level functions have Parent == null.
         /// Names match case-insensitively, as Source's own Function.NameMatches does.
         /// </summary>
-        private static FolderItem ResolveContextFolder(FunctionManager fm, string context)
+        private FolderItem ResolveContextFolder(FunctionManager fm, string context)
         {
             if (string.IsNullOrEmpty(context)) return null;
-            var functions = fm.Functions.ToList();
+            // Snapshot once per batch (the GUI can mutate this ObservableCollection), not per item.
+            var functions = _functionsSnapshot ?? (_functionsSnapshot = fm.Functions.ToList());
             var f = functions.FirstOrDefault(x => string.Equals(x.FullName, context, StringComparison.InvariantCultureIgnoreCase));
             if (f != null) return f.Parent;
             var byName = functions.Where(x => string.Equals(x.Name, context, StringComparison.InvariantCultureIgnoreCase)).Take(2).ToList();
@@ -424,8 +457,5 @@ namespace FlowMatters.Source.Veneer.DomainActions
             if (byName.Count == 0) throw new ArgumentException("context function not found: " + context);
             return byName[0].Parent;
         }
-
-        public static DateTime ParseIsoDate(string text) =>
-            DateTime.ParseExact(text, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None);
     }
 }
