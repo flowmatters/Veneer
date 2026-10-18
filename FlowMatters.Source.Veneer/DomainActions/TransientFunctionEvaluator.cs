@@ -29,6 +29,9 @@ namespace FlowMatters.Source.Veneer.DomainActions
         /// <summary>How long Release waits for Parse's background registrations to land.</summary>
         private static readonly TimeSpan RegistrationWait = TimeSpan.FromSeconds(2);
 
+        /// <summary>Release rounds that Thread.Yield() before falling back to Thread.Sleep(1).</summary>
+        private const int SpinRounds = 50;
+
         // Function.FunctionManager has an internal setter; NOT derived from Parent. Cached once.
         private static readonly MethodInfo SetFunctionManager =
             typeof(Function).GetProperty("FunctionManager", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
@@ -55,7 +58,7 @@ namespace FlowMatters.Source.Veneer.DomainActions
         {
             var fm = _scenario.Network.FunctionManager;
             Function fn = null;
-            var parsed = false;
+            var registrationLaunched = false;
             try
             {
                 // Validate bindings BEFORE touching Source: ExpressionSubstitution documents these as
@@ -73,7 +76,14 @@ namespace FlowMatters.Source.Veneer.DomainActions
                 fn.Parent = ResolveContextFolder(fm, item.Context);
                 SetFunctionManager.Invoke(fn, new object[] { fm });
                 string error;
-                parsed = fn.Parse(out error);
+                var parsed = fn.Parse(out error);
+                // Parse launches the registration tasks whenever it RETURNS (even false: a
+                // ModelledVariable.Clone failure appends to the error and still registers) unless
+                // the manager has disabled referencing functions. Read that flag now, as Parse saw
+                // it, not later in finally. When TryParse itself fails the lists are empty, so the
+                // wait in Release costs nothing; ValidateUsages cannot fail for this transient
+                // (default EvaluationTimes = StartOfTimeStep, no Usages).
+                registrationLaunched = !fm.CachedDisableReferenceFunctions;
                 if (!parsed)
                     return Error(item, error ?? "parse failed");
                 // Source's own runner passes TimeStep.GetTimeSpanToNextTick(now) here
@@ -93,7 +103,7 @@ namespace FlowMatters.Source.Veneer.DomainActions
             }
             finally
             {
-                if (fn != null) Release(fn, parsed && !fm.CachedDisableReferenceFunctions);
+                if (fn != null) Release(fn, registrationLaunched);
             }
         }
 
@@ -113,31 +123,43 @@ namespace FlowMatters.Source.Veneer.DomainActions
         /// Parse does not register synchronously: it starts two fire-and-forget Task.Run loops
         /// that TryAddAsync the transient into each entity's ReferencingFunctions, so a single
         /// immediate Remove pass can run before the add and leave a stray behind. When
-        /// <paramref name="registrationLaunched"/> (Parse succeeded and the manager has not
-        /// disabled referencing functions) every entity WILL receive exactly one add, so we keep
-        /// removing until each Remove has succeeded once, bounded by RegistrationWait. Otherwise
-        /// (parse failed) one pass is made and SweepStrays is the backstop.
+        /// <paramref name="registrationLaunched"/>, every distinct SET receives exactly one add,
+        /// so we keep removing until each set has had one successful Remove, bounded by
+        /// RegistrationWait. Otherwise one pass is made and SweepStrays is the backstop.
+        ///
+        /// Dedupe by set, not by entity: Parse replaces each ModelledVariable with a Clone(), and
+        /// a clone's ReferencingFunctions is its original's set, so two clones of one variable
+        /// (e.g. referenced by full name and by leaf name) share one set, which can only yield
+        /// one successful Remove. AsyncObservableSet has reference equality.
         /// </summary>
         private void Release(Function fn, bool registrationLaunched)
         {
-            var pending = new List<AsyncObservableSet<Function>>();
-            pending.AddRange((fn.Functions ?? Enumerable.Empty<Function>()).Distinct().Select(f => f.ReferencingFunctions));
-            pending.AddRange((fn.Variables ?? Enumerable.Empty<AbstractFunctionVariable>()).Distinct().Select(v => v.ReferencingFunctions));
+            var pending = (fn.Functions ?? Enumerable.Empty<Function>()).Select(f => f.ReferencingFunctions)
+                .Concat((fn.Variables ?? Enumerable.Empty<AbstractFunctionVariable>()).Select(v => v.ReferencingFunctions))
+                .Distinct()
+                .ToList();
 
             var deadline = DateTime.UtcNow + RegistrationWait;
+            var rounds = 0;
             while (true)
             {
                 for (var i = pending.Count - 1; i >= 0; i--)
                     if (pending[i].Remove(fn)) pending.RemoveAt(i);
                 if (pending.Count == 0 || !registrationLaunched || DateTime.UtcNow >= deadline) break;
-                Thread.Sleep(1);
+                // Yield briefly first: the adds are usually only a thread-pool hop behind, and
+                // Thread.Sleep(1) costs ~15.6 ms at Windows' default timer resolution. (Not
+                // SpinWait.SpinOnce: it sleeps 1 ms itself after ~20 calls, and the overload that
+                // disables that doesn't exist on .NET Framework 4.8.)
+                if (rounds++ < SpinRounds) Thread.Yield();
+                else Thread.Sleep(1);
             }
             if (registrationLaunched && pending.Count > 0)
                 _log("WARNING: evaluate release timed out with " + pending.Count + " registration(s) outstanding — SweepStrays should catch them");
         }
 
         /// <summary>Belt and braces, once per batch: any transient still registered anywhere
-        /// is a release bug. Returns how many were removed; logs a warning if > 0.</summary>
+        /// is a release bug. Returns how many were removed, and logs its OWN warning if > 0 —
+        /// callers must not log a second one.</summary>
         public int SweepStrays()
         {
             var fm = _scenario.Network.FunctionManager;
