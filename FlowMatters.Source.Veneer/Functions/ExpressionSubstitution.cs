@@ -54,8 +54,9 @@ namespace FlowMatters.Source.Veneer.Functions
                 // Not preceded by a word char, '.', or '$'; not followed by a word char or '.'.
                 var pattern = @"(?<![\w.$])" + Regex.Escape(kv.Key) + @"(?![\w.])";
                 var literal = kv.Value.ToString("R", CultureInfo.InvariantCulture);
-                // Parenthesise from the formatted text, not kv.Value < 0: -0.0 formats as "-0"
-                // but is not < 0, so checking the sign of the double would miss it.
+                // Parenthesise from the formatted text, not kv.Value < 0: on .NET Core 3.0+ -0.0
+                // formats as "-0" but is not < 0, so checking the sign of the double would miss it.
+                // (On .NET Framework 4.8, "R" formats -0.0 as "0", which needs no parentheses.)
                 // Indexer, not StartsWith(char): that overload doesn't exist on .NET Framework
                 // 4.8 / C# 7.3, which the legacy_ci port (Task 6) compiles against. "R" output
                 // is never empty, so literal[0] is safe.
