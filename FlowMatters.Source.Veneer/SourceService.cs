@@ -377,14 +377,18 @@ namespace FlowMatters.Source.Veneer
 
             lock (_runLock)
             {
-                if (_currentScenarioInvoker?.IsRunning == true)
+                // Non-null means a run is claimed or in progress: it is set below, under _runLock,
+                // before RunScenario starts, and released in the finally. IsRunning would miss the
+                // gap between the claim and RunScenario starting its task, letting a second POST
+                // /runs replace the claim. The same guard as EvaluateFunctions.
+                if (_currentScenarioInvoker != null)
                 {
                     throw new WebFaultException<SimulationFault>(
                         new SimulationFault(new InvalidOperationException("A simulation is already running. Cancel the current run before starting a new one.")),
                         HttpStatusCode.Conflict);
                 }
 
-                // Nothing that can throw between here and the try: the finally is what releases this claim, and evaluate refuses while it is set.
+                // Nothing that can throw between here and the try: the finally is what releases this claim, and both this check and evaluate refuse while it is set.
                 _currentScenarioInvoker = new ScenarioInvoker { Scenario = Scenario };
             }
 
