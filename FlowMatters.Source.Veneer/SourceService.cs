@@ -371,18 +371,6 @@ namespace FlowMatters.Source.WebServer
         {
             Log("Triggering a run.");
 
-            lock (_runLock)
-            {
-                if (_currentScenarioInvoker?.IsRunning == true)
-                {
-                    throw new WebFaultException<SimulationFault>(
-                        new SimulationFault(new InvalidOperationException("A simulation is already running. Cancel the current run before starting a new one.")),
-                        HttpStatusCode.Conflict);
-                }
-
-                _currentScenarioInvoker = new ScenarioInvoker { Scenario = Scenario };
-            }
-
             ConcurrentQueue<string> messages = new ConcurrentQueue<string>();
             object stackTraceLock = new object();
             string lastStackTrace = null;
@@ -399,17 +387,36 @@ namespace FlowMatters.Source.WebServer
                     }
                 }
             };
-            TIME.Management.Log.MessageRecieved += runLogger;
+            HashSet<int> runNumbersBefore = null;
 
-            // Snapshot the existing runs so we can detect whether this invocation actually
-            // produced a new one. RunManager.Execute() can return without throwing yet abort the
-            // simulation internally (e.g. a data file fails to load), reporting the cause only
-            // through the log stream captured above.
-            var runNumbersBefore = new HashSet<int>(
-                Scenario.Project.ResultManager.AllRuns().Select(run => run.RunNumber));
+            lock (_runLock)
+            {
+                // Non-null means a run is claimed or in progress: it is set below, under _runLock,
+                // before RunScenario starts, and released in the finally. IsRunning would miss the
+                // gap between the claim and RunScenario starting its task, letting a second POST
+                // /runs replace the claim. The same guard as EvaluateFunctions.
+                if (_currentScenarioInvoker != null)
+                {
+                    throw new WebFaultException<SimulationFault>(
+                        new SimulationFault(new InvalidOperationException("A simulation is already running. Cancel the current run before starting a new one.")),
+                        HttpStatusCode.Conflict);
+                }
+
+                // Nothing that can throw between here and the try: the finally is what releases this claim, and both this check and evaluate refuse while it is set.
+                _currentScenarioInvoker = new ScenarioInvoker { Scenario = Scenario };
+            }
 
             try
             {
+                TIME.Management.Log.MessageRecieved += runLogger;
+
+                // Snapshot the existing runs so we can detect whether this invocation actually
+                // produced a new one. RunManager.Execute() can return without throwing yet abort the
+                // simulation internally (e.g. a data file fails to load), reporting the cause only
+                // through the log stream captured above.
+                runNumbersBefore = new HashSet<int>(
+                    Scenario.Project.ResultManager.AllRuns().Select(run => run.RunNumber));
+
                 _currentScenarioInvoker.RunScenario(parameters, RunningInGUI, _sharedLogGenerator);
             }
             catch (Exception e)

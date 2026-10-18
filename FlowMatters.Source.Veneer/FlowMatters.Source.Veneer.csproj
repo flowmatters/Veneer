@@ -310,6 +310,7 @@
     <Compile Include="Tests\RunningAddonsTests.cs" />
     <Compile Include="Tests\AddonMenuItemStateTests.cs" />
     <Compile Include="Tests\OneShotLifecycleTests.cs" />
+    <Compile Include="Tests\TriggerRunGuardTests.cs" />
     <Compile Include="ExchangeObjects\FunctionValue.cs" />
     <Compile Include="ExchangeObjects\FunctionEvaluation.cs" />
     <Compile Include="Functions\ExpressionSubstitution.cs" />
