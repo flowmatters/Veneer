@@ -43,6 +43,24 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects
                 if (b != null && !string.IsNullOrEmpty(b.Token)) d[b.Token] = b.Value;
             return d;
         }
+
+        /// <summary>
+        /// The first reason <paramref name="bindings"/> (as from BindingsByToken) cannot be
+        /// substituted, or null when they all can: every token must begin with '$' and every value
+        /// must be finite — ExpressionSubstitution.Apply's preconditions, which it does not check.
+        /// </summary>
+        public static string BindingError(IDictionary<string, double> bindings)
+        {
+            if (bindings == null) return null;
+            foreach (var kv in bindings)
+            {
+                if (kv.Key == null || !kv.Key.StartsWith("$", StringComparison.Ordinal))
+                    return "binding token must start with '$': " + kv.Key;
+                if (double.IsNaN(kv.Value) || double.IsInfinity(kv.Value))
+                    return "binding " + kv.Key + ": non-finite value";
+            }
+            return null;
+        }
     }
 
     [DataContract] public class EvaluateRequest

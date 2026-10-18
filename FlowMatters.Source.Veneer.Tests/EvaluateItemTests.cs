@@ -166,5 +166,31 @@ namespace FlowMatters.Source.Veneer.Tests
             var json = Serialize(response);
             Assert.That(json, Does.Contain("{\"id\":\"z\",\"value\":0}"));
         }
+    
+
+        [Test] public void BindingError_NonDollarToken()
+        {
+            var error = EvaluateItem.BindingError(new Dictionary<string, double> { { "$a", 1 }, { "b", 2 } });
+            Assert.That(error, Is.EqualTo("binding token must start with '$': b"));
+        }
+
+        [Test] public void BindingError_NaN()
+        {
+            var error = EvaluateItem.BindingError(new Dictionary<string, double> { { "$a", double.NaN } });
+            Assert.That(error, Is.EqualTo("binding $a: non-finite value"));
+        }
+
+        [Test] public void BindingError_PositiveInfinity()
+        {
+            var error = EvaluateItem.BindingError(new Dictionary<string, double> { { "$a", double.PositiveInfinity } });
+            Assert.That(error, Is.EqualTo("binding $a: non-finite value"));
+        }
+
+        [Test] public void BindingError_ValidIsNull()
+        {
+            Assert.That(EvaluateItem.BindingError(new Dictionary<string, double> { { "$a", -0.0 }, { "$B", 1e300 } }), Is.Null);
+            Assert.That(EvaluateItem.BindingError(new Dictionary<string, double>()), Is.Null);
+            Assert.That(EvaluateItem.BindingError(null), Is.Null);
+        }
     }
 }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
@@ -9,7 +10,6 @@ using FlowMatters.Source.Veneer.Functions;
 using RiverSystem;
 using RiverSystem.DataManagement.DataManager;
 using RiverSystem.Functions;
-using RiverSystem.Functions.Variables;
 using RiverSystem.Management.ExpressionBuilder;
 using TIME.Collections;
 using TIME.DataTypes;
@@ -26,19 +26,22 @@ namespace FlowMatters.Source.Veneer.DomainActions
     {
         public const string TRANSIENT_NAME = "$f_veneer_evaluate";
 
-        /// <summary>How long Release waits for Parse's background registrations to land.</summary>
+        /// <summary>How long Release waits for Parse's background registrations to land: they
+        /// normally land within a thread-pool hop; 2 s caps a starved pool.</summary>
         private static readonly TimeSpan RegistrationWait = TimeSpan.FromSeconds(2);
 
-        /// <summary>Release rounds that Thread.Yield() before falling back to Thread.Sleep(1).</summary>
+        /// <summary>How long Release keeps removing from a set reached by more than one entity,
+        /// after its first successful Remove, to catch the later entities' re-adds.</summary>
+        private static readonly TimeSpan SettleWindow = TimeSpan.FromMilliseconds(50);
+
+        /// <summary>Wait rounds that Thread.Yield() before falling back to Thread.Sleep(1).</summary>
         private const int SpinRounds = 50;
 
-        // Function.FunctionManager has an internal setter; NOT derived from Parent. Cached once.
-        private static readonly MethodInfo SetFunctionManager =
-            typeof(Function).GetProperty("FunctionManager", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
-                            .GetSetMethod(nonPublic: true);
+        private static MethodInfo _setFunctionManager;
 
         private readonly RiverSystemScenario _scenario;
         private readonly Action<string> _log;
+        private bool _loggedTimeStepFallback;
 
         public TransientFunctionEvaluator(RiverSystemScenario scenario, Action<string> log)
         {
@@ -47,11 +50,20 @@ namespace FlowMatters.Source.Veneer.DomainActions
         }
 
         /// <summary>The scenario's configured time step (RunningConfiguration.TimeStep), or Daily
-        /// when it cannot be read.</summary>
+        /// when it cannot be read (logged once per evaluator).</summary>
         public TimeStep EvaluationTimeStep()
         {
-            try { return _scenario.CurrentConfiguration?.TimeStep ?? TimeStep.Daily; }
-            catch { return TimeStep.Daily; }
+            TimeStep configured = null;
+            string why = "no run configuration time step";
+            try { configured = _scenario.CurrentConfiguration?.TimeStep; }
+            catch (Exception e) { why = e.GetBaseException().Message; }
+            if (configured != null) return configured;
+            if (!_loggedTimeStepFallback)
+            {
+                _loggedTimeStepFallback = true;
+                _log("WARNING: evaluate using a Daily time step (" + why + ")");
+            }
+            return TimeStep.Daily;
         }
 
         public EvaluateResultItem Evaluate(EvaluateItem item, DateTime date, TimeStep timeStep)
@@ -62,19 +74,15 @@ namespace FlowMatters.Source.Veneer.DomainActions
             try
             {
                 // Validate bindings BEFORE touching Source: ExpressionSubstitution documents these as
-                // preconditions and checks neither (see BindingsByToken's doc).
+                // preconditions and checks neither.
                 var bindings = item.BindingsByToken();
-                foreach (var kv in bindings)
-                {
-                    if (!kv.Key.StartsWith("$", StringComparison.Ordinal))
-                        return Error(item, "binding token must start with '$': " + kv.Key);
-                    if (double.IsNaN(kv.Value) || double.IsInfinity(kv.Value))
-                        return Error(item, "binding " + kv.Key + ": non-finite value");
-                }
+                var bindingError = EvaluateItem.BindingError(bindings);
+                if (bindingError != null) return Error(item, bindingError);
+
                 var substituted = ExpressionSubstitution.Apply(item.Expression, bindings);
                 fn = new Function { Name = TRANSIENT_NAME, Expression = substituted };
                 fn.Parent = ResolveContextFolder(fm, item.Context);
-                SetFunctionManager.Invoke(fn, new object[] { fm });
+                FunctionManagerSetter().Invoke(fn, new object[] { fm });
                 string error;
                 var parsed = fn.Parse(out error);
                 // Parse launches the registration tasks whenever it RETURNS (even false: a
@@ -85,92 +93,235 @@ namespace FlowMatters.Source.Veneer.DomainActions
                 // (default EvaluationTimes = StartOfTimeStep, no Usages).
                 registrationLaunched = !fm.CachedDisableReferenceFunctions;
                 if (!parsed)
-                    return Error(item, error ?? "parse failed");
-                // Source's own runner passes TimeStep.GetTimeSpanToNextTick(now) here
-                // (NetworkRunner); modelled variables use it to convert rates to per-step amounts.
-                fn.Evaluate(date, timeStep, SecondsInStep(timeStep, date), PointOfUpdate.AfterTimeSeriesPlayed);
+                    return Error(item, string.IsNullOrEmpty(error) ? "parse failed" : StripNamePrefix(error, fn.FullName));
+                try
+                {
+                    // Source's own runner passes TimeStep.GetTimeSpanToNextTick(now) here
+                    // (NetworkRunner); modelled variables use it to convert rates to per-step
+                    // amounts. No fallback: a 0-second step would give plausible WRONG amounts.
+                    fn.Evaluate(date, timeStep, timeStep.GetTimeSpanToNextTick(date), PointOfUpdate.AfterTimeSeriesPlayed);
+                }
+                catch (ArithmeticException)
+                {
+                    // Source 6.10 throws "The Function … has evaluated to NaN." for NaN and ±Inf.
+                    return Error(item, "non-finite result");
+                }
                 // NaN / ±Infinity would serialise as bare `NaN` / `INF` tokens — not JSON (Python
                 // rejects INF, browsers reject both) — and one 0/0 would lose the whole batch.
-                // (Source 6.10's Function.Evaluate already throws ArithmeticException for these;
-                // this check is for versions that don't.)
+                // (For Source versions whose Evaluate does not throw on these.)
                 if (double.IsNaN(fn.Value) || double.IsInfinity(fn.Value))
                     return Error(item, "non-finite result");
                 return new EvaluateResultItem { Id = item.Id, Value = fn.Value };
             }
-            catch (Exception e)
+            catch (Exception e) when (!(e is OutOfMemoryException))
             {
-                return Error(item, e.Message);
+                return Error(item, e.GetBaseException().Message);
             }
             finally
             {
-                if (fn != null) Release(fn, registrationLaunched);
+                if (fn != null) Release(item, fn, registrationLaunched);
             }
         }
 
         private static EvaluateResultItem Error(EvaluateItem item, string message) =>
             new EvaluateResultItem { Id = item.Id, Error = message };
 
-        private static double SecondsInStep(TimeStep timeStep, DateTime date)
+        /// <summary>Source prefixes parse errors with the function's FullName and ": ", which
+        /// here would be the transient's internal name.</summary>
+        private static string StripNamePrefix(string error, string fullName)
         {
-            try { return timeStep.GetTimeSpanToNextTick(date); }
-            catch { return 0.0; }
+            var prefix = fullName + ": ";
+            return error.StartsWith(prefix, StringComparison.Ordinal) ? error.Substring(prefix.Length) : error;
+        }
+
+        /// <summary>
+        /// Function.FunctionManager's setter is internal on Source 6.10. Resolved lazily so a
+        /// Source version without it fails each item with a clear message instead of a
+        /// TypeInitializationException. (Function.Reset(FunctionManager, bool parse) sets
+        /// FunctionManager publicly on 6.10 and would avoid reflection if the legacy target has
+        /// it — Task 6 decides.)
+        /// </summary>
+        private static MethodInfo FunctionManagerSetter()
+        {
+            var setter = _setFunctionManager;
+            if (setter != null) return setter;
+            setter = typeof(Function)
+                .GetProperty("FunctionManager", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+                ?.GetSetMethod(nonPublic: true);
+            if (setter == null)
+                throw new NotSupportedException("this Source version exposes no Function.FunctionManager setter");
+            _setFunctionManager = setter;
+            return setter;
         }
 
         /// <summary>
         /// Remove the transient from EVERY entity Parse bound it to — functions, variables, date
-        /// builtins, lookup tables alike. Never a counted subset.
-        ///
-        /// Parse does not register synchronously: it starts two fire-and-forget Task.Run loops
-        /// that TryAddAsync the transient into each entity's ReferencingFunctions, so a single
-        /// immediate Remove pass can run before the add and leave a stray behind. When
-        /// <paramref name="registrationLaunched"/>, every distinct SET receives exactly one add,
-        /// so we keep removing until each set has had one successful Remove, bounded by
-        /// RegistrationWait. Otherwise one pass is made and SweepStrays is the backstop.
-        ///
-        /// Dedupe by set, not by entity: Parse replaces each ModelledVariable with a Clone(), and
-        /// a clone's ReferencingFunctions is its original's set, so two clones of one variable
-        /// (e.g. referenced by full name and by leaf name) share one set, which can only yield
-        /// one successful Remove. AsyncObservableSet has reference equality.
+        /// builtins, lookup tables alike. Never a counted subset. See RemoveFromSets for why this
+        /// waits and settles.
         /// </summary>
-        private void Release(Function fn, bool registrationLaunched)
+        private void Release(EvaluateItem item, Function fn, bool registrationLaunched)
         {
-            var pending = (fn.Functions ?? Enumerable.Empty<Function>()).Select(f => f.ReferencingFunctions)
-                .Concat((fn.Variables ?? Enumerable.Empty<AbstractFunctionVariable>()).Select(v => v.ReferencingFunctions))
-                .Distinct()
+            // Group the DISTINCT entities (the same reference equality Parse's Except uses, so one
+            // entity = one TryAddAsync) by the set they reach: a ModelledVariable clone's
+            // ReferencingFunctions is its original's, so clones of one variable share a set.
+            var groups = fn.Functions.Distinct().Select(f => new { Set = f.ReferencingFunctions, Name = SafeName(() => f.FullName) })
+                .Concat(fn.Variables.Distinct().Select(v => new { Set = v.ReferencingFunctions, Name = SafeName(() => v.FullName) }))
+                .Where(x => x.Set != null)
+                .GroupBy(x => x.Set)
                 .ToList();
+            var names = groups.ToDictionary(g => g.Key, g => string.Join(", ", g.Select(x => x.Name).Distinct()));
+            var sets = groups.Select(g => (g.Key, g.Count())).ToList();
 
-            var deadline = DateTime.UtcNow + RegistrationWait;
-            var rounds = 0;
+            var outstanding = RemoveFromSets(sets, s => s.Remove(fn), registrationLaunched, RegistrationWait, SettleWindow,
+                (set, e) => _log("WARNING: evaluate item " + item.Id + ": could not release from " + names[set] + ": " + e.GetBaseException().Message));
+            if (registrationLaunched && outstanding.Count > 0)
+                _log("WARNING: evaluate item " + item.Id + ": release timed out with registration(s) outstanding on "
+                     + string.Join("; ", outstanding.Select(s => names[s])) + " — SweepStrays should catch them");
+        }
+
+        /// <summary>
+        /// Remove the transient (via <paramref name="remove"/>, which reports whether it was
+        /// present) from each set; returns the sets it was never removed from. Each entry is a
+        /// distinct set and the number of distinct entities whose registration reaches it.
+        /// Generic over the set type only so the tests can drive the real TIME
+        /// AsyncObservableSet without a compile-time TIME reference.
+        ///
+        /// Parse does not register synchronously: it starts fire-and-forget Task.Run loops that
+        /// await TryAddAsync once per entity, with a thread-pool hop between, so a single
+        /// immediate Remove pass can run before an add. When <paramref name="waitForAdds"/>, keep
+        /// removing until every set has had a successful Remove, bounded by
+        /// <paramref name="wait"/>. A set reached by more than one entity (clones of one
+        /// ModelledVariable) gets more than one add, and a later add can re-insert after the
+        /// first Remove; so such sets keep being removed from for up to
+        /// <paramref name="settle"/>, stopping early once they have had as many successful
+        /// Removes as entities (then every add has landed and been undone). This settle is a
+        /// heuristic — a pool starved for longer than the window can still re-add; SweepStrays
+        /// is the backstop. A Remove that throws is reported via <paramref name="onError"/> and
+        /// that set is skipped.
+        /// </summary>
+        internal static List<TSet> RemoveFromSets<TSet>(
+            IReadOnlyList<(TSet set, int entityCount)> sets,
+            Func<TSet, bool> remove,
+            bool waitForAdds,
+            TimeSpan wait,
+            TimeSpan settle,
+            Action<TSet, Exception> onError)
+        {
+            var pending = sets.Select(x => new SetRelease<TSet> { Set = x.set, Entities = x.entityCount }).ToList();
+            var settling = new List<SetRelease<TSet>>();
+
+            var clock = Stopwatch.StartNew();
+            var round = 0;
             while (true)
             {
                 for (var i = pending.Count - 1; i >= 0; i--)
-                    if (pending[i].Remove(fn)) pending.RemoveAt(i);
-                if (pending.Count == 0 || !registrationLaunched || DateTime.UtcNow >= deadline) break;
-                // Yield briefly first: the adds are usually only a thread-pool hop behind, and
-                // Thread.Sleep(1) costs ~15.6 ms at Windows' default timer resolution. (Not
-                // SpinWait.SpinOnce: it sleeps 1 ms itself after ~20 calls, and the overload that
-                // disables that doesn't exist on .NET Framework 4.8.)
-                if (rounds++ < SpinRounds) Thread.Yield();
-                else Thread.Sleep(1);
+                {
+                    var entry = pending[i];
+                    bool removed;
+                    if (!TryRemove(entry.Set, remove, onError, out removed)) { pending.RemoveAt(i); continue; }
+                    if (!removed) continue;
+                    entry.Removals = 1;
+                    if (entry.Entities > 1) settling.Add(entry);
+                    pending.RemoveAt(i);
+                }
+                if (pending.Count == 0 || !waitForAdds || clock.Elapsed >= wait) break;
+                Pause(round++);
             }
-            if (registrationLaunched && pending.Count > 0)
-                _log("WARNING: evaluate release timed out with " + pending.Count + " registration(s) outstanding — SweepStrays should catch them");
+
+            if (waitForAdds && settling.Count > 0)
+            {
+                var settleClock = Stopwatch.StartNew();
+                round = 0;
+                while (true)
+                {
+                    for (var i = settling.Count - 1; i >= 0; i--)
+                    {
+                        var entry = settling[i];
+                        bool removed;
+                        if (!TryRemove(entry.Set, remove, onError, out removed)) { settling.RemoveAt(i); continue; }
+                        if (removed && ++entry.Removals >= entry.Entities) settling.RemoveAt(i);
+                    }
+                    if (settling.Count == 0 || settleClock.Elapsed >= settle) break;
+                    Pause(round++);
+                }
+            }
+
+            return pending.Select(p => p.Set).ToList();
+        }
+
+        private sealed class SetRelease<TSet>
+        {
+            public TSet Set;
+            public int Entities;
+            public int Removals;
+        }
+
+        /// <summary>False when remove threw (reported via onError).</summary>
+        private static bool TryRemove<TSet>(TSet set, Func<TSet, bool> remove, Action<TSet, Exception> onError, out bool removed)
+        {
+            try
+            {
+                removed = remove(set);
+                return true;
+            }
+            catch (Exception e) when (!(e is OutOfMemoryException))
+            {
+                removed = false;
+                onError?.Invoke(set, e);
+                return false;
+            }
+        }
+
+        /// <summary>Yield briefly first: the adds are usually only a thread-pool hop behind, and
+        /// Thread.Sleep(1) costs ~15.6 ms at Windows' default timer resolution. (Not
+        /// SpinWait.SpinOnce: it sleeps 1 ms itself after ~20 calls, and the overload that
+        /// disables that doesn't exist on .NET Framework 4.8.)</summary>
+        private static void Pause(int round)
+        {
+            if (round < SpinRounds) Thread.Yield();
+            else Thread.Sleep(1);
+        }
+
+        private static string SafeName(Func<string> name)
+        {
+            try { return name() ?? "?"; }
+            catch { return "?"; }
         }
 
         /// <summary>Belt and braces, once per batch: any transient still registered anywhere
         /// is a release bug. Returns how many were removed, and logs its OWN warning if > 0 —
-        /// callers must not log a second one.</summary>
+        /// callers must not log a second one. A real model function that happens to share the
+        /// transient's name is never swept.</summary>
         public int SweepStrays()
         {
             var fm = _scenario.Network.FunctionManager;
+            // Snapshots: these are ObservableCollections the GUI can mutate.
+            var functions = fm.Functions.ToList();
+            var variables = fm.Variables.ToList();
+            var real = new HashSet<Function>(functions);
             var removed = 0;
-            foreach (var f in fm.Functions)
-                foreach (var s in f.ReferencingFunctions.Where(x => x.Name == TRANSIENT_NAME).ToList())
-                    if (f.ReferencingFunctions.Remove(s)) removed++;
-            foreach (var v in fm.Variables)
-                foreach (var s in v.ReferencingFunctions.Where(x => x.Name == TRANSIENT_NAME).ToList())
-                    if (v.ReferencingFunctions.Remove(s)) removed++;
-            if (removed > 0) _log("WARNING: evaluate swept " + removed + " stray transient reference(s) — release missed an entity");
+            var swept = new List<string>();
+
+            Action<string, AsyncObservableSet<Function>> sweep = (name, set) =>
+            {
+                try
+                {
+                    var hit = false;
+                    foreach (var s in set.Where(x => x.Name == TRANSIENT_NAME && !real.Contains(x)).ToList())
+                        if (set.Remove(s)) { removed++; hit = true; }
+                    if (hit) swept.Add(name);
+                }
+                catch (Exception e) when (!(e is OutOfMemoryException))
+                {
+                    _log("WARNING: evaluate sweep could not check " + name + ": " + e.GetBaseException().Message);
+                }
+            };
+            foreach (var f in functions) sweep(SafeName(() => f.FullName), f.ReferencingFunctions);
+            foreach (var v in variables) sweep(SafeName(() => v.FullName), v.ReferencingFunctions);
+
+            if (removed > 0)
+                _log("WARNING: evaluate swept " + removed + " stray transient reference(s) from "
+                     + string.Join(", ", swept) + " — release missed an entity");
             return removed;
         }
 
@@ -183,13 +334,18 @@ namespace FlowMatters.Source.Veneer.DomainActions
         /// There is no root FolderItem to use instead: FunctionManager.Folders is a flat
         /// ObservableCollection&lt;FolderItem&gt; with several parentless folders (including the
         /// built-in Now/Start/End), and top-level functions have Parent == null.
+        /// Names match case-insensitively, as Source's own Function.NameMatches does.
         /// </summary>
         private static FolderItem ResolveContextFolder(FunctionManager fm, string context)
         {
             if (string.IsNullOrEmpty(context)) return null;
-            var f = fm.Functions.FirstOrDefault(x => x.FullName == context) ?? fm.Functions.FirstOrDefault(x => x.Name == context);
-            if (f == null) throw new ArgumentException("context function not found: " + context);
-            return f.Parent;
+            var functions = fm.Functions.ToList();
+            var f = functions.FirstOrDefault(x => string.Equals(x.FullName, context, StringComparison.InvariantCultureIgnoreCase));
+            if (f != null) return f.Parent;
+            var byName = functions.Where(x => string.Equals(x.Name, context, StringComparison.InvariantCultureIgnoreCase)).Take(2).ToList();
+            if (byName.Count > 1) throw new ArgumentException("ambiguous context: " + context);
+            if (byName.Count == 0) throw new ArgumentException("context function not found: " + context);
+            return byName[0].Parent;
         }
 
         public static DateTime ParseIsoDate(string text) =>
