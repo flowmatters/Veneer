@@ -6,10 +6,12 @@ RESTful endpoints can't express, you can do here. This is also how veneer-py imp
 its higher-level functionality (its `find`/`get`/`set` helpers all compile down to scripts
 posted to `/ironpython`).
 
-> **Security.** Scripting runs arbitrary code in-process. It is gated by a server-side
-> `AllowScript` switch; when disabled, these endpoints return **`403 Forbidden`**. Since there
-> is no authentication, only enable scripting on a server you fully control and that is not
-> reachable by untrusted clients.
+> **Security.** Scripting runs arbitrary code in-process. `POST /ironpython` is gated by a
+> server-side `AllowScript` switch; when disabled, it returns **`403 Forbidden`**.
+> `POST /custom/{action}` runs a pre-registered script and does **not** check `AllowScript`
+> at all — it is always available regardless of that setting. Since there is no
+> authentication, only enable scripting (and register custom endpoints) on a server you fully
+> control and that is not reachable by untrusted clients.
 
 ---
 
@@ -119,7 +121,8 @@ operation without clients sending arbitrary code.
   as `/ironpython`.
 - If `{action}` matches no registered endpoint, the response body is `null` (treat as not
   found).
-- Subject to the same `AllowScript` gate → **`403 Forbidden`** when scripting is disabled.
+- Unlike `POST /ironpython`, this endpoint does **not** check `AllowScript` — it runs the
+  registered endpoint's script regardless of that setting.
 
 ```http
 POST /custom/rebuildIndexes HTTP/1.1

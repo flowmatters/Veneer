@@ -46,6 +46,7 @@ to every path; in **live mode** no extension is added. That single switch is wha
 | GET | `/tables/{table}` | `model_table(table='fus')` (CSV) |
 | GET | `/functions` | `functions()` |
 | PUT | `/functions/{name}` | `update_function(name, value)` |
+| POST | `/functions/evaluate` | (no dedicated helper yet) |
 | GET | `/variables` | `variables()` |
 | GET | `/variables/{name}` | `variable(name)`, `function(name)` |
 | GET | `/variables/{name}/TimeSeries` | `variable_time_series(name)` |

@@ -39,7 +39,7 @@ mirror produced by [veneer-py](https://github.com/flowmatters/veneer-py)'s
 | [server-and-lifecycle.md](server-and-lifecycle.md) | `GET /`, `GET /ping`, `POST /shutdown`, `POST /scenario/{scenario}` |
 | [network.md](network.md) | `GET /network`, `/network/geographic`, `schematic.svg` (+`/tags`), nodes & links |
 | [runs-and-results.md](runs-and-results.md) | Triggering, listing, deleting runs; run status & cancel; time series, aggregated & tabulated results |
-| [functions-and-variables.md](functions-and-variables.md) | `/functions`, `/variables` (incl. `TimeSeries` and `Piecewise`) |
+| [functions-and-variables.md](functions-and-variables.md) | `/functions`, `POST /functions/evaluate`, `/variables` (incl. `TimeSeries` and `Piecewise`) |
 | [input-sets.md](input-sets.md) | `/inputSets` family, applying an input set, `PUT /recorders` |
 | [data-sources.md](data-sources.md) | `/dataSources` CRUD, items and details, `__all__` matching |
 | [tables-and-config.md](tables-and-config.md) | `/tables`, `/configuration/{element}`, `PUT /projection`, `/doc`, `/resources` |
@@ -77,6 +77,7 @@ live. See [network.md](network.md#not-implemented).)
 | `GET` | `…/variable/{v}/tabulated/{functions}` | [runs-and-results](runs-and-results.md) |
 | `GET` | `/functions` | [functions-and-variables](functions-and-variables.md) |
 | `PUT` | `/functions/{functionName}` | [functions-and-variables](functions-and-variables.md) |
+| `POST` | `/functions/evaluate` | [functions-and-variables](functions-and-variables.md) |
 | `GET` | `/variables` | [functions-and-variables](functions-and-variables.md) |
 | `GET` | `/variables/{variableName}` | [functions-and-variables](functions-and-variables.md) |
 | `GET` | `/variables/{variableName}/TimeSeries` | [functions-and-variables](functions-and-variables.md) |

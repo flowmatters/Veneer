@@ -110,7 +110,7 @@ An empty object `{}` runs with the scenario's configured settings.
 | `PercentComplete` | number | 0–100, only when running |
 
 ### SimulationFault
-`ExchangeObjects/SimulationFault.cs` · fault body of `POST /runs` (409/500) and `POST /runs/cancel` (500)
+`ExchangeObjects/SimulationFault.cs` · fault body of `POST /runs` (409/500), `POST /runs/cancel` (500), and `POST /functions/evaluate` (400/409)
 
 | Field | Type | Notes |
 |-------|------|-------|
@@ -227,40 +227,45 @@ series (e.g. via `__all__`), or whenever
 | `YName` | string | Y-axis label |
 | `Entries` | number[][] | Array of `[x, y]` pairs |
 
-### EvaluateBinding, EvaluateItem, EvaluateRequest, EvaluateResultItem, EvaluateResponse
-`ExchangeObjects/FunctionEvaluation.cs` · `POST /functions/evaluate` — see
-[functions-and-variables.md](functions-and-variables.md#post-functionsevaluate) for the full
-behaviour. Field names on these five types are **lowercase**, like the GeoJSON types below,
-not PascalCase like the rest of this page.
+### POST /functions/evaluate
 
-**EvaluateBinding** — element of `EvaluateItem.bindings`
+The five types below back `POST /functions/evaluate` — see
+[functions-and-variables.md](functions-and-variables.md#post-functionsevaluate) for the full
+behaviour. Field names on all five are **lowercase**, like the GeoJSON types below, not
+PascalCase like the rest of this page.
+
+### EvaluateBinding
+`ExchangeObjects/FunctionEvaluation.cs` · element of `EvaluateItem.bindings`
 
 | Field | Type | Notes |
 |-------|------|-------|
-| `token` | string | The text to replace, verbatim as it appears in `expression` (e.g. `"$v_Rain"`). Required. |
-| `value` | number | The literal to substitute, invariant-culture. Required; must be finite. |
+| `token` | string | The text to replace, verbatim as it appears in `expression` (e.g. `"$v_Rain"`). Required (missing → the whole request is rejected by the framework). |
+| `value` | number | The literal to substitute, invariant-culture. Required (missing → the whole request is rejected by the framework); must be finite. |
 
 A **list** of `{token, value}` pairs, not a `token → value` object — the server's JSON
 serialiser (`DataContractJsonSerializer`) silently drops any object member whose name isn't a
 legal XML name, which every `$`-prefixed token is.
 
-**EvaluateItem** — element of `EvaluateRequest.items`
+### EvaluateItem
+`ExchangeObjects/FunctionEvaluation.cs` · element of `EvaluateRequest.items`
 
 | Field | Type | Notes |
 |-------|------|-------|
 | `id` | string | Client-assigned; echoed back on the matching result. Required. Need not be unique — duplicates are accepted; results come back in request order. |
-| `date` | string | `yyyy-MM-dd`. |
+| `date` | string | `yyyy-MM-dd`. Required. |
 | `context` | string \| omitted | `Name` or `FullName` of an existing function whose folder the expression is evaluated in, so leaf names resolve relative to it. Omitted → no containing folder (only full names resolve). |
 | `expression` | string | The Source function expression to evaluate. Required. |
 | `bindings` | [EvaluateBinding](#evaluatebinding)[] \| omitted | Tokens to substitute before evaluation; everything else resolves against current in-Source state. |
 
-**EvaluateRequest** — request body of `POST /functions/evaluate`
+### EvaluateRequest
+`ExchangeObjects/FunctionEvaluation.cs` · request body of `POST /functions/evaluate`
 
 | Field | Type | Notes |
 |-------|------|-------|
-| `items` | [EvaluateItem](#evaluateitem)[] | Up to `MAX_ITEMS` = 2000; more is `400 Bad Request`. |
+| `items` | [EvaluateItem](#evaluateitem)[] | Up to `MAX_ITEMS` = 2000; more is `400 Bad Request`. Missing/`null` is treated as empty. |
 
-**EvaluateResultItem** — element of `EvaluateResponse.results`
+### EvaluateResultItem
+`ExchangeObjects/FunctionEvaluation.cs` · element of `EvaluateResponse.results`
 
 | Field | Type | Notes |
 |-------|------|-------|
@@ -268,7 +273,8 @@ legal XML name, which every `$`-prefixed token is.
 | `value` | number \| omitted | Present only on success. |
 | `error` | string \| omitted | Present only on failure. Exactly one of `value`/`error` is present. A NaN/±Infinity result is reported as the error `"non-finite result"`. |
 
-**EvaluateResponse** — response body of `POST /functions/evaluate`
+### EvaluateResponse
+`ExchangeObjects/FunctionEvaluation.cs` · response body of `POST /functions/evaluate`
 
 | Field | Type | Notes |
 |-------|------|-------|

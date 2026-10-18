@@ -80,7 +80,10 @@ on this endpoint's request/response bodies are **lowercase** (`token`, `id`, `it
   variables, lookup tables, and date builtins (`Now`, `Start`, `End`) all resolve normally.
   Every `token` must start with `$` and every `value` must be finite; otherwise that item gets
   an error (`binding token must start with '$': ...` / `binding $X: non-finite value`), never
-  a request-level failure.
+  a request-level failure. A null or empty `token` in a binding is silently dropped rather
+  than erroring. `token` and `value` are themselves required fields of each binding object —
+  if either is missing, deserialisation of the whole request fails and the framework answers
+  its own `400 Bad Request`, not a `SimulationFault`.
 - **`context`** (optional) is the `Name` or `FullName` of an existing function, as returned by
   `GET /functions` — **not** a folder path. The expression is evaluated as if placed inside
   that function's own folder, so unqualified (leaf) names used in `expression` resolve
@@ -88,15 +91,23 @@ on this endpoint's request/response bodies are **lowercase** (`token`, `id`, `it
   no containing folder, so only full names (and other top-level functions) resolve. Matching
   is case-insensitive; an unresolvable or ambiguous `context` is an error on that item
   (`context function not found: ...` / `ambiguous context: ...`), not a request-level failure.
+  A `FullName` match takes precedence over a leaf `Name` match. A `context` that names a
+  top-level function (one with no parent folder itself) has no effect — the transient ends
+  up with no containing folder either way, same as omitting `context`.
 - **`date`** is `yyyy-MM-dd`. The time step used to evaluate (e.g. to convert a rate to a
-  per-step amount) comes from the scenario's **current run configuration**, not from the
-  request.
+  per-step amount) comes from the scenario's **current run configuration** (`Daily`, with a
+  logged warning, if that configuration cannot be read), not from the request.
 - **Results**: exactly one of `value`/`error` per item. A result that is NaN or ±Infinity is
-  reported as the item error `"non-finite result"` (neither JSON nor some runtimes can carry
-  those values). Any other parse or evaluation problem is also an item error; internal names
-  for the transient function used to evaluate it are stripped from the message first.
+  reported as the item error `"non-finite result"` (JSON cannot carry them; the serialiser
+  would emit bare `NaN`/`INF` tokens — see
+  [overview.md#json-serialisation-notes](overview.md#json-serialisation-notes)). Any other
+  parse or evaluation problem is also an item error; a leading prefix naming the internal
+  transient function used to evaluate it is stripped from the message first.
 - **`400 Bad Request`**: a request-level problem, as a
-  [`SimulationFault`](schemas.md#simulationfault). Exact messages:
+  [`SimulationFault`](schemas.md#simulationfault). Only the **first** problem found is
+  reported — validation stops there rather than collecting every issue. A missing or `null`
+  `items` array is **not** an error: it is treated as empty, so the response is `200 OK` with
+  `"results": []`. Exact messages (`{index}` is the item's zero-based position in `items`):
   - `too many items: {count} > 2000` — more than `MAX_ITEMS` items.
   - `item[{index}] must not be null`
   - `item[{index}] needs an id and an expression`
@@ -106,10 +117,12 @@ on this endpoint's request/response bodies are **lowercase** (`token`, `id`, `it
   (`"No scenario is loaded."`), or a run has been claimed or is in progress via Veneer
   (`"A simulation is running; evaluate after it finishes."`). A run started from the Source
   GUI rather than through Veneer is not detected and does not trigger this.
-- Not gated by `AllowScript` — unlike `POST /ironpython` and `POST /custom/{action}`, which
-  answer `403` when scripting is disabled, evaluate runs no script and is always available.
-- **Available from protocol `20261018`** (see [`GET /`](server-and-lifecycle.md)).
-- **veneer-py**: none yet.
+- The batch holds the server's single run lock for its whole duration, so a concurrent
+  `POST /runs`, `GET /runs/status`, or `POST /runs/cancel` waits until the batch finishes.
+- Not gated by `AllowScript` — only `POST /ironpython` answers `403` when scripting is
+  disabled; evaluate runs no script and is always available.
+- **Added in protocol `20261018`** (see [`GET /`](server-and-lifecycle.md)).
+- **veneer-py**: no dedicated helper yet.
 
 ```http
 POST /functions/evaluate HTTP/1.1

@@ -39,9 +39,12 @@ model. There is no per-client session.
 The server serialises via WCF `DataContract`/`DataMember`. A few consequences worth knowing:
 
 - **Property names are PascalCase** as declared in the `[DataContract]` types (e.g. `Name`,
-  `StartDate`, `Events`). The GeoJSON and schematic-tag payloads are the exception — they use
+  `StartDate`, `Events`). The GeoJSON and schematic-tag payloads are an exception — they use
   lowercase / snake_case names (`type`, `features`, `feature_type`, `tag_name`) to match the
-  GeoJSON spec and the schematic tooling.
+  GeoJSON spec and the schematic tooling — and so is the request/response for
+  `POST /functions/evaluate` ([`EvaluateRequest`](schemas.md#evaluaterequest) /
+  [`EvaluateResponse`](schemas.md#evaluateresponse) and friends), whose fields (`token`,
+  `id`, `items`, `results`, …) are lowercase too.
 - **Infinities**: time series values that are infinite are emitted as the JSON tokens `INF`
   and `-INF` (not valid JSON numbers). veneer-py rewrites these to `Infinity` before parsing;
   a strict JSON parser will choke on them, so handle this if you write your own client.
@@ -131,15 +134,17 @@ Veneer does not use a single uniform error envelope. There are three patterns:
    `WebFaultException<SimulationFault>`. The body is a JSON
    [`SimulationFault`](schemas.md#simulationfault) (`Message` + `StackTrace`) and the status
    is `409 Conflict` (a run is already in progress) or `500 Internal Server Error` (the run
-   threw).
+   threw). `POST /functions/evaluate` throws the same fault type for its own request-level
+   problems, at `400 Bad Request` (malformed request) or `409 Conflict` (no scenario loaded,
+   or a run claimed/in progress).
 
 Other notable status codes:
 
 | Status | Where | Meaning |
 |--------|-------|---------|
 | `302 Found` | `POST /runs` | Run completed; `Location` header points at the new run |
-| `403 Forbidden` | `POST /ironpython`, `POST /custom/{action}` | Scripting is disabled on the server |
-| `400 Bad Request` | `POST /scenario/{scenario}`, `POST /inputSets/{name}/{action}` | Invalid operation (e.g. setting a scenario while running in the GUI; an action other than `run`) |
+| `403 Forbidden` | `POST /ironpython` | Scripting is disabled on the server |
+| `400 Bad Request` | `POST /scenario/{scenario}`, `POST /inputSets/{name}/{action}`, `POST /functions/evaluate` | Invalid operation (e.g. setting a scenario while running in the GUI; an action other than `run`; a malformed evaluate request) |
 | `404 Not Found` | `POST /runs/cancel` | No active run to cancel |
 
 Because the framework also produces its own faults for malformed requests
@@ -164,7 +169,7 @@ In practice this means any origin is allowed. There is no credentialed-CORS conf
 ## Protocol version
 
 `GET /` returns a [`VeneerStatus`](schemas.md#veneerstatus) whose `Version` field is the
-**protocol version** — an integer date stamp (currently `20260519`). Clients can read this to
+**protocol version** — an integer date stamp (currently `20261018`). Clients can read this to
 detect API-surface changes. The constant lives in
 [`VeneerStatus.cs`](../../FlowMatters.Source.Veneer/ExchangeObjects/VeneerStatus.cs) as
 `PROTOCOL_VERSION` and is bumped whenever the REST surface changes.
