@@ -53,6 +53,97 @@ Content-Type: application/json
 
 ---
 
+## `POST /functions/evaluate`
+
+Evaluate a batch of independent expressions in-process, at a chosen date, with chosen
+reference tokens replaced by literal values — without adding anything to the scenario's
+function manager. This is the basis for "what-if" evaluation: a batch is just many items, so
+evaluating a function across a range of dates or binding values is one request. Field names
+on this endpoint's request/response bodies are **lowercase** (`token`, `id`, `items`,
+`results`, …) — the exception, alongside GeoJSON, to the PascalCase convention described in
+[overview.md](overview.md#json-serialisation-notes).
+
+- **Request body**: [`EvaluateRequest`](schemas.md#evaluaterequest) — a list of
+  [`EvaluateItem`](schemas.md#evaluateitem), each with an `id`, a `date`, an `expression`, an
+  optional `context`, and optional `bindings`. Up to 2000 items per request.
+- **Response**: [`EvaluateResponse`](schemas.md#evaluateresponse) (`200 OK`) — one
+  [`EvaluateResultItem`](schemas.md#evaluateresultitem) per request item, **in request order**.
+  Duplicate `id`s are accepted; tell them apart by position, not by `id`.
+- **Bindings are a list, not an object.** `bindings` is `[{token, value}, ...]` rather than a
+  `token → value` map, because the server's JSON serialiser silently drops any object member
+  whose name isn't a legal XML name — which every `$`-prefixed token is. Substitution is
+  textual: each `token` is replaced by its `value` (an invariant-culture numeric literal,
+  parenthesised if negative) wherever it appears as a **whole token**, matched
+  case-insensitively, after `//` and `/* ... */` comments are stripped from the expression
+  (these are assumed to be Source's own function-language comment forms). A reference that
+  isn't bound evaluates against the scenario's current in-Source state — other functions,
+  variables, lookup tables, and date builtins (`Now`, `Start`, `End`) all resolve normally.
+  Every `token` must start with `$` and every `value` must be finite; otherwise that item gets
+  an error (`binding token must start with '$': ...` / `binding $X: non-finite value`), never
+  a request-level failure.
+- **`context`** (optional) is the `Name` or `FullName` of an existing function, as returned by
+  `GET /functions` — **not** a folder path. The expression is evaluated as if placed inside
+  that function's own folder, so unqualified (leaf) names used in `expression` resolve
+  relative to it, the same as a sibling function would. Omitted or empty → the expression has
+  no containing folder, so only full names (and other top-level functions) resolve. Matching
+  is case-insensitive; an unresolvable or ambiguous `context` is an error on that item
+  (`context function not found: ...` / `ambiguous context: ...`), not a request-level failure.
+- **`date`** is `yyyy-MM-dd`. The time step used to evaluate (e.g. to convert a rate to a
+  per-step amount) comes from the scenario's **current run configuration**, not from the
+  request.
+- **Results**: exactly one of `value`/`error` per item. A result that is NaN or ±Infinity is
+  reported as the item error `"non-finite result"` (neither JSON nor some runtimes can carry
+  those values). Any other parse or evaluation problem is also an item error; internal names
+  for the transient function used to evaluate it are stripped from the message first.
+- **`400 Bad Request`**: a request-level problem, as a
+  [`SimulationFault`](schemas.md#simulationfault). Exact messages:
+  - `too many items: {count} > 2000` — more than `MAX_ITEMS` items.
+  - `item[{index}] must not be null`
+  - `item[{index}] needs an id and an expression`
+  - `item {id}: date must be yyyy-MM-dd ({reason})` — `{reason}` is `missing`,
+    `not yyyy-MM-dd`, or `not a calendar date`.
+- **`409 Conflict`**: also a `SimulationFault`. Either no scenario is loaded
+  (`"No scenario is loaded."`), or a run has been claimed or is in progress via Veneer
+  (`"A simulation is running; evaluate after it finishes."`). A run started from the Source
+  GUI rather than through Veneer is not detected and does not trigger this.
+- Not gated by `AllowScript` — unlike `POST /ironpython` and `POST /custom/{action}`, which
+  answer `403` when scripting is disabled, evaluate runs no script and is always available.
+- **Available from protocol `20261018`** (see [`GET /`](server-and-lifecycle.md)).
+- **veneer-py**: none yet.
+
+```http
+POST /functions/evaluate HTTP/1.1
+Content-Type: application/json
+
+{
+  "items": [
+    {
+      "id": "1",
+      "date": "2000-01-01",
+      "expression": "$Storages.StorageA.f_Inflow * 2",
+      "bindings": [ { "token": "$Storages.StorageA.f_Inflow", "value": 12.5 } ]
+    },
+    {
+      "id": "2",
+      "date": "2000-01-01",
+      "expression": "1 / $v_Rain",
+      "bindings": [ { "token": "$v_Rain", "value": 0.0 } ]
+    }
+  ]
+}
+```
+
+```json
+{
+  "results": [
+    { "id": "1", "value": 25.0 },
+    { "id": "2", "error": "non-finite result" }
+  ]
+}
+```
+
+---
+
 ## `GET /variables`
 
 All variables (the inputs to functions).

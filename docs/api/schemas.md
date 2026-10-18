@@ -227,6 +227,53 @@ series (e.g. via `__all__`), or whenever
 | `YName` | string | Y-axis label |
 | `Entries` | number[][] | Array of `[x, y]` pairs |
 
+### EvaluateBinding, EvaluateItem, EvaluateRequest, EvaluateResultItem, EvaluateResponse
+`ExchangeObjects/FunctionEvaluation.cs` · `POST /functions/evaluate` — see
+[functions-and-variables.md](functions-and-variables.md#post-functionsevaluate) for the full
+behaviour. Field names on these five types are **lowercase**, like the GeoJSON types below,
+not PascalCase like the rest of this page.
+
+**EvaluateBinding** — element of `EvaluateItem.bindings`
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `token` | string | The text to replace, verbatim as it appears in `expression` (e.g. `"$v_Rain"`). Required. |
+| `value` | number | The literal to substitute, invariant-culture. Required; must be finite. |
+
+A **list** of `{token, value}` pairs, not a `token → value` object — the server's JSON
+serialiser (`DataContractJsonSerializer`) silently drops any object member whose name isn't a
+legal XML name, which every `$`-prefixed token is.
+
+**EvaluateItem** — element of `EvaluateRequest.items`
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `id` | string | Client-assigned; echoed back on the matching result. Required. Need not be unique — duplicates are accepted; results come back in request order. |
+| `date` | string | `yyyy-MM-dd`. |
+| `context` | string \| omitted | `Name` or `FullName` of an existing function whose folder the expression is evaluated in, so leaf names resolve relative to it. Omitted → no containing folder (only full names resolve). |
+| `expression` | string | The Source function expression to evaluate. Required. |
+| `bindings` | [EvaluateBinding](#evaluatebinding)[] \| omitted | Tokens to substitute before evaluation; everything else resolves against current in-Source state. |
+
+**EvaluateRequest** — request body of `POST /functions/evaluate`
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `items` | [EvaluateItem](#evaluateitem)[] | Up to `MAX_ITEMS` = 2000; more is `400 Bad Request`. |
+
+**EvaluateResultItem** — element of `EvaluateResponse.results`
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `id` | string | Copied from the matching request item. |
+| `value` | number \| omitted | Present only on success. |
+| `error` | string \| omitted | Present only on failure. Exactly one of `value`/`error` is present. A NaN/±Infinity result is reported as the error `"non-finite result"`. |
+
+**EvaluateResponse** — response body of `POST /functions/evaluate`
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `results` | [EvaluateResultItem](#evaluateresultitem)[] | One per request item, in request order. |
+
 ---
 
 ## Input sets & recorders
