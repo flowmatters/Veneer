@@ -227,8 +227,6 @@ series (e.g. via `__all__`), or whenever
 | `YName` | string | Y-axis label |
 | `Entries` | number[][] | Array of `[x, y]` pairs |
 
-### POST /functions/evaluate
-
 The five types below back `POST /functions/evaluate` — see
 [functions-and-variables.md](functions-and-variables.md#post-functionsevaluate) for the full
 behaviour. Field names on all five are **lowercase**, like the GeoJSON types below, not
