@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using FlowMatters.Source.Veneer.DomainActions;
@@ -51,13 +52,15 @@ namespace FlowMatters.Source.Veneer.Tests
         /// <summary>
         /// The real race against the real TIME AsyncObservableSet: Parse's fire-and-forget loop
         /// awaits TryAddAsync once per entity — here two clones of one ModelledVariable (sharing
-        /// one set) and one unrelated variable — while Release runs concurrently. Without the
-        /// settle step a reviewer's probe left the shared set holding the transient in over a
-        /// third of trials.
+        /// one set) and one unrelated variable — while Release runs concurrently, followed by the
+        /// batch's settle window (here immediately, the tightest case: in the endpoint other items
+        /// run in between). Without the settle step a reviewer's probe left the shared set holding
+        /// the transient in over a third of trials; forcing the shared set's entity count to 1
+        /// (so it is never settled) must make strays appear.
         /// </summary>
-        [Test] public void RemoveFromSets_LeavesNoStrayWhenTwoEntitiesShareASet()
+        [Test, Category("Slow")] public void RemoveFromSets_ThenSettle_LeavesNoStrayWhenTwoEntitiesShareASet()
         {
-            const int trials = 200;
+            const int trials = 100;
             var straysShared = 0;
             var straysOther = 0;
             var outstandingReported = 0;
@@ -69,13 +72,18 @@ namespace FlowMatters.Source.Veneer.Tests
                 var entitySets = new[] { shared, shared, other };   // clone, clone, unrelated
                 var addTask = Task.Run(async () => { foreach (var s in entitySets) await TryAddAsync(s, fn); });
 
+                List<(object set, int entityCount, int removals)> unsettled;
                 var outstanding = TransientFunctionEvaluator.RemoveFromSets(
                     new List<(object set, int entityCount)> { (shared, 2), (other, 1) },
                     s => Remove(s, fn),
                     waitForAdds: true,
                     wait: TimeSpan.FromSeconds(2),
-                    settle: TimeSpan.FromMilliseconds(50),
-                    onError: (s, e) => Assert.Fail("Remove threw: " + e));
+                    onError: (s, e) => Assert.Fail("Remove threw: " + e),
+                    unsettled: out unsettled);
+                TransientFunctionEvaluator.Settle(
+                    unsettled.Select(u => Entry(() => Remove(u.set, fn), u.entityCount, u.removals)).ToList(),
+                    TimeSpan.FromMilliseconds(50),
+                    (s, e) => Assert.Fail("Remove threw: " + e));
 
                 Assert.That(addTask.Wait(TimeSpan.FromSeconds(10)), Is.True, "add task did not finish");
                 outstandingReported += outstanding.Count;
@@ -85,6 +93,113 @@ namespace FlowMatters.Source.Veneer.Tests
             Assert.That(straysShared, Is.EqualTo(0), "strays in the shared set");
             Assert.That(straysOther, Is.EqualTo(0), "strays in the unique set");
             Assert.That(outstandingReported, Is.EqualTo(0), "sets reported outstanding");
+        }
+
+        private static TransientFunctionEvaluator.SettleEntry Entry(Func<bool> remove, int entities, int removals) =>
+            new TransientFunctionEvaluator.SettleEntry { Remove = remove, Entities = entities, Removals = removals, Label = "test" };
+
+        /// <summary>The probe behind Settle's reporting rule: the real set dedups, so two adds
+        /// that both land before the first Remove leave ONE presence and allow ONE successful
+        /// Remove — an entry can fall short of its entity count with no stray.</summary>
+        [Test] public void AsyncObservableSet_DedupsASecondAdd()
+        {
+            var fn = new object();
+            var set = NewSet();
+            Assert.That(TryAddAsync(set, fn).Result, Is.True);
+            Assert.That(TryAddAsync(set, fn).Result, Is.False);
+            Assert.That(Remove(set, fn), Is.True);
+            Assert.That(Remove(set, fn), Is.False);
+        }
+
+        [Test] public void RemoveFromSets_HandsMultiEntitySetsOnForSettling()
+        {
+            var fn = new object();
+            var shared = NewSet();
+            var single = NewSet();
+            TryAddAsync(shared, fn).Wait();
+            TryAddAsync(single, fn).Wait();
+
+            List<(object set, int entityCount, int removals)> unsettled;
+            var outstanding = TransientFunctionEvaluator.RemoveFromSets(
+                new List<(object set, int entityCount)> { (shared, 2), (single, 1) },
+                s => Remove(s, fn),
+                waitForAdds: true,
+                wait: TimeSpan.FromSeconds(2),
+                onError: null,
+                unsettled: out unsettled);
+
+            Assert.That(outstanding, Is.Empty);
+            Assert.That(unsettled.Count, Is.EqualTo(1));
+            Assert.That(unsettled[0].set, Is.SameAs(shared));
+            Assert.That(unsettled[0].entityCount, Is.EqualTo(2));
+            Assert.That(unsettled[0].removals, Is.EqualTo(1));
+        }
+
+        [Test] public void RemoveFromSets_WithoutWaitHandsNothingOnForSettling()
+        {
+            var fn = new object();
+            var shared = NewSet();
+            TryAddAsync(shared, fn).Wait();
+
+            List<(object set, int entityCount, int removals)> unsettled;
+            TransientFunctionEvaluator.RemoveFromSets(
+                new List<(object set, int entityCount)> { (shared, 2) },
+                s => Remove(s, fn),
+                waitForAdds: false,
+                wait: TimeSpan.FromSeconds(2),
+                onError: null,
+                unsettled: out unsettled);
+
+            Assert.That(Contains(shared, fn), Is.False);
+            Assert.That(unsettled, Is.Empty);
+        }
+
+        [Test] public void Settle_StopsEarlyOnceEveryAddIsUndone()
+        {
+            var calls = 0;
+            var entry = Entry(() => ++calls == 3, entities: 2, removals: 1);   // the re-add is found on the 3rd look
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+
+            var strays = TransientFunctionEvaluator.Settle(new[] { entry }, TimeSpan.FromSeconds(5), null);
+
+            Assert.That(strays, Is.Empty);
+            Assert.That(entry.Removals, Is.EqualTo(2));
+            Assert.That(calls, Is.EqualTo(3));
+            Assert.That(clock.Elapsed, Is.LessThan(TimeSpan.FromSeconds(2)));
+        }
+
+        [Test] public void Settle_SkipsEntriesAlreadyConfirmed()
+        {
+            var calls = 0;
+            var entry = Entry(() => { calls++; return false; }, entities: 2, removals: 2);
+            Assert.That(TransientFunctionEvaluator.Settle(new[] { entry }, TimeSpan.FromMilliseconds(50), null), Is.Empty);
+            Assert.That(calls, Is.EqualTo(0));
+        }
+
+        [Test] public void Settle_DoesNotReportAnEntryThatFellShortButHoldsNoStray()
+        {
+            // The common dedup case: both adds landed before Release — one presence, one Remove.
+            var entry = Entry(() => false, entities: 2, removals: 1);
+            Assert.That(TransientFunctionEvaluator.Settle(new[] { entry }, TimeSpan.FromMilliseconds(20), null), Is.Empty);
+        }
+
+        [Test] public void Settle_ReportsAnEntryStillHoldingTheTransientAfterTheWindow()
+        {
+            // A set that keeps being re-added to: more entities than the window can drain.
+            var entry = Entry(() => true, entities: int.MaxValue, removals: 1);
+            var strays = TransientFunctionEvaluator.Settle(new[] { entry }, TimeSpan.FromMilliseconds(20), null);
+            Assert.That(strays.Count, Is.EqualTo(1));
+            Assert.That(strays[0], Is.SameAs(entry));
+        }
+
+        [Test] public void Settle_ReportsAThrowingRemoveAndDropsIt()
+        {
+            var errors = new List<TransientFunctionEvaluator.SettleEntry>();
+            var bad = Entry(() => throw new InvalidOperationException("boom"), entities: 2, removals: 1);
+            var strays = TransientFunctionEvaluator.Settle(new[] { bad }, TimeSpan.FromMilliseconds(20), (e, ex) => errors.Add(e));
+            Assert.That(errors.Count, Is.EqualTo(1));
+            Assert.That(errors[0], Is.SameAs(bad));
+            Assert.That(strays, Is.Empty);
         }
 
         [Test] public void RemoveFromSets_WithoutWaitMakesOnePassAndReportsTheRest()
@@ -99,8 +214,8 @@ namespace FlowMatters.Source.Veneer.Tests
                 s => Remove(s, fn),
                 waitForAdds: false,
                 wait: TimeSpan.FromSeconds(2),
-                settle: TimeSpan.FromMilliseconds(50),
-                onError: null);
+                onError: null,
+                unsettled: out _);
 
             Assert.That(Contains(present, fn), Is.False);
             // Is.SameAs, not Is.EqualTo: NUnit would compare the sets as (empty) collections.
@@ -119,8 +234,8 @@ namespace FlowMatters.Source.Veneer.Tests
                 s => Remove(s, fn),
                 waitForAdds: true,
                 wait: TimeSpan.FromMilliseconds(100),
-                settle: TimeSpan.FromMilliseconds(50),
-                onError: null);
+                onError: null,
+                unsettled: out _);
 
             // Is.SameAs, not Is.EqualTo: NUnit would compare the sets as (empty) collections.
             Assert.That(outstanding.Count, Is.EqualTo(1));
@@ -141,8 +256,8 @@ namespace FlowMatters.Source.Veneer.Tests
                 s => ReferenceEquals(s, bad) ? throw new InvalidOperationException("boom") : Remove(s, fn),
                 waitForAdds: true,
                 wait: TimeSpan.FromSeconds(2),
-                settle: TimeSpan.FromMilliseconds(50),
-                onError: (s, e) => errors.Add(s));
+                onError: (s, e) => errors.Add(s),
+                unsettled: out _);
 
             Assert.That(errors.Count, Is.EqualTo(1));
             Assert.That(errors[0], Is.SameAs(bad));

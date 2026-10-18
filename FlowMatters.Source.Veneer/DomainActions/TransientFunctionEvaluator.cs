@@ -21,6 +21,8 @@ namespace FlowMatters.Source.Veneer.DomainActions
     /// Every step here was verified live (SIFT spec 2026-10-17 §4.2). The release step is the
     /// one that matters: Parse() registers the transient in every referenced entity's
     /// ReferencingFunctions, and nothing else undoes it.
+    /// One instance per batch: Evaluate each item, then — in a finally — SettlePending, then
+    /// SweepStrays.
     /// </summary>
     public class TransientFunctionEvaluator
     {
@@ -30,8 +32,9 @@ namespace FlowMatters.Source.Veneer.DomainActions
         /// normally land within a thread-pool hop; 2 s caps a starved pool.</summary>
         private static readonly TimeSpan RegistrationWait = TimeSpan.FromSeconds(2);
 
-        /// <summary>How long Release keeps removing from a set reached by more than one entity,
-        /// after its first successful Remove, to catch the later entities' re-adds.</summary>
+        /// <summary>How long SettlePending keeps removing from the sets reached by more than one
+        /// entity, after Release's first successful Remove, to catch the later entities' re-adds.
+        /// One window per batch, shared by every such set.</summary>
         private static readonly TimeSpan SettleWindow = TimeSpan.FromMilliseconds(50);
 
         /// <summary>Wait rounds that Thread.Yield() before falling back to Thread.Sleep(1).</summary>
@@ -42,6 +45,7 @@ namespace FlowMatters.Source.Veneer.DomainActions
         private readonly RiverSystemScenario _scenario;
         private readonly Action<string> _log;
         private bool _loggedTimeStepFallback;
+        private readonly List<SettleEntry> _pendingSettle = new List<SettleEntry>();
 
         public TransientFunctionEvaluator(RiverSystemScenario scenario, Action<string> log)
         {
@@ -94,12 +98,15 @@ namespace FlowMatters.Source.Veneer.DomainActions
                 registrationLaunched = !fm.CachedDisableReferenceFunctions;
                 if (!parsed)
                     return Error(item, string.IsNullOrEmpty(error) ? "parse failed" : StripNamePrefix(error, fn.FullName));
+                // Source's own runner passes TimeStep.GetTimeSpanToNextTick(now) to Evaluate
+                // (NetworkRunner); modelled variables use it to convert rates to per-step amounts.
+                // No fallback: a 0-second step would give plausible WRONG amounts. Computed outside
+                // the ArithmeticException catch below, so an OverflowException from it is reported
+                // as itself (by the outer catch), not as a non-finite result.
+                var stepLength = timeStep.GetTimeSpanToNextTick(date);
                 try
                 {
-                    // Source's own runner passes TimeStep.GetTimeSpanToNextTick(now) here
-                    // (NetworkRunner); modelled variables use it to convert rates to per-step
-                    // amounts. No fallback: a 0-second step would give plausible WRONG amounts.
-                    fn.Evaluate(date, timeStep, timeStep.GetTimeSpanToNextTick(date), PointOfUpdate.AfterTimeSeriesPlayed);
+                    fn.Evaluate(date, timeStep, stepLength, PointOfUpdate.AfterTimeSeriesPlayed);
                 }
                 catch (ArithmeticException)
                 {
@@ -119,7 +126,16 @@ namespace FlowMatters.Source.Veneer.DomainActions
             }
             finally
             {
-                if (fn != null) Release(item, fn, registrationLaunched);
+                // A throw out of Release (e.g. from its grouping) must not replace the item's result.
+                if (fn != null)
+                {
+                    try { Release(item, fn, registrationLaunched); }
+                    catch (Exception e) when (!(e is OutOfMemoryException))
+                    {
+                        _log("WARNING: evaluate item " + item.Id + ": release failed: " + e.GetBaseException().Message
+                             + " — SweepStrays should catch any stray");
+                    }
+                }
             }
         }
 
@@ -157,7 +173,7 @@ namespace FlowMatters.Source.Veneer.DomainActions
         /// <summary>
         /// Remove the transient from EVERY entity Parse bound it to — functions, variables, date
         /// builtins, lookup tables alike. Never a counted subset. See RemoveFromSets for why this
-        /// waits and settles.
+        /// waits; sets that still need settling are queued for the batch's SettlePending.
         /// </summary>
         private void Release(EvaluateItem item, Function fn, bool registrationLaunched)
         {
@@ -172,11 +188,44 @@ namespace FlowMatters.Source.Veneer.DomainActions
             var names = groups.ToDictionary(g => g.Key, g => string.Join(", ", g.Select(x => x.Name).Distinct()));
             var sets = groups.Select(g => (g.Key, g.Count())).ToList();
 
-            var outstanding = RemoveFromSets(sets, s => s.Remove(fn), registrationLaunched, RegistrationWait, SettleWindow,
-                (set, e) => _log("WARNING: evaluate item " + item.Id + ": could not release from " + names[set] + ": " + e.GetBaseException().Message));
+            List<(AsyncObservableSet<Function> set, int entityCount, int removals)> unsettled;
+            var outstanding = RemoveFromSets(sets, s => s.Remove(fn), registrationLaunched, RegistrationWait,
+                (set, e) => _log("WARNING: evaluate item " + item.Id + ": could not release from " + names[set] + ": " + e.GetBaseException().Message),
+                out unsettled);
+            foreach (var u in unsettled)
+            {
+                var set = u.set;
+                _pendingSettle.Add(new SettleEntry
+                {
+                    Remove = () => set.Remove(fn),
+                    Entities = u.entityCount,
+                    Removals = u.removals,
+                    Label = "item " + item.Id + " on " + names[set],
+                });
+            }
             if (registrationLaunched && outstanding.Count > 0)
                 _log("WARNING: evaluate item " + item.Id + ": release timed out with registration(s) outstanding on "
                      + string.Join("; ", outstanding.Select(s => names[s])) + " — SweepStrays should catch them");
+        }
+
+        /// <summary>
+        /// Once per batch, after the last item and before SweepStrays: run ONE bounded settle
+        /// window across every set that Release left needing one (see Settle), then clear the
+        /// list. Returns how many of them still held the transient once the window had closed
+        /// (those are removed, and named in this method's OWN warning — callers must not log a
+        /// second one).
+        /// </summary>
+        public int SettlePending()
+        {
+            if (_pendingSettle.Count == 0) return 0;
+            var entries = _pendingSettle.ToList();
+            _pendingSettle.Clear();
+            var strays = Settle(entries, SettleWindow,
+                (entry, e) => _log("WARNING: evaluate " + entry.Label + ": could not settle release: " + e.GetBaseException().Message));
+            if (strays.Count > 0)
+                _log("WARNING: evaluate found " + strays.Count + " late re-registration(s) after the settle window, now removed: "
+                     + string.Join("; ", strays.Select(s => s.Label)));
+            return strays.Count;
         }
 
         /// <summary>
@@ -192,23 +241,21 @@ namespace FlowMatters.Source.Veneer.DomainActions
         /// removing until every set has had a successful Remove, bounded by
         /// <paramref name="wait"/>. A set reached by more than one entity (clones of one
         /// ModelledVariable) gets more than one add, and a later add can re-insert after the
-        /// first Remove; so such sets keep being removed from for up to
-        /// <paramref name="settle"/>, stopping early once they have had as many successful
-        /// Removes as entities (then every add has landed and been undone). This settle is a
-        /// heuristic — a pool starved for longer than the window can still re-add; SweepStrays
-        /// is the backstop. A Remove that throws is reported via <paramref name="onError"/> and
-        /// that set is skipped.
+        /// first Remove; such sets, once removed from, are returned in
+        /// <paramref name="unsettled"/> (with their removal count so far) for Settle to finish —
+        /// once per batch, not per item. A Remove that throws is reported via
+        /// <paramref name="onError"/> and that set is skipped.
         /// </summary>
         internal static List<TSet> RemoveFromSets<TSet>(
             IReadOnlyList<(TSet set, int entityCount)> sets,
             Func<TSet, bool> remove,
             bool waitForAdds,
             TimeSpan wait,
-            TimeSpan settle,
-            Action<TSet, Exception> onError)
+            Action<TSet, Exception> onError,
+            out List<(TSet set, int entityCount, int removals)> unsettled)
         {
-            var pending = sets.Select(x => new SetRelease<TSet> { Set = x.set, Entities = x.entityCount }).ToList();
-            var settling = new List<SetRelease<TSet>>();
+            var pending = sets.ToList();
+            var settle = new List<(TSet set, int entityCount, int removals)>();
 
             var clock = Stopwatch.StartNew();
             var round = 0;
@@ -218,56 +265,86 @@ namespace FlowMatters.Source.Veneer.DomainActions
                 {
                     var entry = pending[i];
                     bool removed;
-                    if (!TryRemove(entry.Set, remove, onError, out removed)) { pending.RemoveAt(i); continue; }
+                    if (!TryRemove(() => remove(entry.set), e => onError?.Invoke(entry.set, e), out removed)) { pending.RemoveAt(i); continue; }
                     if (!removed) continue;
-                    entry.Removals = 1;
-                    if (entry.Entities > 1) settling.Add(entry);
+                    // Without waitForAdds no registration was launched, so nothing can re-add.
+                    if (waitForAdds && entry.entityCount > 1) settle.Add((entry.set, entry.entityCount, 1));
                     pending.RemoveAt(i);
                 }
                 if (pending.Count == 0 || !waitForAdds || clock.Elapsed >= wait) break;
                 Pause(round++);
             }
 
-            if (waitForAdds && settling.Count > 0)
-            {
-                var settleClock = Stopwatch.StartNew();
-                round = 0;
-                while (true)
-                {
-                    for (var i = settling.Count - 1; i >= 0; i--)
-                    {
-                        var entry = settling[i];
-                        bool removed;
-                        if (!TryRemove(entry.Set, remove, onError, out removed)) { settling.RemoveAt(i); continue; }
-                        if (removed && ++entry.Removals >= entry.Entities) settling.RemoveAt(i);
-                    }
-                    if (settling.Count == 0 || settleClock.Elapsed >= settle) break;
-                    Pause(round++);
-                }
-            }
-
-            return pending.Select(p => p.Set).ToList();
+            unsettled = settle;
+            return pending.Select(p => p.set).ToList();
         }
 
-        private sealed class SetRelease<TSet>
+        /// <summary>A set Release removed the transient from once, but which more than one entity's
+        /// registration reaches, so a later add may re-insert it.</summary>
+        internal sealed class SettleEntry
         {
-            public TSet Set;
+            /// <summary>Removes the transient from the set; true when it was present.</summary>
+            public Func<bool> Remove;
             public int Entities;
             public int Removals;
+            public string Label;
+        }
+
+        /// <summary>
+        /// Keep removing from each entry for up to <paramref name="window"/>, stopping early for an
+        /// entry once it has had as many successful Removes as entities (then every add has
+        /// landed and been undone). An entry often never gets there, and that is fine: the set
+        /// dedups, so adds that both landed before the first Remove leave one presence and one
+        /// successful Remove. That is why falling short is not itself reported. After the window,
+        /// one last Remove per remaining entry: the entries it found the transient in (an add that
+        /// landed after the window's last pass) are returned. This is a heuristic — a pool
+        /// starved for longer than the window can still re-add later; SweepStrays is the
+        /// backstop. A Remove that throws is reported via <paramref name="onError"/> and that
+        /// entry is dropped.
+        /// </summary>
+        internal static List<SettleEntry> Settle(IReadOnlyList<SettleEntry> entries, TimeSpan window, Action<SettleEntry, Exception> onError)
+        {
+            var active = entries.Where(e => e.Removals < e.Entities).ToList();
+            var clock = Stopwatch.StartNew();
+            var round = 0;
+            while (active.Count > 0)
+            {
+                for (var i = active.Count - 1; i >= 0; i--)
+                {
+                    var entry = active[i];
+                    bool removed;
+                    if (!TryRemove(entry.Remove, e => onError?.Invoke(entry, e), out removed)) { active.RemoveAt(i); continue; }
+                    if (removed && ++entry.Removals >= entry.Entities) active.RemoveAt(i);
+                }
+                if (active.Count == 0 || clock.Elapsed >= window) break;
+                Pause(round++);
+            }
+
+            var strays = new List<SettleEntry>();
+            foreach (var entry in active)
+            {
+                bool removed;
+                if (TryRemove(entry.Remove, e => onError?.Invoke(entry, e), out removed) && removed)
+                {
+                    entry.Removals++;
+                    strays.Add(entry);
+                }
+            }
+            return strays;
         }
 
         /// <summary>False when remove threw (reported via onError).</summary>
-        private static bool TryRemove<TSet>(TSet set, Func<TSet, bool> remove, Action<TSet, Exception> onError, out bool removed)
+        private static bool TryRemove(Func<bool> remove, Action<Exception> onError, out bool removed)
         {
             try
             {
-                removed = remove(set);
+                removed = remove();
                 return true;
             }
             catch (Exception e) when (!(e is OutOfMemoryException))
             {
                 removed = false;
-                onError?.Invoke(set, e);
+                onError?.Invoke(e);
                 return false;
             }
         }
