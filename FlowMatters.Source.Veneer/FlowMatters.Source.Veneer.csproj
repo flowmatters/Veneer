@@ -258,6 +258,7 @@
     <Compile Include="DomainActions\ScenarioInvoker.cs" />
     <Compile Include="DomainActions\TimeSeriesFunctions.cs" />
     <Compile Include="DomainActions\TrimNetwork.cs" />
+    <Compile Include="DomainActions\TransientFunctionEvaluator.cs" />
     <Compile Include="ExchangeObjects\BooleanResponse.cs" />
     <Compile Include="ExchangeObjects\DataSources\SimpleDataDetails.cs" />
     <Compile Include="ExchangeObjects\DataSources\SimpleDataGroupItem.cs" />
@@ -310,6 +311,8 @@
     <Compile Include="Tests\AddonMenuItemStateTests.cs" />
     <Compile Include="Tests\OneShotLifecycleTests.cs" />
     <Compile Include="ExchangeObjects\FunctionValue.cs" />
+    <Compile Include="ExchangeObjects\FunctionEvaluation.cs" />
+    <Compile Include="Functions\ExpressionSubstitution.cs" />
     <Compile Include="ExchangeObjects\InputSetSummary.cs" />
     <Compile Include="AutoStart\InitialiseOnLoadAttribute.cs" />
     <Compile Include="AutoStart\ProjectLoadListener.cs" />
