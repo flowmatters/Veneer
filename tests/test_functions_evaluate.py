@@ -88,6 +88,28 @@ def test_bindings_replace_whole_tokens(veneer):
     assert r == {"id": "b", "value": 3.5}
 
 
+# Bound values whose round-trip ("R") rendering is in exponent form: 1E-05, 1E+300, -1.5E-07,
+# 1.2345678901234568E+20 and (the smallest denormal) 5E-324. Source's parser must accept them.
+EXPONENT_VALUES = {"small": 1e-5, "huge": 1e300, "neg": -1.5e-7, "big": 123456789012345680000.0}
+DENORMAL = 4.9e-324
+
+
+def test_bindings_in_exponent_form(veneer):
+    items = [make_item(key, "$f_Const * 1", bindings=[{"token": "$f_Const", "value": value}])
+             for key, value in {**EXPONENT_VALUES, "denormal": DENORMAL}.items()]
+    status, body = evaluate(veneer.base_url, items)
+    assert status == 200, body
+    by_id = {r["id"]: r for r in body["results"]}
+    print("\nexponent-form results:", body["results"])
+    for key, value in EXPONENT_VALUES.items():
+        assert "error" not in by_id[key], by_id[key]
+        assert by_id[key]["value"] == pytest.approx(value, rel=1e-12), by_id[key]
+    # The denormal survives exactly, or (were Source to flush it) is an item error — never a
+    # silently different number.
+    denormal = by_id["denormal"]
+    assert denormal.get("value") == DENORMAL or "error" in denormal, denormal
+
+
 def test_non_finite_result_is_an_item_error(veneer):
     def reject(name):
         raise ValueError("non-JSON constant " + name)
