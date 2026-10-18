@@ -6,16 +6,18 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects
 {
     /// <summary>
     /// One token -> literal. `bindings` is a LIST of these, never a Dictionary or an ISerializable
-    /// flat object: the request path is CoreWCF WebHttpBinding with the default
-    /// DataContractJsonSerializer (SourceRESTfulService.cs:116-140), which reads a Dictionary
-    /// member as [{"Key":…,"Value":…}] and silently DROPS object members whose name is not a legal
-    /// XML name — every `$`-prefixed token (verified with a .NET 8 probe during planning). A list
-    /// of DataContract pairs deserialises exactly and ports to classic WCF unchanged.
+    /// flat object: the request path is the WebHttpBinding endpoint set up in
+    /// SourceRESTfulService (no custom request formatter for this operation in
+    /// ReplyFormatSwitchBehaviour), which uses the default DataContractJsonSerializer; that
+    /// serializer reads a Dictionary member as [{"Key":…,"Value":…}] and silently DROPS object
+    /// members whose name is not a legal XML name — every `$`-prefixed token (verified with a
+    /// .NET 8 probe during planning). A list of DataContract pairs deserialises exactly and ports
+    /// to classic WCF unchanged.
     /// </summary>
     [DataContract] public class EvaluateBinding
     {
-        [DataMember(Name = "token")] public string Token { get; set; }
-        [DataMember(Name = "value")] public double Value { get; set; }
+        [DataMember(Name = "token", IsRequired = true)] public string Token { get; set; }
+        [DataMember(Name = "value", IsRequired = true)] public double Value { get; set; }
     }
 
     [DataContract] public class EvaluateItem
@@ -28,15 +30,17 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects
 
         /// <summary>
         /// The bindings as ExpressionSubstitution wants them. Case-insensitive, because
-        /// substitution matches tokens case-insensitively: two bindings differing only in case are
-        /// the same token, and the LAST one wins (so the rule holds whichever the regex meets first).
-        /// Empty/null tokens are dropped.
+        /// substitution matches tokens case-insensitively: case-only duplicates collapse to one
+        /// entry, so Apply substitutes a single value. Empty/null tokens are dropped, and a null
+        /// element in the list (e.g. a "bindings":[null] body) is skipped rather than throwing.
+        /// Does NOT validate that tokens start with '$' or that values are finite — the evaluator
+        /// (TransientFunctionEvaluator) checks both and turns failures into item errors.
         /// </summary>
         public Dictionary<string, double> BindingsByToken()
         {
             var d = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
             foreach (var b in Bindings ?? new List<EvaluateBinding>())
-                if (!string.IsNullOrEmpty(b.Token)) d[b.Token] = b.Value;
+                if (b != null && !string.IsNullOrEmpty(b.Token)) d[b.Token] = b.Value;
             return d;
         }
     }

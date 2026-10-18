@@ -56,7 +56,10 @@ namespace FlowMatters.Source.Veneer.Functions
                 var literal = kv.Value.ToString("R", CultureInfo.InvariantCulture);
                 // Parenthesise from the formatted text, not kv.Value < 0: -0.0 formats as "-0"
                 // but is not < 0, so checking the sign of the double would miss it.
-                if (literal.StartsWith('-')) literal = "(" + literal + ")";
+                // Indexer, not StartsWith(char): that overload doesn't exist on .NET Framework
+                // 4.8 / C# 7.3, which the legacy_ci port (Task 6) compiles against. "R" output
+                // is never empty, so literal[0] is safe.
+                if (literal[0] == '-') literal = "(" + literal + ")";
                 text = Regex.Replace(text, pattern, literal, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
             }
             return text;

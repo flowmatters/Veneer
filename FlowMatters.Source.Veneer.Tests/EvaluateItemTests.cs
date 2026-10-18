@@ -1,5 +1,7 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
 using System.Text;
 using FlowMatters.Source.Veneer.ExchangeObjects;
@@ -65,6 +67,22 @@ namespace FlowMatters.Source.Veneer.Tests
             Assert.That(item.BindingsByToken(), Is.Empty);
         }
 
+        [Test] public void BindingsByToken_SkipsNullElementKeepsOthers()
+        {
+            // A "bindings":[null] body deserialises to a list containing a null element.
+            var item = new EvaluateItem
+            {
+                Bindings = new List<EvaluateBinding>
+                {
+                    null,
+                    new EvaluateBinding { Token = "$a", Value = 3 },
+                }
+            };
+            var d = item.BindingsByToken();
+            Assert.That(d.Count, Is.EqualTo(1));
+            Assert.That(d["$a"], Is.EqualTo(3));
+        }
+
         [Test] public void RequestRoundTripsThroughDataContractJsonSerializer()
         {
             var request = new EvaluateRequest
@@ -93,6 +111,27 @@ namespace FlowMatters.Source.Veneer.Tests
             Assert.That(roundTripped.Items[0].BindingsByToken()["$Storages.StorageA.v_Level"], Is.EqualTo(-3.25));
         }
 
+        [Test] public void DeserializingAMissingBindingValueThrows()
+        {
+            var json = "{\"items\":[{\"id\":\"i1\",\"date\":\"2025-11-01\",\"expression\":\"$x\","
+                      + "\"bindings\":[{\"token\":\"$x\"}]}]}";
+            Action act = () => Deserialize<EvaluateRequest>(json);
+            Assert.Throws<SerializationException>(act);
+        }
+
+        [Test] public void DeserializesHandWrittenJsonWithOutOfOrderFieldsAndNoBindings()
+        {
+            var json = "{\"items\":["
+                      + "{\"id\":\"i1\",\"date\":\"2025-11-01\",\"expression\":\"$x*2\","
+                      + "\"bindings\":[ {\"value\":4.5,\"token\":\"$x\"} ]},"
+                      + "{\"id\":\"i2\",\"date\":\"2025-11-01\",\"expression\":\"1\"}"
+                      + "]}";
+            var request = Deserialize<EvaluateRequest>(json);
+            Assert.That(request.Items[0].BindingsByToken()["$x"], Is.EqualTo(4.5));
+            Assert.That(request.Items[1].Bindings, Is.Null);
+            Assert.That(request.Items[1].BindingsByToken(), Is.Empty);
+        }
+
         [Test] public void ResponseOmitsNullValueAndError()
         {
             var response = new EvaluateResponse
@@ -111,6 +150,21 @@ namespace FlowMatters.Source.Veneer.Tests
             Assert.That(json, Does.Contain("{\"error\":\"boom\",\"id\":\"b\"}"));
             Assert.That(json, Does.Not.Contain("\"error\":null"));
             Assert.That(json, Does.Not.Contain("\"value\":null"));
+        }
+
+        [Test] public void ResponseEmitsAZeroValue()
+        {
+            // Pins the double?-zero-emission trap: a plain `double` with EmitDefaultValue=false
+            // would drop a legitimate 0 just like it drops the default; `double?` does not.
+            var response = new EvaluateResponse
+            {
+                Results = new List<EvaluateResultItem>
+                {
+                    new EvaluateResultItem { Id = "z", Value = 0 },
+                }
+            };
+            var json = Serialize(response);
+            Assert.That(json, Does.Contain("{\"id\":\"z\",\"value\":0}"));
         }
     }
 }
