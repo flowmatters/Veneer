@@ -22,6 +22,7 @@ using FlowMatters.Source.Veneer.DomainActions;
 using FlowMatters.Source.Veneer.ExchangeObjects;
 using FlowMatters.Source.Veneer.ExchangeObjects.DataSources;
 using FlowMatters.Source.Veneer.Formatting;
+using FlowMatters.Source.Veneer.Functions;
 using FlowMatters.Source.Veneer.RemoteScripting;
 using FlowMatters.Source.WebServer;
 using FlowMatters.Source.WebServer.ExchangeObjects;
@@ -744,6 +745,59 @@ namespace FlowMatters.Source.Veneer
                 }
             }
         }
+
+        /// <summary>
+        /// POST /functions/evaluate: evaluate a batch of expressions in-process against the loaded
+        /// scenario, without adding anything to its FunctionManager. Request-level problems answer
+        /// 409 (no scenario, or a run in progress) or 400 (over the item cap, malformed); every
+        /// per-item problem is an error on that item and never fails the batch.
+        /// </summary>
+        public EvaluateResponse EvaluateFunctions(EvaluateRequest request)
+        {
+            if (Scenario == null)
+                throw Fault(HttpStatusCode.Conflict, new InvalidOperationException("No scenario is loaded."));
+            string problem;
+            var parsed = EvaluateRequestValidation.Parse(request, out problem);
+            if (parsed == null)
+                throw Fault(HttpStatusCode.BadRequest, new ArgumentException(problem));
+            Log("Evaluating " + parsed.Count + " expression(s)");
+            lock (_runLock)
+            {
+                // Holding _runLock also keeps TriggerRun from starting a run mid-batch.
+                if (_currentScenarioInvoker?.IsRunning == true)
+                    throw Fault(HttpStatusCode.Conflict, new InvalidOperationException("A simulation is running; evaluate after it finishes."));
+                var evaluator = new TransientFunctionEvaluator(Scenario,
+                    msg => Log(msg, msg.StartsWith("WARNING", StringComparison.Ordinal) ? LogLevel.Warning : LogLevel.Info));
+                var response = new EvaluateResponse();
+                try
+                {
+                    var timeStep = evaluator.EvaluationTimeStep();
+                    foreach (var pair in parsed)
+                        response.Results.Add(evaluator.Evaluate(pair.Item, pair.Date, timeStep));
+                }
+                finally
+                {
+                    // Runs even if the batch is abandoned mid-way (client disconnect, exception).
+                    // Both log their own warnings; do not log again here. Each is guarded so a
+                    // throw (e.g. the GUI mutating a collection mid-snapshot) neither skips the
+                    // other nor replaces the batch's results.
+                    try { evaluator.SettlePending(); }
+                    catch (Exception e) when (!(e is OutOfMemoryException))
+                    {
+                        Log("WARNING: evaluate settle failed: " + e.GetBaseException().Message, LogLevel.Warning);
+                    }
+                    try { evaluator.SweepStrays(); }
+                    catch (Exception e) when (!(e is OutOfMemoryException))
+                    {
+                        Log("WARNING: evaluate sweep failed: " + e.GetBaseException().Message, LogLevel.Warning);
+                    }
+                }
+                return response;
+            }
+        }
+
+        private static WebFaultException<SimulationFault> Fault(HttpStatusCode status, Exception cause) =>
+            new WebFaultException<SimulationFault>(new SimulationFault(cause), status);
 
         public FunctionValue[] GetFunctionList()
         {

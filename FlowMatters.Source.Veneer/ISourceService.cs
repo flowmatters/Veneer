@@ -115,6 +115,11 @@ namespace FlowMatters.Source.Veneer
         FunctionValue[] GetFunctionList();
 
         [OperationContract]
+        [WebInvoke(Method = "POST", UriTemplate = "/functions/evaluate", RequestFormat = WebMessageFormat.Json, ResponseFormat = WebMessageFormat.Json)]
+        [FaultContract(typeof(SimulationFault))]
+        EvaluateResponse EvaluateFunctions(EvaluateRequest request);
+
+        [OperationContract]
         [WebInvoke(Method = "GET", UriTemplate = "/variables", ResponseFormat = WebMessageFormat.Json)]
         VariableSummary[] GetInputList();
 
