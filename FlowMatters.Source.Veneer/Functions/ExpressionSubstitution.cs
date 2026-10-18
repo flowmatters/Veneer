@@ -83,6 +83,9 @@ namespace FlowMatters.Source.Veneer.Functions
             var text = Apply(expression, bindings);
             foreach (var kv in Unbound(bindings, builtIns))
             {
+                // Most built-ins are absent from most expressions: skip them before building a
+                // regex, so a large batch does not churn Regex's small pattern cache.
+                if (text.IndexOf(kv.Key, StringComparison.OrdinalIgnoreCase) < 0) continue;
                 var extra = string.Equals(kv.Key, ActiveInputSetToken, StringComparison.OrdinalIgnoreCase)
                     ? InputSetComparison
                     : string.Empty;

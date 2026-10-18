@@ -36,6 +36,12 @@ namespace FlowMatters.Source.Veneer.DomainActions
     ///   item error naming it (UnboundMessage), never a silently wrong value.
     /// - Lookup tables whose in-memory interpolator has not been built yet are built from their
     ///   persisted entries (FillLookupTables).
+    /// - Names resolve as Source resolves them — functions before variables, each by full name
+    ///   before leaf name in the context folder — so a built-in's leaf name is never substituted
+    ///   where Source would have meant another function or variable (ResolveBuiltInTokens).
+    /// Known limit: a plugin custom function that reads run state itself (e.g. through
+    /// ICustomFunctionContext.CurrentTimeStep) sees whatever the last run left, or nothing on a
+    /// scenario that has not run; Veneer cannot supply or guard what it does internally.
     ///
     /// One instance per batch, constructed under the run lock: Evaluate each item, then — in a
     /// finally — SettlePending, then SweepStrays.
@@ -81,13 +87,27 @@ namespace FlowMatters.Source.Veneer.DomainActions
         {
             _scenario = scenario;
             _log = log ?? (_ => { });
-            try { PrepareBuiltIns(); }
+            List<AbstractFunctionVariable> variables = null;
+            try
+            {
+                // Snapshot: an ObservableCollection the GUI can mutate.
+                variables = _scenario.Network.FunctionManager.Variables.ToList();
+                PrepareBuiltIns(variables);
+            }
             catch (Exception e) when (!(e is OutOfMemoryException))
             {
                 _builtIns.Clear();
                 _log("WARNING: evaluate could not read the scenario's built-in variables: " + e.GetBaseException().Message
                      + " — items that use them will be errors");
             }
+            // Separate from the above: a failure to tell whether the scenario has run is only a
+            // missing log line, and must not cost the batch its built-ins.
+            try
+            {
+                if (variables != null && IsCold(_scenario.Network.FunctionManager, variables))
+                    _log("evaluating on a scenario that has not run in this process");
+            }
+            catch (Exception e) when (!(e is OutOfMemoryException)) { }
         }
 
         /// <summary>One of Source's built-in variables and how Veneer computes its value at an
@@ -114,11 +134,10 @@ namespace FlowMatters.Source.Veneer.DomainActions
         /// - a pattern variable at date d: its pattern time series at d, what PatternVariable.Set
         ///   records during a run.
         /// </summary>
-        private void PrepareBuiltIns()
+        private void PrepareBuiltIns(List<AbstractFunctionVariable> variables)
         {
-            var fm = _scenario.Network.FunctionManager;
-            // Snapshot: an ObservableCollection the GUI can mutate.
-            var variables = fm.Variables.ToList();
+            foreach (var v in variables)
+                _variableFullNames.Add(SafeName(() => v.FullName));
 
             DateTime? start = null, end = null;
             try
@@ -185,9 +204,6 @@ namespace FlowMatters.Source.Veneer.DomainActions
                     Value = value,
                 });
             }
-
-            if (IsCold(fm, variables))
-                _log("evaluating on a scenario that has not run in this process");
         }
 
         /// <summary>$Now.X (and $Start.X, $End.X) at <paramref name="date"/>, by Source's own
@@ -222,14 +238,13 @@ namespace FlowMatters.Source.Veneer.DomainActions
 
         /// <summary>
         /// The per-item half: token -> value for every built-in Veneer could compute at
-        /// <paramref name="date"/>, by full name, and also by leaf name for those whose folder is
-        /// the item's context folder (as Source resolves leaf names) unless a function answers to
-        /// that leaf name (Source looks functions up first). A value that throws or is not finite
-        /// is left out, so the guard reports the built-in; a throw is logged once per batch.
+        /// <paramref name="date"/>, resolved as Source resolves names (see ResolveBuiltInTokens).
+        /// A value that throws or is not finite is left out, so the guard reports the built-in; a
+        /// throw is logged once per batch.
         /// </summary>
         private Dictionary<string, double> BuiltInValues(FunctionManager fm, DateTime date, FolderItem context)
         {
-            var values = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+            var computed = new List<BuiltInToken>();
             foreach (var b in _builtIns)
             {
                 if (b.Value == null) continue;
@@ -242,12 +257,89 @@ namespace FlowMatters.Source.Veneer.DomainActions
                     continue;
                 }
                 if (double.IsNaN(value) || double.IsInfinity(value)) continue;
-                if (!values.ContainsKey(b.FullName)) values[b.FullName] = value;
-                if (b.Parent == context && !string.Equals(b.Name, b.FullName, StringComparison.OrdinalIgnoreCase)
-                    && !values.ContainsKey(b.Name) && !FunctionsSnapshot(fm).Any(f => f.NameMatches(b.Name, context)))
-                    values[b.Name] = value;
+                computed.Add(new BuiltInToken(b.FullName, b.Name, context != null && b.Parent == context, value));
+            }
+            return ResolveBuiltInTokens(computed, FunctionTokens(fm, context), _variableFullNames);
+        }
+
+        /// <summary>A built-in's names and its value at an item's date; InContext is true when it
+        /// lives in the item's context folder (so its leaf name can resolve to it).</summary>
+        internal struct BuiltInToken
+        {
+            public readonly string FullName;
+            public readonly string Name;
+            public readonly bool InContext;
+            public readonly double Value;
+
+            public BuiltInToken(string fullName, string name, bool inContext, double value)
+            {
+                FullName = fullName;
+                Name = name;
+                InContext = inContext;
+                Value = value;
+            }
+        }
+
+        /// <summary>
+        /// Which tokens to substitute with which built-in's value, deciding a name the way Source
+        /// does (FunctionCaches): functions before variables, and within each, the FULL name before
+        /// the leaf name within the context folder. So:
+        /// - a built-in's full name is substituted unless a function answers to that token;
+        /// - a built-in's leaf name is substituted only when the built-in is in the context folder,
+        ///   no function answers to it, and no variable at all has that FULL name — otherwise
+        ///   Source would resolve the leaf token to that function or variable, and substituting
+        ///   would silently replace a reference the guard must see.
+        /// Every full name is decided before any leaf name, so a leaf name never pre-empts another
+        /// built-in's full name. Names that do not start with '$' (unreadable names) are skipped.
+        /// <paramref name="functionTokens"/>: every function's full name, and the leaf name of each
+        /// function in the context folder. <paramref name="variableFullNames"/>: every variable's
+        /// full name, built-ins included. Source compares names case-insensitively, so both
+        /// collections must too (e.g. HashSets with StringComparer.OrdinalIgnoreCase).
+        /// </summary>
+        internal static Dictionary<string, double> ResolveBuiltInTokens(
+            IEnumerable<BuiltInToken> builtIns, ICollection<string> functionTokens, ICollection<string> variableFullNames)
+        {
+            var values = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+            var list = builtIns.ToList();
+            foreach (var b in list)
+            {
+                if (!IsToken(b.FullName) || values.ContainsKey(b.FullName) || Contains(functionTokens, b.FullName)) continue;
+                values[b.FullName] = b.Value;
+            }
+            foreach (var b in list)
+            {
+                if (!b.InContext || !IsToken(b.Name) || values.ContainsKey(b.Name)) continue;
+                if (Contains(functionTokens, b.Name) || Contains(variableFullNames, b.Name)) continue;
+                values[b.Name] = b.Value;
             }
             return values;
+        }
+
+        private static bool IsToken(string name) => name != null && name.Length > 1 && name[0] == '$';
+
+        private static bool Contains(ICollection<string> names, string name) => names != null && names.Contains(name);
+
+        /// <summary>Every variable's full name (built-ins included), per batch.</summary>
+        private readonly HashSet<string> _variableFullNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        private HashSet<string> _functionFullNames;
+        private readonly Dictionary<FolderItem, HashSet<string>> _functionTokensByContext = new Dictionary<FolderItem, HashSet<string>>();
+
+        /// <summary>The tokens a function answers to from <paramref name="context"/>: every
+        /// function's full name, plus the leaf names of the functions in that folder. Per batch,
+        /// per context.</summary>
+        private HashSet<string> FunctionTokens(FunctionManager fm, FolderItem context)
+        {
+            if (_functionFullNames == null)
+                _functionFullNames = new HashSet<string>(FunctionsSnapshot(fm).Select(f => SafeName(() => f.FullName)), StringComparer.OrdinalIgnoreCase);
+            if (context == null) return _functionFullNames;
+            HashSet<string> tokens;
+            if (_functionTokensByContext.TryGetValue(context, out tokens)) return tokens;
+            tokens = new HashSet<string>(_functionFullNames, StringComparer.OrdinalIgnoreCase);
+            foreach (var f in FunctionsSnapshot(fm))
+                if (f.Parent == context) tokens.Add(SafeName(() => f.Name));
+            _functionTokensByContext[context] = tokens;
+            return tokens;
         }
 
         private List<Function> FunctionsSnapshot(FunctionManager fm) =>
@@ -311,7 +403,7 @@ namespace FlowMatters.Source.Veneer.DomainActions
                 // value at the item's date is evaluated. The finally still releases.
                 var unbound = UnboundReferences(fn.Variables.Cast<object>().Concat(fn.Functions), EntityName);
                 if (unbound != null) return Error(item, unbound);
-                FillLookupTables(fn);
+                FillLookupTables(fn.Variables);
                 // Source's own runner passes TimeStep.GetTimeSpanToNextTick(now) to Evaluate
                 // (NetworkRunner); modelled variables use it to convert rates to per-step amounts.
                 // No fallback: a 0-second step would give plausible WRONG amounts. Computed outside
@@ -468,9 +560,9 @@ namespace FlowMatters.Source.Veneer.DomainActions
         /// defaults into model parameters through every function usage.) Bilinear tables need
         /// nothing: BilinearInterpolator builds its cache on first lookup.
         /// </summary>
-        private static void FillLookupTables(Function fn)
+        internal static void FillLookupTables(IEnumerable<AbstractFunctionVariable> variables)
         {
-            foreach (var table in fn.Variables.OfType<LinearVariable>().Distinct())
+            foreach (var table in variables.OfType<LinearVariable>().Distinct())
                 if (table.LinearFunction.Count == 0 && table.Entries.Count > 0)
                     table.Reset();
         }
