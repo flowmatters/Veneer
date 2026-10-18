@@ -40,9 +40,8 @@ namespace FlowMatters.Source.Veneer.Functions
         /// culture-invariant. A negative value (including negative zero) is wrapped in
         /// parentheses, e.g. "2 - $a" with $a = -3 becomes "2 - (-3)". Null or empty keys, and
         /// keys that don't appear in the expression, are ignored. Preconditions: every key in
-        /// <paramref name="bindings"/> begins with '$', and every value is finite — callers are
-        /// expected to reject non-finite results before they reach here; this method does not
-        /// check for that itself.
+        /// <paramref name="bindings"/> begins with '$', and every value is finite; this method
+        /// does not check, and a NaN or infinity would be emitted as text Source cannot parse.
         /// </summary>
         public static string Apply(string expression, IDictionary<string, double> bindings)
         {
@@ -57,7 +56,7 @@ namespace FlowMatters.Source.Veneer.Functions
                 var literal = kv.Value.ToString("R", CultureInfo.InvariantCulture);
                 // Parenthesise from the formatted text, not kv.Value < 0: -0.0 formats as "-0"
                 // but is not < 0, so checking the sign of the double would miss it.
-                if (literal.StartsWith("-")) literal = "(" + literal + ")";
+                if (literal.StartsWith('-')) literal = "(" + literal + ")";
                 text = Regex.Replace(text, pattern, literal, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
             }
             return text;
