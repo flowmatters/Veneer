@@ -39,7 +39,7 @@ namespace FlowMatters.Source.Veneer.Tests
             yield return new TestCaseData(new ContextVariable()).Returns("Context").SetName("Classify_ContextVariable");
             yield return new TestCaseData(new TimeSeriesVariable()).Returns("TimeSeries").SetName("Classify_TimeSeriesVariable");
             yield return new TestCaseData(new NowVariable()).Returns("BuiltIn").SetName("Classify_NowVariable");
-            yield return new TestCaseData(new FixedDateVariable(FixedDateVariableEnum.Start)).Returns("BuiltIn").SetName("Classify_FixedDateVariable");
+            yield return new TestCaseData(new FixedDateVariable()).Returns("BuiltIn").SetName("Classify_FixedDateVariable");
             yield return new TestCaseData(new PatternVariable()).Returns("BuiltIn").SetName("Classify_PatternVariable");
             yield return new TestCaseData(new ActiveInputSetVariable()).Returns("BuiltIn").SetName("Classify_ActiveInputSetVariable");
             yield return new TestCaseData(new LinearVariable()).Returns("Allowed").SetName("Classify_LinearVariable");
