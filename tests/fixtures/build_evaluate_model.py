@@ -17,7 +17,8 @@ import veneer
 from veneer import manage
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from tests.live import port_in_use, veneer_cmd  # noqa: E402  (needs the path above)
+from tests.live import (USAGE_FUNCTION, USAGE_NODE, USAGE_PARAMETER,  # noqa: E402  (needs the path above)
+                        USAGE_VALUE, port_in_use, run_script, veneer_cmd)
 
 PORT = int(os.environ.get("VENEER_TEST_PORT", "9890"))
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "evaluate-model.rsproj")
@@ -32,6 +33,12 @@ FUNCTIONS = [
     ("$f_Lookup", "lookup($pw_Curve, $f_Const)"),
     ("$f_Demand2", "$v_Demand * 2"),
 ]
+# The usage target as the function manager sees it: "<usage count>|<first target's value>".
+USAGE_SCRIPT = '''
+fm = scenario.Network.FunctionManager
+f = [x for x in fm.Functions if x.FullName == "%s"][0]
+result = "%%d|%%r" %% (f.Usages.Count, f.Usages[0].ReflectedItem.itemValue if f.Usages.Count else None)
+''' % USAGE_FUNCTION
 VARIABLE_TYPES = {"$v_StorageA_Volume": "ModelledVariable", "$v_Demand": "TimeSeriesVariable",
                   "$pw_Curve": "LinearVariable"}
 
@@ -98,6 +105,17 @@ def build(v, base_url) -> None:
         require(isinstance(created, dict) and not created.get("failed"),
                 f"creating {name}", created)
 
+    # One function usage on a numeric model parameter holding a distinctive value, so that the
+    # no-mutation test would see a write to a usage target (see tests/live.py).
+    storages = v.model.node.storages
+    storages.set_param_values(USAGE_PARAMETER, [USAGE_VALUE], nodes=[USAGE_NODE])
+    value = storages.get_param_values(USAGE_PARAMETER, nodes=[USAGE_NODE])
+    require(value == [USAGE_VALUE], f"setting {USAGE_NODE}.{USAGE_PARAMETER}", value)
+    applied = storages.apply_function(USAGE_PARAMETER, USAGE_FUNCTION, nodes=[USAGE_NODE])
+    usage = run_script(base_url, USAGE_SCRIPT)
+    require(usage == f"1|{USAGE_VALUE!r}", f"applying {USAGE_FUNCTION} to {USAGE_PARAMETER}",
+            (usage, applied))
+
     # create_modelled_variable reports "created" even for a name it skipped, so confirm the
     # final state independently.
     variables = {x["FullName"]: x.get("VariableType")
@@ -141,6 +159,9 @@ def main() -> None:
             v.run_model(start="01/01/2000", end="31/01/2000")
         except Exception as e:
             print("run failed (continuing):", e, file=sys.stderr)
+        # The run restores the usage target at its end; confirm before saving.
+        usage = run_script(base_url, USAGE_SCRIPT)
+        require(usage == f"1|{USAGE_VALUE!r}", "the usage target after the run", usage)
         v.model.save(out)
         print("saved", out)
     finally:

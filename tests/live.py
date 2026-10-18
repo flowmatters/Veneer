@@ -8,6 +8,15 @@ import requests
 # Must match TransientFunctionEvaluator.TRANSIENT_NAME.
 TRANSIENT_NAME = "$f_veneer_evaluate"
 
+# The generated model's one function usage: USAGE_FUNCTION drives USAGE_PARAMETER on the storage
+# node USAGE_NODE, whose own (saved) value is the distinctive USAGE_VALUE. A run writes the
+# function's value there and restores USAGE_VALUE at its end; FunctionManager.Reset — which
+# evaluate must never call — would write the parameter type's default (0) through the usage.
+USAGE_NODE = "StorageA"
+USAGE_PARAMETER = "InitialStorage"
+USAGE_FUNCTION = "$WhatIf.f_Const"
+USAGE_VALUE = 123.4
+
 STRAY_SCRIPT = '''
 fm = scenario.Network.FunctionManager
 n = 0
@@ -46,11 +55,16 @@ def evaluate(base_url, items, timeout=120):
     return r.status_code, body
 
 
-def stray_count(base_url) -> int:
-    """How many ReferencingFunctions entries still hold the endpoint's transient function.
-    Runs through /ironpython, which does not take Veneer's run lock and does not sweep."""
-    r = requests.post(f"{base_url}/ironpython", json={"Script": STRAY_SCRIPT}, timeout=60)
+def run_script(base_url, script, timeout=60):
+    """Run an IronPython script through /ironpython (which does not take Veneer's run lock and
+    does not sweep) and return the Value of its `result`."""
+    r = requests.post(f"{base_url}/ironpython", json={"Script": script}, timeout=timeout)
     r.raise_for_status()
     body = r.json()
     assert not body.get("Exception"), body["Exception"]
-    return int(body["Response"]["Value"])
+    return body["Response"]["Value"]
+
+
+def stray_count(base_url) -> int:
+    """How many ReferencingFunctions entries still hold the endpoint's transient function."""
+    return int(run_script(base_url, STRAY_SCRIPT))
