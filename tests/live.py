@@ -8,10 +8,11 @@ import requests
 # Must match TransientFunctionEvaluator.TRANSIENT_NAME.
 TRANSIENT_NAME = "$f_veneer_evaluate"
 
-# The generated model's one function usage: USAGE_FUNCTION drives USAGE_PARAMETER on the storage
-# node USAGE_NODE, whose own (saved) value is the distinctive USAGE_VALUE. A run writes the
+# The generated model's once-per-run function usage: USAGE_FUNCTION drives USAGE_PARAMETER on the
+# storage node USAGE_NODE, whose own (saved) value is the distinctive USAGE_VALUE. A run writes the
 # function's value there and restores USAGE_VALUE at its end; FunctionManager.Reset — which
 # evaluate must never call — would write the parameter type's default (0) through the usage.
+# (Every function also drives a per-timestep parameter: see fixtures/build_evaluate_model.py.)
 USAGE_NODE = "StorageA"
 USAGE_PARAMETER = "InitialStorage"
 USAGE_FUNCTION = "$WhatIf.f_Const"
@@ -27,9 +28,16 @@ result = str(n)
 
 
 def port_in_use(port: int) -> bool:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.settimeout(1.0)
-        return s.connect_ex(("127.0.0.1", port)) == 0
+    """True when anything accepts connections on the port, over IPv4 or IPv6 loopback."""
+    for family, host in ((socket.AF_INET, "127.0.0.1"), (socket.AF_INET6, "::1")):
+        try:
+            with socket.socket(family, socket.SOCK_STREAM) as s:
+                s.settimeout(1.0)
+                if s.connect_ex((host, port)) == 0:
+                    return True
+        except OSError:
+            pass  # no IPv6 on this machine
+    return False
 
 
 def veneer_cmd(exe: str) -> str:

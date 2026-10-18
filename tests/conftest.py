@@ -52,12 +52,14 @@ def served_model(tmp_path_factory):
                                            veneer_exe=veneer_cmd(exe), quiet=True,
                                            return_log_paths=True,
                                            capture_output_dir=str(log_dir))
+    print(f"\nstarted VeneerCmd pid(s) {[p.pid for p in procs]} on port {port}")
     try:
         if ports[0] != port:
             pytest.fail(f"VeneerCmd bound port {ports[0]}, not {port}")
         yield LiveVeneer(f"http://localhost:{port}", port, log_paths[0])
     finally:
         manage.kill_all_now(procs)
+        print(f"\nkilled VeneerCmd pid(s) {[p.pid for p in procs]}")
 
 
 @pytest.fixture(scope="session")
