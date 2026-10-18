@@ -313,6 +313,7 @@
     <Compile Include="ExchangeObjects\FunctionValue.cs" />
     <Compile Include="ExchangeObjects\FunctionEvaluation.cs" />
     <Compile Include="Functions\ExpressionSubstitution.cs" />
+    <Compile Include="Functions\EvaluateRequestValidation.cs" />
     <Compile Include="ExchangeObjects\InputSetSummary.cs" />
     <Compile Include="AutoStart\InitialiseOnLoadAttribute.cs" />
     <Compile Include="AutoStart\ProjectLoadListener.cs" />

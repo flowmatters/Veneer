@@ -27,6 +27,7 @@ using FlowMatters.Source.Veneer.DomainActions;
 using FlowMatters.Source.Veneer.ExchangeObjects;
 using FlowMatters.Source.Veneer.ExchangeObjects.DataSources;
 using FlowMatters.Source.Veneer.Formatting;
+using FlowMatters.Source.Veneer.Functions;
 using FlowMatters.Source.Veneer.RemoteScripting;
 using FlowMatters.Source.WebServer.ExchangeObjects;
 using RiverSystem;
@@ -790,6 +791,72 @@ namespace FlowMatters.Source.WebServer
                 }
             }
         }
+
+        /// <summary>
+        /// POST /functions/evaluate: evaluate a batch of expressions in-process against the loaded
+        /// scenario, without adding anything to its FunctionManager. Request-level problems answer
+        /// 409 (no scenario, or a run claimed or in progress via Veneer) or 400 (over the item cap, malformed); every
+        /// per-item problem is an error on that item and never fails the batch.
+        /// </summary>
+        [OperationContract]
+        [WebInvoke(Method = "POST", UriTemplate = "/functions/evaluate", RequestFormat = WebMessageFormat.Json, ResponseFormat = WebMessageFormat.Json)]
+        [FaultContract(typeof(SimulationFault))]
+        public EvaluateResponse EvaluateFunctions(EvaluateRequest request)
+        {
+            if (Scenario == null)
+                throw Fault(HttpStatusCode.Conflict, new InvalidOperationException("No scenario is loaded."));
+            string problem;
+            var parsed = EvaluateRequestValidation.Parse(request, out problem);
+            if (parsed == null)
+                throw Fault(HttpStatusCode.BadRequest, new ArgumentException(problem));
+            Log("Evaluating " + parsed.Count + " expression(s)");
+            lock (_runLock)
+            {
+                // TriggerRun sets _currentScenarioInvoker under _runLock BEFORE it starts the run
+                // (outside the lock) and nulls it under _runLock in its finally, so non-null means a
+                // run is claimed or in progress — including the gap before IsRunning turns true,
+                // while the run parameters (TimeStep among them) are being applied. Holding
+                // _runLock for the whole batch keeps TriggerRun from claiming a run mid-batch; it
+                // also delays TriggerRun, GetRunStatus and CancelRun (they take the same lock),
+                // which is acceptable because batches are short. A run started from the Source GUI
+                // (not via Veneer) never sets _currentScenarioInvoker and is not detected here.
+                if (_currentScenarioInvoker != null)
+                    throw Fault(HttpStatusCode.Conflict, new InvalidOperationException("A simulation is running; evaluate after it finishes."));
+                var evaluator = new TransientFunctionEvaluator(Scenario,
+                    msg => Log(msg, msg.StartsWith("WARNING", StringComparison.Ordinal) ? LogLevel.Warning : LogLevel.Info));
+                var response = new EvaluateResponse();
+                try
+                {
+                    var timeStep = evaluator.EvaluationTimeStep();
+                    foreach (var pair in parsed)
+                        response.Results.Add(evaluator.Evaluate(pair.Item, pair.Date, timeStep));
+                }
+                finally
+                {
+                    // Runs even if an item throws out of Evaluate and abandons the batch mid-way.
+                    // Both log their own warnings; do not log again here. Each is guarded so a
+                    // throw (e.g. the GUI mutating a collection mid-snapshot) neither skips the
+                    // other nor replaces the batch's results. Best effort: a re-add to a shared set
+                    // that lands after the settle window AND after this sweep stays registered on
+                    // the real entity until the NEXT batch's SweepStrays; this batch does not
+                    // clean it up.
+                    try { evaluator.SettlePending(); }
+                    catch (Exception e) when (!(e is OutOfMemoryException))
+                    {
+                        Log("WARNING: evaluate settle failed: " + e.GetBaseException().Message, LogLevel.Warning);
+                    }
+                    try { evaluator.SweepStrays(); }
+                    catch (Exception e) when (!(e is OutOfMemoryException))
+                    {
+                        Log("WARNING: evaluate sweep failed: " + e.GetBaseException().Message, LogLevel.Warning);
+                    }
+                }
+                return response;
+            }
+        }
+
+        private static WebFaultException<SimulationFault> Fault(HttpStatusCode status, Exception cause) =>
+            new WebFaultException<SimulationFault>(new SimulationFault(cause), status);
 
         [OperationContract]
         [WebInvoke(Method = "GET", UriTemplate = "/functions", ResponseFormat = WebMessageFormat.Json)]
