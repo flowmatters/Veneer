@@ -60,6 +60,12 @@ namespace FlowMatters.Source.Veneer
             }
         }
 
+        /// <summary>
+        /// Held while a run changes or restores SelectedRecorderSets, and while GET /recorderSets
+        /// reads it, so the read never enumerates the list mid-change.
+        /// </summary>
+        internal static readonly object SelectionLock = new object();
+
         private readonly List<string> _restoreErrors = new List<string>();
 
         /// <summary>
@@ -378,15 +384,18 @@ namespace FlowMatters.Source.Veneer
         {
             OnGuiThread(runningInGui, () =>
             {
-                // Reading SelectedRecorderSets while it is empty adds the Current Recorder Tree to
-                // it, so an empty selection is snapshotted, and restored, as [CurrentTree].
-                var selected = Scenario.CurrentRiverSystemConfiguration.SelectedRecorderSets;
-                restore.Snapshot = new List<IRecorderSet>(selected);
-                restore.Target = selected;
+                lock (SelectionLock)
+                {
+                    // Reading SelectedRecorderSets while it is empty adds the Current Recorder Tree
+                    // to it, so an empty selection is snapshotted, and restored, as [CurrentTree].
+                    var selected = Scenario.CurrentRiverSystemConfiguration.SelectedRecorderSets;
+                    restore.Snapshot = new List<IRecorderSet>(selected);
+                    restore.Target = selected;
 
-                selected.Clear();
-                foreach (var set in sets)
-                    selected.Add(set);
+                    selected.Clear();
+                    foreach (var set in sets)
+                        selected.Add(set);
+                }
             });
         }
 
@@ -400,9 +409,12 @@ namespace FlowMatters.Source.Veneer
             {
                 OnGuiThread(runningInGui, () =>
                 {
-                    restore.Target.Clear();
-                    foreach (var set in restore.Snapshot)
-                        restore.Target.Add(set);
+                    lock (SelectionLock)
+                    {
+                        restore.Target.Clear();
+                        foreach (var set in restore.Snapshot)
+                            restore.Target.Add(set);
+                    }
                 });
             }
             catch (Exception ex)

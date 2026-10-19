@@ -1002,12 +1002,19 @@ namespace FlowMatters.Source.Veneer
             // governs recording. PersistedSelectedRecorderSets is never read: its getter rewrites
             // the persisted collection.
             var configuration = Scenario.CurrentRiverSystemConfiguration;
+            string[] selected = new string[0];
+            if (configuration != null)
+            {
+                // A run changes and restores the selection under the same lock.
+                lock (ScenarioInvoker.SelectionLock)
+                {
+                    selected = configuration.SelectedRecorderSets.Select(set => set.Name).ToArray();
+                }
+            }
             return new RecorderSetsSummary
             {
                 Sets = manager.Sets.Select(set => set.Name).ToArray(),
-                Selected = configuration == null
-                    ? new string[0]
-                    : configuration.SelectedRecorderSets.Select(set => set.Name).ToArray()
+                Selected = selected
             };
         }
 
