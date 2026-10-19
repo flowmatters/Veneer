@@ -20,13 +20,25 @@ import os
 import pytest
 import requests
 
-from tests.live import port_in_use, veneer_cmd
+from tests.live import port_in_use, rsproj_identity_hits, veneer_cmd
 
 MODEL = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                      "fixtures", "evaluate-model.rsproj")
 
 # base_url and port as before; log_path is VeneerCmd's captured stdout/stderr.
 LiveVeneer = collections.namedtuple("LiveVeneer", ["base_url", "port", "log_path"])
+
+
+def pytest_sessionstart(session):
+    """The committed fixture is published: refuse to run at all if any of its text members names
+    this machine, its user or a local path (Source writes the saving user into the project; the
+    generator scrubs it — this stops a regeneration without the scrub from slipping through)."""
+    if os.path.exists(MODEL):
+        hits = rsproj_identity_hits(MODEL)
+        if hits:
+            pytest.exit(f"{MODEL} identifies a machine, user or local path: {hits}; regenerate it "
+                        "with tests/fixtures/build_evaluate_model.py (which scrubs them)",
+                        returncode=1)
 
 
 def cold_mode() -> bool:

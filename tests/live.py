@@ -1,7 +1,12 @@
 """Helpers shared by the live tests (conftest.py, test_functions_evaluate.py) and the model
 generator (fixtures/build_evaluate_model.py). Imports nothing from pytest."""
+import getpass
 import os
+import re
+import shutil
 import socket
+import tempfile
+import zipfile
 
 import requests
 
@@ -76,3 +81,115 @@ def run_script(base_url, script, timeout=60):
 def stray_count(base_url) -> int:
     """How many ReferencingFunctions entries still hold the endpoint's transient function."""
     return int(run_script(base_url, STRAY_SCRIPT))
+
+
+# ---- fixture hygiene: a saved .rsproj is a zip, and Source writes the saving user's name into
+# its _CreatorMetadata.txt. The fixture is published, so it must carry no user name, machine name
+# or local path.
+
+NEUTRAL_NAME = "sift-tests"
+# Members Source writes as text; every other member (the Firebird .fdb, the .tsz time series) is
+# copied through unchanged.
+TEXT_MEMBER_SUFFIXES = (".txt", ".xml", ".json")
+# A Windows drive path (C:\... or C:/...), up to the next quote, angle bracket, ';' or whitespace.
+LOCAL_PATH = re.compile(r"\b[A-Za-z]:[\\/][^\s\"'<>;]*")
+CREATOR_USER = re.compile(r"(User:\s*)[^;\r\n]*")
+
+
+def local_identities():
+    """The names that identify this machine and its user: user name and machine name."""
+    names = {os.environ.get("USERNAME"), os.environ.get("USER"), os.environ.get("COMPUTERNAME")}
+    try:
+        names.add(getpass.getuser())
+    except Exception:
+        pass
+    return sorted(n for n in names if n and n.strip() and n != NEUTRAL_NAME)
+
+
+def scrub_text(text, identities):
+    """`text` with the creator's user replaced by NEUTRAL_NAME, every whole-word occurrence of an
+    identity (case-insensitive) replaced by NEUTRAL_NAME, and every local drive path removed."""
+    text = CREATOR_USER.sub(lambda m: m.group(1) + NEUTRAL_NAME, text)
+    for name in identities:
+        text = re.sub(r"(?<![\w-])" + re.escape(name) + r"(?![\w-])", NEUTRAL_NAME, text,
+                      flags=re.IGNORECASE)
+    return LOCAL_PATH.sub("", text)
+
+
+def is_text_member(name):
+    return name.lower().endswith(TEXT_MEMBER_SUFFIXES)
+
+
+def identity_hits(text, identities):
+    """What in `text` would identify the machine: identities (whole word, any case) and local
+    drive paths."""
+    hits = [n for n in identities
+            if re.search(r"(?<![\w-])" + re.escape(n) + r"(?![\w-])", text, flags=re.IGNORECASE)]
+    return hits + LOCAL_PATH.findall(text)
+
+
+def _decode(data):
+    return data.decode("utf-8-sig") if data.startswith(b"\xef\xbb\xbf") else data.decode("utf-8")
+
+
+def scrub_rsproj(path, identities=None):
+    """Rewrite the zip at `path` with every text member scrubbed (scrub_text) and every other
+    member's bytes unchanged, in the original order, names, timestamps and compression. Returns
+    {text member: changed?}."""
+    identities = local_identities() if identities is None else identities
+    report = {}
+    fd, tmp = tempfile.mkstemp(suffix=".rsproj", dir=os.path.dirname(os.path.abspath(path)))
+    os.close(fd)
+    try:
+        with zipfile.ZipFile(path) as src, zipfile.ZipFile(tmp, "w") as dst:
+            for info in src.infolist():
+                data = src.read(info)
+                if is_text_member(info.filename):
+                    bom = data.startswith(b"\xef\xbb\xbf")
+                    text = _decode(data)
+                    scrubbed = scrub_text(text, identities)
+                    report[info.filename] = scrubbed != text
+                    data = (b"\xef\xbb\xbf" if bom else b"") + scrubbed.encode("utf-8")
+                dst.writestr(info, data, compress_type=info.compress_type)
+        shutil.move(tmp, path)
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+    return report
+
+
+def rsproj_identity_hits(path, identities=None):
+    """{member: hits} for every text member of the .rsproj at `path` that would identify the
+    machine, plus a _CreatorMetadata.txt whose user is not NEUTRAL_NAME. Empty when clean."""
+    identities = local_identities() if identities is None else identities
+    found = {}
+    with zipfile.ZipFile(path) as z:
+        for info in z.infolist():
+            if not is_text_member(info.filename):
+                continue
+            text = _decode(z.read(info))
+            hits = identity_hits(text, identities)
+            if info.filename == "_CreatorMetadata.txt":
+                users = [m.group(0) for m in CREATOR_USER.finditer(text)]
+                hits += [u for u in users if u.split(":", 1)[1].strip() != NEUTRAL_NAME]
+            if hits:
+                found[info.filename] = hits
+    return found
+
+
+def binary_identity_hits(path, identities=None):
+    """{member: [identity, ...]} for every NON-text member of the .rsproj at `path` whose bytes
+    contain an identity (any case, as UTF-8 or UTF-16LE). Reported, never edited: the members
+    are binary (a Firebird database, time series)."""
+    identities = local_identities() if identities is None else identities
+    found = {}
+    with zipfile.ZipFile(path) as z:
+        for info in z.infolist():
+            if is_text_member(info.filename):
+                continue
+            data = z.read(info)
+            hits = [n for n in identities for enc in ("utf-8", "utf-16-le")
+                    if re.search(re.escape(n.encode(enc)), data, flags=re.IGNORECASE)]
+            if hits:
+                found[info.filename] = sorted(set(hits))
+    return found

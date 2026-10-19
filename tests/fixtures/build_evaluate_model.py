@@ -18,7 +18,8 @@ from veneer import manage
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from tests.live import (USAGE_FUNCTION, USAGE_NODE, USAGE_PARAMETER,  # noqa: E402  (needs the path above)
-                        USAGE_VALUE, port_in_use, run_script, veneer_cmd)
+                        USAGE_VALUE, binary_identity_hits, port_in_use, rsproj_identity_hits,
+                        run_script, scrub_rsproj, veneer_cmd)
 
 PORT = int(os.environ.get("VENEER_TEST_PORT", "9890"))
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "evaluate-model.rsproj")
@@ -283,6 +284,15 @@ def main() -> None:
     finally:
         manage.kill_all_now(procs)
         print("killed VeneerCmd pid(s):", [p.pid for p in procs])
+    # Source writes the saving user's name into the project; the fixture is published.
+    scrubbed = scrub_rsproj(out)
+    print("scrubbed text members (changed?):", scrubbed)
+    hits = rsproj_identity_hits(out)
+    require(not hits, "scrubbing the saved project's text members", hits)
+    binary = binary_identity_hits(out)
+    if binary:
+        print("WARNING: binary members still contain identifying text (not edited):", binary,
+              file=sys.stderr)
 
 
 if __name__ == "__main__":
