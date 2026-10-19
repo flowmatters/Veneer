@@ -158,8 +158,8 @@ The recorder sets the scenario defines, and which of them its current configurat
 **Added in protocol `20261019`.**
 
 - **Response**: [`RecorderSetsSummary`](schemas.md#recordersetssummary) (`200 OK`)
-  - `Sets`: the name of every recorder set, in Source's order, including the Current Recorder
-    Tree.
+  - `Sets`: the name of every recorder set, in Source's order. On Source 5.16 and later it
+    includes the Current Recorder Tree. Source 4.x was not run.
   - `Selected`: the names of the selected sets, in order.
 - **`Selected` may read `[]` or `["Current Recorder Tree"]`.** Both mean that the Current
   Recorder Tree alone governs recording, so it is what [`PUT /recorders`](#put-recorders)
@@ -168,9 +168,12 @@ The recorder sets the scenario defines, and which of them its current configurat
 - **`200 OK` with `{"Sets": [], "Selected": []}`** when the scenario has no recorder set
   manager.
 - **`404 Not Found`** with a `null` body when no scenario is loaded.
-- Read-only: it changes nothing a run records.
-- **Hosted in the Source GUI**, the read runs on the GUI thread. During a run started with
-  `SelectedRecorderSets`, it reports the run's selection, which is restored when the run ends.
+- Read-only: it changes nothing a run records. Reading an empty selection does write the tree
+  into it (Source's getter), so a later project save stores `["Current Recorder Tree"]`, which
+  selects the same.
+- During a run started with `SelectedRecorderSets`, it reports the run's selection, which is
+  restored when the run ends.
+- **Hosted in the Source GUI**, the read runs on the GUI thread.
 - **veneer-py**: no REST helper yet. `v.model.simulation.recorder_sets()` and
   `v.model.simulation.selected_recorder_sets()` read the same over
   [`/ironpython`](scripting.md), which needs scripting enabled.

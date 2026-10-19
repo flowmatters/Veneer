@@ -24,6 +24,8 @@ Runs the current scenario. The body is a flat JSON object of run parameters.
   - **A key that names no property, or a value that does not convert** (`"32/01/2000"`), fails
     the run with a `500`, and the configuration is left as it was. On Source 6.10, for example,
     there is no `InputSet` property, so an `InputSet` key is a `500`.
+  - **An input set name that matches no input set is not refused.** Where the property is an
+    input set, an unknown name assigns no input set (`null`) for the run, without an error.
   - **Two keys are not configuration properties.** `_RunName` names the resulting run, where
     the Source version supports it. `SelectedRecorderSets` chooses the recorder sets for the run
     (see [Choosing recorder sets for one run](#choosing-recorder-sets-for-one-run)).
@@ -49,7 +51,8 @@ Runs the current scenario. The body is a flat JSON object of run parameters.
   [`SimulationFault`](schemas.md#simulationfault) — *"A simulation is already running. Cancel
   the current run before starting a new one."* Also while an earlier run is still stopping
   (*"A previous simulation is still stopping. Try again once it has stopped."*); see
-  [When a run is still stopping](#when-a-run-is-still-stopping).
+  [When a run is still stopping](#when-a-run-is-still-stopping). The "still stopping" `409` is
+  **added in protocol `20261019`.**
 - **`500 Internal Server Error`**: the run failed. Body is a `SimulationFault`. Two cases:
   - The run threw — the fault carries the exception `Message` and `StackTrace`, and the `Log`
     captured so far.
@@ -110,10 +113,10 @@ and the tree's recorders are ignored. When the tree is selected as well, the run
   everything each of them records. This was observed on Source 5.61 and 6.10. To keep the
   user's usual outputs and add your own, send `"Current Recorder Tree"` followed by the names
   `GET /recorderSets` reports in `Selected`.
-- **Names.** Each name matches a set's name exactly (case-sensitive). `"Current Recorder Tree"`
-  is Source's constant name for the tree, and always means the scenario's tree, even when a
-  named set has the same name. A repeated name is dropped (the first is kept), and the order is
-  otherwise kept.
+- **Names.** Each name matches a set's name exactly (case-sensitive). On Source 5.16 and later,
+  `"Current Recorder Tree"` is Source's constant name for the tree, and always means the
+  scenario's tree, even when a named set has the same name. Source 4.x has no such constant and
+  was not run. A repeated name is dropped (the first is kept), and the order is otherwise kept.
 - **For this run only.** Veneer copies the selection before the run, replaces it, and restores
   the copy when the run ends: after success, failure and cancel alike. An empty saved selection
   reads back as `["Current Recorder Tree"]` afterwards, which means the same thing.
@@ -151,7 +154,7 @@ Normally the selection is restored before `POST /runs` responds. But a cancelled
 most 5 s for Source to stop. If Source's run is still executing when the request finishes
 (after that wait times out, or after an error that left it running), the restore waits until the
 run stops. This applies to every run started through Veneer, whether or not it sent
-`SelectedRecorderSets`. Until the run stops:
+`SelectedRecorderSets`. **Added in protocol `20261019`.** Until the run stops:
 
 - `POST /runs` answers **`409`**: *"A previous simulation is still stopping. Try again once it
   has stopped."*

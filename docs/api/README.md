@@ -18,6 +18,11 @@ mirror produced by [veneer-py](https://github.com/flowmatters/veneer-py)'s
 > [`VeneerStatus.cs`](../../FlowMatters.Source.Veneer/ExchangeObjects/VeneerStatus.cs)
 > whenever the API surface changes.
 
+> **Source versions.** These pages also describe Veneer's 5.x legacy line, the Veneer built for
+> Source 5.x and 4.x. Where a page states behaviour for particular Source versions, the rest
+> were not checked. For recorder sets, the earliest Source checked is 5.16. Source 4.x has no
+> constant for the Current Recorder Tree's name, and was not run.
+
 ## How to read these docs
 
 1. Start with **[overview.md](overview.md)** — base URL, JSON conventions, the error model,

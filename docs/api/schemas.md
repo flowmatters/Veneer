@@ -313,7 +313,7 @@ Selectors use the network-element grammar (`location/.../element/.../variable/..
 
 | Field | Type | Notes |
 |-------|------|-------|
-| `Sets` | string[] | The name of every recorder set the scenario defines, in Source's order, including the Current Recorder Tree. Empty when the scenario has no recorder set manager. |
+| `Sets` | string[] | The name of every recorder set the scenario defines, in Source's order, including the Current Recorder Tree on Source 5.16 and later. Empty when the scenario has no recorder set manager. |
 | `Selected` | string[] | The names of the sets selected in the current configuration, in order. `[]` and `["Current Recorder Tree"]` both mean the tree alone governs recording. |
 
 ```json
