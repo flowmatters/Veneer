@@ -167,6 +167,10 @@ namespace FlowMatters.Source.Veneer
         void RunInputSet(string inputSetName, string action);
 
         [OperationContract]
+        [WebInvoke(Method = "GET", UriTemplate = UriTemplates.RecorderSets, ResponseFormat = WebMessageFormat.Json)]
+        RecorderSetsSummary GetRecorderSets();
+
+        [OperationContract]
         [WebInvoke(Method = "PUT", UriTemplate = "/recorders", RequestFormat = WebMessageFormat.Json)]
         void UpdateRecorders(RecordingInstructions ri);
 

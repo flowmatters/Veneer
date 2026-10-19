@@ -32,6 +32,7 @@ using RiverSystem.DataManagement.DataManager;
 using RiverSystem.Functions;
 using RiverSystem.ManagedExtensions;
 using RiverSystem.PreProcessing.ProjectionInfo;
+using RiverSystem.ScenarioSets.RecorderSets;
 using TIME.DataTypes;
 using TIME.DataTypes.Utils;
 using TIME.Management;
@@ -944,6 +945,40 @@ namespace FlowMatters.Source.Veneer
             Log("Applying inout set " + inputSetName);
             var sets = new InputSets(Scenario);
             sets.Run(inputSetName);
+        }
+
+        /// <summary>
+        /// GET /recorderSets: the recorder sets the scenario defines and the ones its current
+        /// configuration selects. 404 with a null body when no scenario is loaded; empty arrays when
+        /// the scenario has no RecorderSetManager.
+        /// </summary>
+        public RecorderSetsSummary GetRecorderSets()
+        {
+            Log("Requested recorder sets");
+            if (Scenario == null)
+            {
+                WebOperationContext.Current.OutgoingResponse.StatusCode = HttpStatusCode.NotFound;
+                return null;
+            }
+
+            // GetPluginModel returns null when the manager is absent and never creates it. Reading
+            // SelectedRecorderSets does create it, so the selection is read only when it exists.
+            var manager = Scenario.GetPluginModel<RecorderSetManager>();
+            if (manager == null)
+                return new RecorderSetsSummary { Sets = new string[0], Selected = new string[0] };
+
+            // Reading SelectedRecorderSets while it is empty adds the Current Recorder Tree to it,
+            // so an empty selection is reported as ["Current Recorder Tree"]. Both mean the tree
+            // governs recording. PersistedSelectedRecorderSets is never read: its getter rewrites
+            // the persisted collection.
+            var configuration = Scenario.CurrentRiverSystemConfiguration;
+            return new RecorderSetsSummary
+            {
+                Sets = manager.Sets.Select(set => set.Name).ToArray(),
+                Selected = configuration == null
+                    ? new string[0]
+                    : configuration.SelectedRecorderSets.Select(set => set.Name).ToArray()
+            };
         }
 
         public void UpdateRecorders(RecordingInstructions ri)
