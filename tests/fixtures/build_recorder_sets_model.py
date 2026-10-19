@@ -6,21 +6,28 @@
 
 The output defaults to tests/fixtures/recorder-sets-model.rsproj. Set VENEER_SOURCE_DIR to the
 Source binaries folder when VeneerCmd cannot find Source on its own (it is passed as
-VeneerCmd's -d option). VeneerCmd is started with -x, so no registered plugins load.
+VeneerCmd's -d option). VeneerCmd is started with -x; on a 6.x build that stops registered
+plugins from loading (a 5.x VeneerCmd still loads them). VENEER_TEST_PORT must lie outside
+9876-9883 and 9900-9901.
 
 The model: Inflow X -> Inflow Y -> Gauge Z. The named recorder set SET_X records item X (Inflow
 X's downstream flow) and is the only set selected; the Current Recorder Tree records item Y
 (Inflow Y's downstream flow). A run with the saved selection therefore records X only: the
 selected named set overrides the tree.
 
-After saving, the script reopens the saved model in a second VeneerCmd and checks it, then
-checks GET /recorderSets and the SelectedRecorderSets run parameter against it (protocol
-20261019 or later). Those runs are never saved.
+After saving, the script removes the "User: <name>" field that Source writes into the archive's
+_CreatorMetadata.txt, leaving every other member as Source wrote it, and checks that no member
+holds the Windows user or computer name. It then reopens a copy of the saved model in a second
+VeneerCmd and checks it, then checks GET /recorderSets and the SelectedRecorderSets run parameter
+against it (protocol 20261019 or later). Those runs are never saved.
 """
+import getpass
 import os
+import re
 import shutil
 import sys
 import tempfile
+import zipfile
 
 import requests
 import veneer
@@ -30,6 +37,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from tests.live import port_in_use, run_script, veneer_cmd  # noqa: E402  (needs the path above)
 
 PORT = int(os.environ.get("VENEER_TEST_PORT", "9892"))
+RESERVED_PORTS = list(range(9876, 9884)) + [9900, 9901]
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "recorder-sets-model.rsproj")
 
 NODES = [("Inflow X", "inflow"), ("Inflow Y", "inflow"), ("Gauge Z", "gauge")]
@@ -167,12 +175,37 @@ def build(v, base_url) -> None:
     require(len(on) == 1 and on[0].startswith(ITEM_Y + "|"), "the tree recording Y alone", on)
 
 
+def started_veneer_cmds():
+    """This process's VeneerCmd descendants."""
+    import psutil
+    found = []
+    for child in psutil.Process().children(recursive=True):
+        try:
+            if "veneercmd" in child.name().lower():
+                found.append(child)
+        except psutil.Error:
+            pass
+    return found
+
+
 def start(project_fn, exe):
+    if PORT in RESERVED_PORTS:
+        sys.exit(f"port {PORT} is reserved; set VENEER_TEST_PORT outside 9876-9883 and 9900-9901")
     if port_in_use(PORT):
         sys.exit(f"port {PORT} is already in use; refusing to start VeneerCmd there")
-    procs, ports, _logs = manage.start(project_fn=project_fn, ports=PORT, script=True,
-                                       veneer_exe=veneer_cmd(exe) + " -x",
-                                       quiet=True, return_log_paths=True)
+    try:
+        procs, ports, _logs = manage.start(project_fn=project_fn, ports=PORT, script=True,
+                                           veneer_exe=veneer_cmd(exe) + " -x",
+                                           quiet=True, return_log_paths=True)
+    except BaseException:
+        # manage.start kills its instances when one fails or times out; this also covers any
+        # other exit part-way through. Only this process's own descendants are touched.
+        for child in started_veneer_cmds():
+            try:
+                child.kill()
+            except Exception:
+                pass
+        raise
     print("started VeneerCmd pid(s):", [p.pid for p in procs])
     if ports[0] != PORT:
         manage.kill_all_now(procs)
@@ -228,6 +261,8 @@ def check(base_url) -> None:
         ({"SelectedRecorderSets": []}, (302, [ITEM_Y])),                # replace: the tree alone
         ({"SelectedRecorderSets": [TREE, SET_X]}, (302, [ITEM_X, ITEM_Y])),  # add: the union
         ({"SelectedRecorderSets": [SET_X]}, (302, [ITEM_X])),
+        ({"SelectedRecorderSets": [SET_X, SET_X]}, (302, [ITEM_X])),    # repeats are dropped
+        ({"SelectedRecorderSets": [TREE, TREE]}, (302, [ITEM_Y])),
     ]
     for body, expected in cases:
         got = run(base_url, body)
@@ -248,6 +283,42 @@ def check(base_url) -> None:
     require(len(on) == 1 and on[0].startswith(ITEM_Y + "|"), "the tree after the runs", on)
 
 
+def scrub_creator_metadata(path) -> None:
+    """Rebuilds the archive with the "User: <name>" field removed from _CreatorMetadata.txt. Every
+    member keeps its order, metadata and compression method; only that one member's content
+    changes."""
+    with zipfile.ZipFile(path) as source:
+        members = [(info, source.read(info)) for info in source.infolist()]
+    scrubbed = path + ".scrubbed"
+    with zipfile.ZipFile(scrubbed, "w") as target:
+        for info, data in members:
+            if info.filename == "_CreatorMetadata.txt":
+                text = data.decode("utf-8")
+                text = re.sub(r";\s*User:[^;\r\n]*", "", text)
+                text = re.sub(r"^User:[^;\r\n]*;?\s*", "", text, flags=re.M)
+                require("User:" not in text, "removing the user from _CreatorMetadata.txt", None)
+                data = text.encode("utf-8")
+            target.writestr(info, data, compress_type=info.compress_type)
+    os.replace(scrubbed, path)
+
+    with zipfile.ZipFile(path) as result:
+        names = [info.filename for info in result.infolist()]
+        require(names == [info.filename for info, _ in members], "the archive's member order", names)
+        for info, data in members:
+            if info.filename != "_CreatorMetadata.txt":
+                require(result.read(info.filename) == data, f"keeping {info.filename} unchanged", None)
+        identities = [value for value in (getpass.getuser(), os.environ.get("COMPUTERNAME")) if value]
+        for info in result.infolist():
+            data = result.read(info)
+            for identity in identities:
+                for encoding in ("ascii", "utf-16-le", "utf-16-be"):
+                    found = re.search(re.escape(identity.encode(encoding)), data, re.I)
+                    # The name itself is never printed.
+                    require(found is None, f"checking {info.filename} for the user and computer names",
+                            f"found ({encoding})")
+    print("scrubbed", path)
+
+
 def main() -> None:
     out = os.path.abspath(sys.argv[1]) if len(sys.argv) > 1 else OUT
     exe = os.environ["VENEER_CMD_EXE"]
@@ -263,6 +334,7 @@ def main() -> None:
         print("saved", out)
     finally:
         stop(procs)
+    scrub_creator_metadata(out)
 
     # The checks run on a copy, so nothing they do can reach the saved model.
     work = tempfile.mkdtemp(prefix="recorder-sets-model-")
