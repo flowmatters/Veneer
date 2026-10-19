@@ -50,6 +50,7 @@ errors. Commonly used keys:
 | `StartDate` | string | Run start date, `dd/MM/yyyy` |
 | `EndDate` | string | Run end date, `dd/MM/yyyy` |
 | `_RunName` | string | Name for the resulting run (not a configuration property; ignored, with a warning, where the Source version does not support it) |
+| `SelectedRecorderSets` | string[] | Recorder set names to select for this run only (not a configuration property). `[]` means the Current Recorder Tree only. An invalid value is a `400`. See [Choosing recorder sets for one run](runs-and-results.md#choosing-recorder-sets-for-one-run). **Added in protocol `20261019`.** |
 
 ```json
 { "StartDate": "01/01/1990", "EndDate": "31/12/2000" }
@@ -112,13 +113,13 @@ An empty object `{}` runs with the scenario's configured settings.
 | `PercentComplete` | number | 0–100, only when running |
 
 ### SimulationFault
-`ExchangeObjects/SimulationFault.cs` · fault body of `POST /runs` (409/500), `POST /runs/cancel` (500), and `POST /functions/evaluate` (400/409)
+`ExchangeObjects/SimulationFault.cs` · fault body of `POST /runs` (400/409/500), `POST /runs/cancel` (500), and `POST /functions/evaluate` (400/409)
 
 | Field | Type | Notes |
 |-------|------|-------|
 | `Message` | string | |
 | `StackTrace` | string | Present when the fault wraps a thrown exception |
-| `Log` | string[] | Diagnostic messages captured from Source during the run. Present when a run completes without producing a result. Omitted when empty. |
+| `Log` | string[] | Diagnostic messages captured from Source during the run. Present on the `400` and `500` faults of `POST /runs`, where it may be an empty array; omitted from the other faults. |
 
 ---
 
@@ -306,6 +307,18 @@ legal XML name, which every `$`-prefixed token is.
 
 Selectors use the network-element grammar (`location/.../element/.../variable/...`, with
 `__all__` wildcards and `@@` functional-unit suffixes).
+
+### RecorderSetsSummary
+`ExchangeObjects/RecorderSetsSummary.cs` · response of `GET /recorderSets` · **Added in protocol `20261019`.**
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `Sets` | string[] | The name of every recorder set the scenario defines, in Source's order, including the Current Recorder Tree. Empty when the scenario has no recorder set manager. |
+| `Selected` | string[] | The names of the sets selected in the current configuration, in order. `[]` and `["Current Recorder Tree"]` both mean the tree alone governs recording. |
+
+```json
+{ "Sets": ["Current Recorder Tree", "SetX"], "Selected": ["SetX"] }
+```
 
 ---
 

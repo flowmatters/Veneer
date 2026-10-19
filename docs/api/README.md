@@ -40,7 +40,7 @@ mirror produced by [veneer-py](https://github.com/flowmatters/veneer-py)'s
 | [network.md](network.md) | `GET /network`, `/network/geographic`, `schematic.svg` (+`/tags`), nodes & links |
 | [runs-and-results.md](runs-and-results.md) | Triggering, listing, deleting runs; run status & cancel; time series, aggregated & tabulated results |
 | [functions-and-variables.md](functions-and-variables.md) | `/functions`, `POST /functions/evaluate`, `/variables` (incl. `TimeSeries` and `Piecewise`) |
-| [input-sets.md](input-sets.md) | `/inputSets` family, applying an input set, `PUT /recorders` |
+| [input-sets.md](input-sets.md) | `/inputSets` family, applying an input set, `PUT /recorders`, `GET /recorderSets` |
 | [data-sources.md](data-sources.md) | `/dataSources` CRUD, items and details, `__all__` matching |
 | [tables-and-config.md](tables-and-config.md) | `/tables`, `/configuration/{element}`, `PUT /projection`, `/doc`, `/resources` |
 | [scripting.md](scripting.md) | `POST /ironpython` and `POST /custom/{action}` (server-side IronPython) |
@@ -89,6 +89,7 @@ live. See [network.md](network.md#not-implemented).)
 | `PUT` | `/inputSets/{inputSetName}` | [input-sets](input-sets.md) |
 | `POST` | `/inputSets/{inputSetName}/{action}` | [input-sets](input-sets.md) |
 | `PUT` | `/recorders` | [input-sets](input-sets.md) |
+| `GET` | `/recorderSets` | [input-sets](input-sets.md) |
 | `GET` | `/dataSources` | [data-sources](data-sources.md) |
 | `POST` | `/dataSources` | [data-sources](data-sources.md) |
 | `GET` | `/dataSources/{dataSourceGroup}` | [data-sources](data-sources.md) |

@@ -24,8 +24,9 @@ Runs the current scenario. The body is a flat JSON object of run parameters.
   - **A key that names no property, or a value that does not convert** (`"32/01/2000"`), fails
     the run with a `500`, and the configuration is left as it was. On Source 6.10, for example,
     there is no `InputSet` property, so an `InputSet` key is a `500`.
-  - **`_RunName` is not a configuration property.** It names the resulting run, where the
-    Source version supports it.
+  - **Two keys are not configuration properties.** `_RunName` names the resulting run, where
+    the Source version supports it. `SelectedRecorderSets` chooses the recorder sets for the run
+    (see [Choosing recorder sets for one run](#choosing-recorder-sets-for-one-run)).
 - **Parameters apply to this run only.** Any values supplied are applied to the scenario
   configuration for the duration of the run and then **restored to their pre-run values**
   once the run finishes — on success, failure, or cancellation. A subsequent run that omits a
@@ -40,15 +41,24 @@ Runs the current scenario. The body is a flat JSON object of run parameters.
 - **Success**: **`302 Found`** with a `Location` response header pointing at the new run
   (e.g. `Location: .../runs/5`). The body is empty. Follow the header (or call
   `GET /runs/{n}`) to fetch results.
+- **`400 Bad Request`**: an invalid `SelectedRecorderSets`. Body is a
+  [`SimulationFault`](schemas.md#simulationfault). Nothing is changed and no run starts. See
+  [Choosing recorder sets for one run](#choosing-recorder-sets-for-one-run).
+  **Added in protocol `20261019`.**
 - **`409 Conflict`**: a run is already in progress. Body is a
   [`SimulationFault`](schemas.md#simulationfault) — *"A simulation is already running. Cancel
-  the current run before starting a new one."*
+  the current run before starting a new one."* Also while an earlier run is still stopping
+  (*"A previous simulation is still stopping. Try again once it has stopped."*); see
+  [When a run is still stopping](#when-a-run-is-still-stopping).
 - **`500 Internal Server Error`**: the run failed. Body is a `SimulationFault`. Two cases:
-  - The run threw — the fault carries the exception `Message` and `StackTrace`.
+  - The run threw — the fault carries the exception `Message` and `StackTrace`, and the `Log`
+    captured so far.
   - The run completed without producing a result (Source aborted internally, e.g. an input
     file could not be loaded). The fault carries an explanatory `Message` and a `Log` array of
     the diagnostic messages captured from Source during the run.
-- **veneer-py**: `v.run_model(params=None, start=None, end=None, run_async=False, name=None)`
+- **veneer-py**: `v.run_model(params=None, start=None, end=None, run_async=False, name=None, **kwargs)`.
+  `start`/`end` are sent as `StartDate`/`EndDate` in `dd/MM/yyyy`, `name` as `_RunName`, and
+  `kwargs` as further keys.
 
 > **The run is synchronous.** The HTTP request does not return until the simulation finishes;
 > the `302` is sent *after* completion. To watch progress, poll `GET /runs/status` from a
@@ -73,6 +83,110 @@ Content-Type: application/json
 HTTP/1.1 302 Found
 Location: http://localhost:9876/runs/5
 ```
+
+### Choosing recorder sets for one run
+
+**Added in protocol `20261019`.** Earlier versions do not apply the `SelectedRecorderSets` key.
+Protocol `20261018`, for example, accepts it without an error and runs with the saved selection.
+Check `Version` from [`GET /`](server-and-lifecycle.md) before relying on it.
+
+Source records a run through the recorder sets selected in the scenario's configuration
+([`GET /recorderSets`](input-sets.md#get-recordersets) lists them). The **Current Recorder
+Tree** is one of those sets, and it is what [`PUT /recorders`](input-sets.md#put-recorders)
+configures. When a named set is selected and the tree is not, the named sets govern recording
+and the tree's recorders are ignored. When the tree is selected as well, the run records both.
+
+`SelectedRecorderSets` is a JSON array of set names. It is the **whole selection for this run**:
+
+| `SelectedRecorderSets` | The run records |
+|------------------------|-----------------|
+| *(key omitted)* | Through the saved selection, unchanged |
+| `[]` | The Current Recorder Tree only (**replace**): what `PUT /recorders` asked for, and none of the named sets |
+| `["Current Recorder Tree"]` | The same as `[]` |
+| `["Current Recorder Tree", "SetX"]` | The tree and `SetX` together (**add**) |
+| `["SetX"]` | `SetX` only; the tree's recorders are ignored |
+
+- **Add is a union.** With the tree and named sets selected together, the run records
+  everything each of them records. This was observed on Source 5.61 and 6.10. To keep the
+  user's usual outputs and add your own, send `"Current Recorder Tree"` followed by the names
+  `GET /recorderSets` reports in `Selected`.
+- **Names.** Each name matches a set's name exactly (case-sensitive). `"Current Recorder Tree"`
+  is Source's constant name for the tree, and always means the scenario's tree, even when a
+  named set has the same name. A repeated name is dropped (the first is kept), and the order is
+  otherwise kept.
+- **For this run only.** Veneer copies the selection before the run, replaces it, and restores
+  the copy when the run ends: after success, failure and cancel alike. An empty saved selection
+  reads back as `["Current Recorder Tree"]` afterwards, which means the same thing.
+- **Validated before anything changes.** These are a **`400 Bad Request`** with a
+  [`SimulationFault`](schemas.md#simulationfault) body. A `400` leaves the configuration exactly
+  as it was, including every other run parameter in the body, and no run starts.
+
+  | Request | `Message` |
+  |---------|-----------|
+  | Not an array (a string, number, object or `null`) | `SelectedRecorderSets must be a JSON array of recorder set names, not a string.` |
+  | An element that is not a string | `SelectedRecorderSets[1] must be a recorder set name (a string), not null.` |
+  | A name that matches no set | `SelectedRecorderSets names an unknown recorder set: 'no such set'. Available recorder sets: 'Current Recorder Tree', 'SetX'.` |
+  | A name that more than one set has | `SelectedRecorderSets names a recorder set name shared by more than one set: 'SetX'. Available recorder sets: …` |
+  | A non-empty list for a scenario with no recorder sets | `SelectedRecorderSets cannot select 'SetX': the scenario has no recorder sets.` |
+  | A non-empty list when the configuration has no recorder set selection | `SelectedRecorderSets cannot select 'SetX': the current configuration has no recorder set selection.` |
+
+  The type in the first two messages (`a string`, `a number`, `an object`, `null`) and the index
+  follow the request. An unknown-name or shared-name message lists every offending name. `[]` is
+  accepted for a scenario with no recorder sets, and changes nothing.
+- **Other run parameters.** `SelectedRecorderSets` is validated before any of them is applied,
+  so an invalid value is a `400` even when another key is also bad. The others are then applied
+  before the selection is changed, so if one of them fails (a `500`, see above), the selection
+  has not been changed.
+
+```http
+POST /runs HTTP/1.1
+Content-Type: application/json
+
+{ "StartDate": "01/01/1990", "EndDate": "31/12/2000", "SelectedRecorderSets": [] }
+```
+
+#### When a run is still stopping
+
+Normally the selection is restored before `POST /runs` responds. But a cancelled run waits at
+most 5 s for Source to stop. If Source's run is still executing when the request finishes
+(after that wait times out, or after an error that left it running), the restore waits until the
+run stops. This applies to every run started through Veneer, whether or not it sent
+`SelectedRecorderSets`. Until the run stops:
+
+- `POST /runs` answers **`409`**: *"A previous simulation is still stopping. Try again once it
+  has stopped."*
+- `POST /functions/evaluate` answers **`409`**: *"A simulation is running; evaluate after it
+  finishes."*
+- `GET /runs/status` reports `IsRunning: false`, and `POST /runs/cancel` answers `404`, because
+  the run no longer counts as active.
+- If Source's run never stops, only restarting the host (VeneerCmd or the Source GUI) recovers.
+
+#### Restore errors
+
+A failure to restore the selection is never thrown. Its message, *"Could not restore the
+recorder set selection to its pre-run value: …"*, is added at `Error` to the run's log: the
+`RunLog` of the resulting run, or the `Log` of the `500` fault. It is also logged to Source's
+log, which the run's log captures too, so the line can appear twice. A restore that waits for a
+stopping run (above) finishes after the request, so its errors reach only the console (VeneerCmd)
+or the Source GUI's log.
+
+#### While the selection is applied and restored
+
+Both steps are brief. During them `POST /runs` answers `409` (*"A simulation is already
+running…"*), while `GET /runs/status` reports `IsRunning: false` and `POST /runs/cancel` answers
+`400`.
+
+#### Hosted in the Source GUI
+
+The selection belongs to the project, so the Source GUI sees the run's selection while the run is
+in progress. Veneer makes its changes on the GUI thread.
+
+- **Saving the project during a run** saves the run's selection, not the user's.
+- **Editing the selection in the GUI during a run** is overwritten when the run ends and the
+  selection is restored.
+- **The tree's recording states.** During a run with a named set selected and the tree not
+  selected, Source temporarily rewrites the tree's recording states. Source restores them itself
+  when the run ends, but a project saved during the run saves the temporary states.
 
 ---
 
@@ -164,8 +278,11 @@ Requests cancellation of the currently running simulation.
 
 - **Request body**: none
 - **`200 OK`**: cancellation request sent.
-- **`404 Not Found`**: there is no active run.
-- **`400 Bad Request`**: there is an invoker but it isn't currently running.
+- **`404 Not Found`**: there is no active run. This includes an earlier run that is still
+  stopping (see [When a run is still stopping](#when-a-run-is-still-stopping)).
+- **`400 Bad Request`**: there is an invoker but it isn't currently running, as during the brief
+  steps before and after the simulation itself (for example, applying and restoring
+  `SelectedRecorderSets`).
 - **`500 Internal Server Error`**: cancellation threw — body is a
   [`SimulationFault`](schemas.md#simulationfault).
 - **veneer-py**: `v.cancel_run()`

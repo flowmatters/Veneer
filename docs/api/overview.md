@@ -134,7 +134,8 @@ Veneer does not use a single uniform error envelope. There are three patterns:
 3. **`SimulationFault`** — the run endpoints (`POST /runs`, `POST /runs/cancel`) throw a WCF
    `WebFaultException<SimulationFault>`. The body is a JSON
    [`SimulationFault`](schemas.md#simulationfault) (`Message` + `StackTrace`) and the status
-   is `409 Conflict` (a run is already in progress) or `500 Internal Server Error` (the run
+   is `400 Bad Request` (an invalid `SelectedRecorderSets`), `409 Conflict` (a run is already
+   in progress, or an earlier run is still stopping) or `500 Internal Server Error` (the run
    threw). `POST /functions/evaluate` throws the same fault type for its own request-level
    problems, at `400 Bad Request` (malformed request) or `409 Conflict` (no scenario loaded,
    or a run claimed/in progress).
@@ -145,7 +146,7 @@ Other notable status codes:
 |--------|-------|---------|
 | `302 Found` | `POST /runs` | Run completed; `Location` header points at the new run |
 | `403 Forbidden` | `POST /ironpython` | Scripting is disabled on the server |
-| `400 Bad Request` | `POST /scenario/{scenario}`, `POST /inputSets/{name}/{action}`, `POST /functions/evaluate` | Invalid operation (e.g. setting a scenario while running in the GUI; an action other than `run`; a malformed evaluate request) |
+| `400 Bad Request` | `POST /scenario/{scenario}`, `POST /inputSets/{name}/{action}`, `POST /functions/evaluate`, `POST /runs` | Invalid operation (e.g. setting a scenario while running in the GUI; an action other than `run`; a malformed evaluate request; an invalid `SelectedRecorderSets`) |
 | `404 Not Found` | `POST /runs/cancel` | No active run to cancel |
 
 Because the framework also produces its own faults for malformed requests
@@ -170,7 +171,7 @@ In practice this means any origin is allowed. There is no credentialed-CORS conf
 ## Protocol version
 
 `GET /` returns a [`VeneerStatus`](schemas.md#veneerstatus) whose `Version` field is the
-**protocol version** — an integer date stamp (currently `20261018`). Clients can read this to
+**protocol version** — an integer date stamp (currently `20261019`). Clients can read this to
 detect API-surface changes. The constant lives in
 [`VeneerStatus.cs`](../../FlowMatters.Source.Veneer/ExchangeObjects/VeneerStatus.cs) as
 `PROTOCOL_VERSION` and is bumped whenever the REST surface changes.

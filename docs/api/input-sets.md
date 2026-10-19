@@ -2,7 +2,7 @@
 
 **Input sets** are named collections of configuration changes that can be applied to a model
 before a run (Source's "Input Sets" feature). **Recorders** control which results are captured
-during a run.
+during a run, and **recorder sets** decide which recorders a run uses.
 
 ---
 
@@ -120,6 +120,20 @@ ones to **stop** recording and ones to **start** recording.
 - **Response**: none (`200 OK`)
 - **veneer-py**: `v.configure_recording(enable=[...], disable=[...])`
 
+> **A selected named recorder set overrides this.** `PUT /recorders` configures the scenario's
+> **Current Recorder Tree**. When the scenario's selection holds a named recorder set and not the
+> tree, a run records only through the named sets, and nothing configured here is recorded. To
+> tell, call [`GET /recorderSets`](#get-recordersets) and look at `Selected`:
+>
+> - `[]`, or only `"Current Recorder Tree"`: this configuration governs recording.
+> - `"Current Recorder Tree"` with other names: the run records this configuration *and* the
+>   named sets.
+> - Other names, without `"Current Recorder Tree"`: **this configuration is not recorded.**
+>
+> To record it for one run without changing the user's selection, send `SelectedRecorderSets`
+> on [`POST /runs`](runs-and-results.md#choosing-recorder-sets-for-one-run): `[]` for this
+> configuration only, or `"Current Recorder Tree"` followed by the selected names for both.
+
 ```http
 PUT /recorders HTTP/1.1
 Content-Type: application/json
@@ -135,3 +149,40 @@ Content-Type: application/json
 > the resulting time series list) small. The exact selector strings veneer-py builds are in
 > its `configure_recording` helper — see
 > [veneer-py-crossref.md](veneer-py-crossref.md).
+
+---
+
+## `GET /recorderSets`
+
+The recorder sets the scenario defines, and which of them its current configuration selects.
+**Added in protocol `20261019`.**
+
+- **Response**: [`RecorderSetsSummary`](schemas.md#recordersetssummary) (`200 OK`)
+  - `Sets`: the name of every recorder set, in Source's order, including the Current Recorder
+    Tree.
+  - `Selected`: the names of the selected sets, in order.
+- **`Selected` may read `[]` or `["Current Recorder Tree"]`.** Both mean that the Current
+  Recorder Tree alone governs recording, so it is what [`PUT /recorders`](#put-recorders)
+  configures. Source adds the tree to an empty selection when the selection is read, so an
+  empty selection usually reads back as `["Current Recorder Tree"]`. That selects the same.
+- **`200 OK` with `{"Sets": [], "Selected": []}`** when the scenario has no recorder set
+  manager.
+- **`404 Not Found`** with a `null` body when no scenario is loaded.
+- Read-only: it changes nothing a run records.
+- **Hosted in the Source GUI**, the read runs on the GUI thread. During a run started with
+  `SelectedRecorderSets`, it reports the run's selection, which is restored when the run ends.
+- **veneer-py**: no REST helper yet. `v.model.simulation.recorder_sets()` and
+  `v.model.simulation.selected_recorder_sets()` read the same over
+  [`/ironpython`](scripting.md), which needs scripting enabled.
+
+```http
+GET /recorderSets HTTP/1.1
+```
+
+```json
+{ "Sets": ["Current Recorder Tree", "SetX"], "Selected": ["SetX"] }
+```
+
+Here `SetX` is selected without the tree, so a run records only what `SetX` records, and
+`PUT /recorders` has no effect on it. To change that for one run, see
+[Choosing recorder sets for one run](runs-and-results.md#choosing-recorder-sets-for-one-run).

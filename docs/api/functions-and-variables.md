@@ -153,8 +153,11 @@ on this endpoint's request/response bodies are **lowercase** (`token`, `id`, `it
     `not yyyy-MM-dd`, or `not a calendar date`.
 - **`409 Conflict`**: also a `SimulationFault`. Either no scenario is loaded
   (`"No scenario is loaded."`), or a run has been claimed or is in progress via Veneer
-  (`"A simulation is running; evaluate after it finishes."`). A run started from the Source
-  GUI rather than through Veneer is not detected and does not trigger this.
+  (`"A simulation is running; evaluate after it finishes."`). The same `409` answers while an
+  earlier Veneer run is still stopping (see
+  [When a run is still stopping](runs-and-results.md#when-a-run-is-still-stopping)). A run
+  started from the Source GUI rather than through Veneer is not detected and does not trigger
+  this.
 - The batch holds the server's single run lock for its whole duration, so a concurrent
   `POST /runs`, `GET /runs/status`, or `POST /runs/cancel` waits until the batch finishes.
 - Not gated by `AllowScript` — only `POST /ironpython` answers `403` when scripting is
