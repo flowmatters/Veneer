@@ -14,9 +14,18 @@ active run's state is shared across all clients.
 Runs the current scenario. The body is a flat JSON object of run parameters.
 
 - **Request body**: [`RunParameters`](schemas.md#runparameters) — a flat key/value object.
-  Common keys: `Start`, `End` (dates), `InputSet` (name), `ForecastLength`. Keys are passed
-  through to Source, so the accepted set depends on the model/version. An empty object `{}`
-  runs with the scenario's configured dates.
+  Each key is a property path on the scenario's running configuration, and its value is
+  assigned to that property for the run. The common keys are `StartDate` and `EndDate`. The
+  accepted set depends on the configuration and the Source version. An empty object `{}` runs
+  with the scenario's configured settings.
+  - **Values are converted by the property's type.** A date takes a `dd/MM/yyyy` string
+    (`"31/12/2000"`). A time step takes a time step name. An input set takes an input set's
+    name. Any other value is assigned as sent.
+  - **A key that names no property, or a value that does not convert** (`"32/01/2000"`), fails
+    the run with a `500`, and the configuration is left as it was. On Source 6.10, for example,
+    there is no `InputSet` property, so an `InputSet` key is a `500`.
+  - **`_RunName` is not a configuration property.** It names the resulting run, where the
+    Source version supports it.
 - **Parameters apply to this run only.** Any values supplied are applied to the scenario
   configuration for the duration of the run and then **restored to their pre-run values**
   once the run finishes — on success, failure, or cancellation. A subsequent run that omits a
@@ -57,7 +66,7 @@ Runs the current scenario. The body is a flat JSON object of run parameters.
 POST /runs HTTP/1.1
 Content-Type: application/json
 
-{ "Start": "1990-01-01", "End": "2000-12-31", "InputSet": "Baseline" }
+{ "StartDate": "01/01/1990", "EndDate": "31/12/2000" }
 ```
 
 ```http

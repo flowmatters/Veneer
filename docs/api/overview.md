@@ -71,7 +71,8 @@ means "from the start of the series" / "to the end of the series".
 
 Dates inside JSON payloads (`StartDate`, `EndDate`, `DateRun`, time series event `Date`,
 etc.) are strings. Run-status dates use `yyyy-MM-dd`, and the live simulation date uses
-`yyyy-MM-dd HH:mm:ss`. Time series event dates use the model's date formatting.
+`yyyy-MM-dd HH:mm:ss`. Time series event dates use the model's date formatting. Date run
+parameters on `POST /runs` (`StartDate`, `EndDate`) are parsed as `dd/MM/yyyy`.
 
 ### `precision`
 

@@ -39,18 +39,20 @@ properties.
 `ExchangeObjects/RunParameters.cs` · request body of `POST /runs`
 
 A **flat, open key/value object** (implemented via `ISerializable`, not fixed `DataMember`s).
-Whatever keys you send become run parameters passed to Source. There is no fixed schema; the
-accepted keys depend on the model and Source version. Commonly used keys:
+Each key is a property path on the scenario's running configuration, and is applied for that
+run only. There is no fixed schema; the accepted keys depend on the configuration and the
+Source version. A date property takes a `dd/MM/yyyy` string. See
+[`POST /runs`](runs-and-results.md#post-runs--trigger-a-run) for the conversions and the
+errors. Commonly used keys:
 
 | Key | Type | Meaning |
 |-----|------|---------|
-| `Start` | string | Run start date |
-| `End` | string | Run end date |
-| `InputSet` | string | Input set to apply |
-| `ForecastLength` | number (int) | Forecast horizon (where applicable) |
+| `StartDate` | string | Run start date, `dd/MM/yyyy` |
+| `EndDate` | string | Run end date, `dd/MM/yyyy` |
+| `_RunName` | string | Name for the resulting run (not a configuration property; ignored, with a warning, where the Source version does not support it) |
 
 ```json
-{ "Start": "1990-01-01", "End": "2000-12-31", "InputSet": "Baseline" }
+{ "StartDate": "01/01/1990", "EndDate": "31/12/2000" }
 ```
 
 An empty object `{}` runs with the scenario's configured settings.
