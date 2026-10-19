@@ -389,6 +389,16 @@ namespace FlowMatters.Source.Veneer
                         HttpStatusCode.Conflict);
                 }
 
+                // A cancelled run whose task outlived the cancel wait has released its claim but is
+                // still executing, and its recorder set selection is restored only when it stops. A
+                // run started before then would snapshot that run's applied selection as its own.
+                if (ScenarioInvoker.IsRestorePending)
+                {
+                    throw new WebFaultException<SimulationFault>(
+                        new SimulationFault(new InvalidOperationException("A cancelled simulation is still stopping, and its recorder set selection has not been restored yet. Try again once it has stopped.")),
+                        HttpStatusCode.Conflict);
+                }
+
                 // Nothing that can throw between here and the try: the finally is what releases this claim, and both this check and evaluate refuse while it is set.
                 _currentScenarioInvoker = new ScenarioInvoker { Scenario = Scenario };
             }
@@ -404,7 +414,25 @@ namespace FlowMatters.Source.Veneer
                 runNumbersBefore = new HashSet<int>(
                     Scenario.Project.ResultManager.AllRuns().Select(run => run.RunNumber));
 
-                _currentScenarioInvoker.RunScenario(parameters, RunningInGUI, _sharedLogGenerator);
+                try
+                {
+                    _currentScenarioInvoker.RunScenario(parameters, RunningInGUI, _sharedLogGenerator);
+                }
+                finally
+                {
+                    // Added here, while runLogger is still attached and before any
+                    // messages.ToArray(), so the run's log always carries them. A deferred restore
+                    // finishes after this and reaches the console or GUI log only.
+                    foreach (var restoreError in _currentScenarioInvoker.RestoreErrors)
+                        messages.Enqueue(RunLogFormatter.FormatLine(LogType.Error.ToString(), null, restoreError));
+                }
+            }
+            catch (InvalidRunParameterException e)
+            {
+                Log("Run refused: " + e.Message, LogLevel.Warning);
+                throw new WebFaultException<SimulationFault>(
+                    new SimulationFault(e) { Log = messages.ToArray() },
+                    HttpStatusCode.BadRequest);
             }
             catch (Exception e)
             {
@@ -778,8 +806,10 @@ namespace FlowMatters.Source.Veneer
                 // _runLock for the whole batch keeps TriggerRun from claiming a run mid-batch; it
                 // also delays TriggerRun, GetRunStatus and CancelRun (they take the same lock),
                 // which is acceptable because batches are short. A run started from the Source GUI
-                // (not via Veneer) never sets _currentScenarioInvoker and is not detected here.
-                if (_currentScenarioInvoker != null)
+                // (not via Veneer) never sets _currentScenarioInvoker and is not detected here. A
+                // pending restore is a cancelled run still executing after its claim was released;
+                // TriggerRun refuses during it too.
+                if (_currentScenarioInvoker != null || ScenarioInvoker.IsRestorePending)
                     throw Fault(HttpStatusCode.Conflict, new InvalidOperationException("A simulation is running; evaluate after it finishes."));
                 var evaluator = new TransientFunctionEvaluator(Scenario,
                     msg => Log(msg, msg.StartsWith("WARNING", StringComparison.Ordinal) ? LogLevel.Warning : LogLevel.Info));
