@@ -15,15 +15,15 @@ X's downstream flow) and is the only set selected; the Current Recorder Tree rec
 (Inflow Y's downstream flow). A run with the saved selection therefore records X only: the
 selected named set overrides the tree.
 
-After saving, the script removes the "User: <name>" field that Source writes into the archive's
-_CreatorMetadata.txt, leaving every other member as Source wrote it, and checks that no member
-holds the Windows user or computer name. It then reopens a copy of the saved model in a second
-VeneerCmd and checks it, then checks GET /recorderSets and the SelectedRecorderSets run parameter
-against it (protocol 20261019 or later). Those runs are never saved.
+After saving, the script scrubs the archive with the shared fixture scrub in tests/live.py, which
+replaces the user that Source writes into _CreatorMetadata.txt with a neutral name and removes
+user names, machine names and local paths from every text member. It leaves every other member
+as Source wrote it, and checks that no member holds the Windows user or computer name. It then
+reopens a copy of the saved model in a second VeneerCmd and checks it, then checks
+GET /recorderSets and the SelectedRecorderSets run parameter against it (protocol 20261019 or
+later). Those runs are never saved.
 """
-import getpass
 import os
-import re
 import shutil
 import sys
 import tempfile
@@ -34,7 +34,8 @@ import veneer
 from veneer import manage
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from tests.live import port_in_use, run_script, veneer_cmd  # noqa: E402  (needs the path above)
+from tests.live import (binary_identity_hits, is_text_member, port_in_use,  # noqa: E402
+                        rsproj_identity_hits, run_script, scrub_rsproj, veneer_cmd)
 
 PORT = int(os.environ.get("VENEER_TEST_PORT", "9892"))
 RESERVED_PORTS = list(range(9876, 9884)) + [9900, 9901]
@@ -283,39 +284,27 @@ def check(base_url) -> None:
     require(len(on) == 1 and on[0].startswith(ITEM_Y + "|"), "the tree after the runs", on)
 
 
-def scrub_creator_metadata(path) -> None:
-    """Rebuilds the archive with the "User: <name>" field removed from _CreatorMetadata.txt. Every
-    member keeps its order, metadata and compression method; only that one member's content
-    changes."""
+def scrub(path) -> None:
+    """Scrubs the saved archive with the shared fixture scrub (tests/live.py): Source writes the
+    saving user's name into _CreatorMetadata.txt, and the fixture is published. Then checks that
+    the member order and every non-text member's bytes are unchanged, and that no member, the
+    Firebird database included, still identifies the machine or its user."""
     with zipfile.ZipFile(path) as source:
-        members = [(info, source.read(info)) for info in source.infolist()]
-    scrubbed = path + ".scrubbed"
-    with zipfile.ZipFile(scrubbed, "w") as target:
-        for info, data in members:
-            if info.filename == "_CreatorMetadata.txt":
-                text = data.decode("utf-8")
-                text = re.sub(r";\s*User:[^;\r\n]*", "", text)
-                text = re.sub(r"^User:[^;\r\n]*;?\s*", "", text, flags=re.M)
-                require("User:" not in text, "removing the user from _CreatorMetadata.txt", None)
-                data = text.encode("utf-8")
-            target.writestr(info, data, compress_type=info.compress_type)
-    os.replace(scrubbed, path)
+        members = [(info.filename, source.read(info)) for info in source.infolist()]
+    changed = scrub_rsproj(path)
+    print("scrubbed text members (changed?):", changed)
 
     with zipfile.ZipFile(path) as result:
         names = [info.filename for info in result.infolist()]
-        require(names == [info.filename for info, _ in members], "the archive's member order", names)
-        for info, data in members:
-            if info.filename != "_CreatorMetadata.txt":
-                require(result.read(info.filename) == data, f"keeping {info.filename} unchanged", None)
-        identities = [value for value in (getpass.getuser(), os.environ.get("COMPUTERNAME")) if value]
-        for info in result.infolist():
-            data = result.read(info)
-            for identity in identities:
-                for encoding in ("ascii", "utf-16-le", "utf-16-be"):
-                    found = re.search(re.escape(identity.encode(encoding)), data, re.I)
-                    # The name itself is never printed.
-                    require(found is None, f"checking {info.filename} for the user and computer names",
-                            f"found ({encoding})")
+        require(names == [name for name, _ in members], "the archive's member order", names)
+        for name, data in members:
+            if not is_text_member(name):
+                require(result.read(name) == data, f"keeping {name} unchanged", None)
+    # The hits name the user or machine, so only the members that hold them are reported.
+    hits = rsproj_identity_hits(path)
+    require(not hits, "scrubbing the saved project's text members", sorted(hits))
+    binary = binary_identity_hits(path)
+    require(not binary, "checking the binary members for the user and computer names", sorted(binary))
     print("scrubbed", path)
 
 
@@ -334,7 +323,7 @@ def main() -> None:
         print("saved", out)
     finally:
         stop(procs)
-    scrub_creator_metadata(out)
+    scrub(out)
 
     # The checks run on a copy, so nothing they do can reach the saved model.
     work = tempfile.mkdtemp(prefix="recorder-sets-model-")
