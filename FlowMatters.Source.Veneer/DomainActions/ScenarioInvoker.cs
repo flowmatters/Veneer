@@ -41,8 +41,9 @@ namespace FlowMatters.Source.Veneer
         private CancellationTokenSource _cancellationTokenSource;
         private Task _runningTask;
 
-        // The deferred restore of a cancelled run's recorder set selection, which waits for that
-        // run's task to stop. TriggerRun and EvaluateFunctions refuse while it is incomplete.
+        // Published when RunScenario finishes while its task is still executing: completes once that
+        // task has stopped and the run's recorder set selection (if it changed one) is restored.
+        // TriggerRun and EvaluateFunctions refuse while it is incomplete.
         private static Task _pendingRestore;
 
         internal static Task PendingRestore
@@ -61,8 +62,9 @@ namespace FlowMatters.Source.Veneer
         }
 
         /// <summary>
-        /// Held while a run changes or restores SelectedRecorderSets, and while GET /recorderSets
-        /// reads it, so the read never enumerates the list mid-change.
+        /// Held while Veneer's apply or restore changes SelectedRecorderSets, and while GET
+        /// /recorderSets reads it, so that read never sees the list mid-change by Veneer's apply or
+        /// restore. Source's own code does not take it.
         /// </summary>
         internal static readonly object SelectionLock = new object();
 
@@ -221,21 +223,20 @@ namespace FlowMatters.Source.Veneer
                 // project is later saved, persists — the scenario's configuration.
                 RevertRunParameters(originalConfiguration, logger);
 
-                if (selection.Target != null)
+                if (runTask != null && !runTask.IsCompleted)
                 {
-                    if (runTask != null && !runTask.IsCompleted)
-                    {
-                        // The task is still executing (a cancel whose wait timed out). The restore
-                        // runs once it stops, so the selection never changes under a running
-                        // Execute, and is published so TriggerRun refuses new runs until then.
-                        PendingRestore = runTask.ContinueWith(
-                            _ => RestoreRecorderSetSelection(selection, showWindow), TaskScheduler.Default);
-                        logger?.Invoke(this, "Warning: the recorder set selection will be restored once the simulation task stops.", LogLevel.Warning);
-                    }
-                    else
-                    {
-                        RestoreRecorderSetSelection(selection, showWindow);
-                    }
+                    // Execute is still running: after a cancel whose wait timed out, or after any
+                    // exception that left the task executing. The selection's restore (a no-op when
+                    // this run changed nothing) runs once the task stops, so the selection never
+                    // changes under a running Execute. It is published whether or not there is
+                    // anything to restore, so POST /runs and evaluate refuse until the task stops.
+                    PendingRestore = runTask.ContinueWith(
+                        _ => RestoreRecorderSetSelection(selection, showWindow), TaskScheduler.Default);
+                    logger?.Invoke(this, "Warning: the simulation task is still stopping; new runs are refused until it has.", LogLevel.Warning);
+                }
+                else
+                {
+                    RestoreRecorderSetSelection(selection, showWindow);
                 }
 
                 if (showWindow && runWindow != null)
@@ -348,8 +349,9 @@ namespace FlowMatters.Source.Veneer
 
         /// <summary>
         /// The recorder sets the SelectedRecorderSets parameter asks for, as instances from the
-        /// manager's Sets, in the caller's order; null when the parameter is absent, or when it is
-        /// empty and there is no RecorderSetManager (nothing is changed then). Throws
+        /// manager's Sets, in the caller's order without repeats, and never empty: an empty request
+        /// gives [CurrentTree]. Null when the parameter is absent, or when it is empty and there is
+        /// no RecorderSetManager or no RiverSystemConfiguration (nothing is changed then). Throws
         /// InvalidRunParameterException for an invalid value, before anything is changed.
         /// </summary>
         private List<IRecorderSet> ResolveRecorderSetSelection(RunParameters parameters)
@@ -363,17 +365,30 @@ namespace FlowMatters.Source.Veneer
             // GetPluginModel never creates the manager. SelectedRecorderSets is not read here: its
             // getter creates the manager when it is absent.
             var manager = Scenario.GetPluginModel<RecorderSetManager>();
-            List<IRecorderSet> available = (manager == null || Scenario.CurrentRiverSystemConfiguration == null)
-                ? null
-                : manager.Sets.ToList();
-
-            var indices = RecorderSetSelection.Resolve(available?.Select(set => set.Name).ToList(), requested);
-            if (available == null)
+            if (manager == null)
+            {
+                RecorderSetSelection.Resolve(null, -1, requested);
                 return null;
+            }
+            if (Scenario.CurrentRiverSystemConfiguration == null)
+            {
+                RecorderSetSelection.RequireEmpty(requested, "the current configuration has no recorder set selection");
+                return null;
+            }
 
-            // Each instance comes from mgr.Sets, so the Current Recorder Tree, when named, is the
-            // manager's CurrentTree object itself.
-            return indices.Select(i => available[i]).ToList();
+            var available = manager.Sets.ToList();
+            var currentTree = manager.CurrentTree;
+            var treeIndex = available.FindIndex(set => ReferenceEquals(set, currentTree));
+
+            var indices = RecorderSetSelection.Resolve(available.Select(set => set.Name).ToList(), treeIndex, requested);
+
+            // Each instance comes from mgr.Sets, so the tree is the manager's CurrentTree object
+            // itself. The selection is never left empty: Source's getter would then add the tree on
+            // the run's own thread, outside SelectionLock.
+            var sets = indices.Select(i => available[i]).ToList();
+            if (sets.Count == 0)
+                sets.Add(currentTree);
+            return sets;
         }
 
         /// <summary>
@@ -400,11 +415,15 @@ namespace FlowMatters.Source.Veneer
         }
 
         /// <summary>
-        /// Puts the pre-run contents back into the collection the run changed. A failure is added
-        /// to RestoreErrors and logged at Error through TIME.Management.Log; it is never thrown.
+        /// Puts the pre-run contents back into the collection the run changed; does nothing when the
+        /// run changed no selection. A failure is added to RestoreErrors and logged at Error through
+        /// TIME.Management.Log; it is never thrown.
         /// </summary>
         private void RestoreRecorderSetSelection(SelectionRestore restore, bool runningInGui)
         {
+            if (restore.Target == null)
+                return;
+
             try
             {
                 OnGuiThread(runningInGui, () =>
@@ -433,14 +452,15 @@ namespace FlowMatters.Source.Veneer
         /// the calling thread otherwise.
         /// </summary>
         /// <remarks>
-        /// Apply runs on a service thread and a deferred restore on a thread-pool thread, while the
-        /// Source GUI reads the selection on its own thread (its recorder set controls, a project
-        /// save). SelectedRecorderSets is a List&lt;IRecorderSet&gt;, which is not thread-safe, so
-        /// in the GUI each Clear/Add sequence goes through MainForm.Instance.Invoke and cannot
-        /// interleave with those reads, as RunScenario already does for the run window. VeneerCmd
-        /// has no GUI thread, so the action runs directly there.
+        /// Apply and GET /recorderSets run on a service thread and a deferred restore on a
+        /// thread-pool thread, while the Source GUI reads the selection on its own thread (its
+        /// recorder set controls, a project save). SelectedRecorderSets is a
+        /// List&lt;IRecorderSet&gt;, which is not thread-safe, so in the GUI each Clear/Add sequence,
+        /// and GET /recorderSets's read, goes through MainForm.Instance.Invoke and cannot interleave
+        /// with those reads, as RunScenario already does for the run window. VeneerCmd has no GUI
+        /// thread, so the action runs directly there.
         /// </remarks>
-        private static void OnGuiThread(bool runningInGui, Action action)
+        internal static void OnGuiThread(bool runningInGui, Action action)
         {
             var form = runningInGui ? MainForm.Instance : null;
             if (form != null && form.InvokeRequired)

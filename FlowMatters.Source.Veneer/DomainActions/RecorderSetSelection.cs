@@ -25,6 +25,12 @@ namespace FlowMatters.Source.Veneer.DomainActions
         public const string KEY = "SelectedRecorderSets";
 
         /// <summary>
+        /// The Current Recorder Tree's name in Source 5.16 and later
+        /// (CurrentTreeRecorderSet.CurrentRecorderTreeName), a constant that is not localised.
+        /// </summary>
+        public const string CURRENT_TREE_NAME = "Current Recorder Tree";
+
+        /// <summary>
         /// The requested names, in the caller's order. The request deserialiser delivers a JSON
         /// array as object[] and a JSON string as string; anything other than an object[] whose
         /// elements are all non-null strings is refused.
@@ -49,40 +55,59 @@ namespace FlowMatters.Source.Veneer.DomainActions
         }
 
         /// <summary>
-        /// The index in <paramref name="available"/> of each requested name, in the requested
-        /// order. <paramref name="available"/> is the manager's set names in its order, or null
-        /// when the scenario has no recorder set manager. An empty request resolves to an empty
-        /// array whether or not there is a manager. Names match exactly (ordinal); a name that
-        /// matches no set, or more than one, is refused.
+        /// The index in <paramref name="available"/> of each set to select, in the requested order
+        /// with repeats dropped (the first occurrence is kept).
         /// </summary>
-        public static int[] Resolve(IList<string> available, IList<string> requested)
+        /// <param name="available">The manager's set names in its order, or null when the scenario
+        /// has no recorder set manager.</param>
+        /// <param name="treeIndex">The index in <paramref name="available"/> of the manager's
+        /// CurrentTree, found by reference; -1 when it is not there.</param>
+        /// <param name="requested">The names asked for.</param>
+        /// <remarks>
+        /// <see cref="CURRENT_TREE_NAME"/> resolves to <paramref name="treeIndex"/> before any name
+        /// is matched, so a named set that shares the tree's name does not make it ambiguous. Every
+        /// other name matches exactly (ordinal); one that matches no set, or more than one, is
+        /// refused. An empty request resolves to [<paramref name="treeIndex"/>]: an empty selection
+        /// and the tree alone select the same, and Source's getter adds the tree to an empty
+        /// selection when it next reads it. Without a manager, only an empty request resolves, to
+        /// an empty array.
+        /// </remarks>
+        public static int[] Resolve(IList<string> available, int treeIndex, IList<string> requested)
         {
-            if (requested == null || requested.Count == 0)
-                return new int[0];
-
+            requested = requested ?? new string[0];
             if (available == null)
-                throw new InvalidRunParameterException(
-                    $"{KEY} cannot select {Quote(requested.Distinct())}: the scenario has no recorder sets.");
+            {
+                RequireEmpty(requested, "the scenario has no recorder sets");
+                return new int[0];
+            }
+
+            if (requested.Count == 0)
+                return treeIndex >= 0 ? new[] { treeIndex } : new int[0];
 
             var unknown = new List<string>();
             var ambiguous = new List<string>();
-            var indices = new int[requested.Count];
-            for (int i = 0; i < requested.Count; i++)
+            var indices = new List<int>();
+            foreach (var name in requested)
             {
-                var matches = Enumerable.Range(0, available.Count)
-                    .Where(j => string.Equals(available[j], requested[i], StringComparison.Ordinal))
-                    .ToList();
+                List<int> matches;
+                if (treeIndex >= 0 && string.Equals(name, CURRENT_TREE_NAME, StringComparison.Ordinal))
+                    matches = new List<int> { treeIndex };
+                else
+                    matches = Enumerable.Range(0, available.Count)
+                        .Where(j => string.Equals(available[j], name, StringComparison.Ordinal))
+                        .ToList();
+
                 if (matches.Count == 0)
                 {
-                    if (!unknown.Contains(requested[i])) unknown.Add(requested[i]);
+                    if (!unknown.Contains(name)) unknown.Add(name);
                 }
                 else if (matches.Count > 1)
                 {
-                    if (!ambiguous.Contains(requested[i])) ambiguous.Add(requested[i]);
+                    if (!ambiguous.Contains(name)) ambiguous.Add(name);
                 }
-                else
+                else if (!indices.Contains(matches[0]))
                 {
-                    indices[i] = matches[0];
+                    indices.Add(matches[0]);
                 }
             }
 
@@ -96,7 +121,18 @@ namespace FlowMatters.Source.Veneer.DomainActions
                     $"{KEY} names {(ambiguous.Count == 1 ? "a recorder set name" : "recorder set names")} " +
                     $"shared by more than one set: {Quote(ambiguous)}. Available recorder sets: {Available(available)}.");
 
-            return indices;
+            return indices.ToArray();
+        }
+
+        /// <summary>
+        /// Refuses a non-empty request, naming its sets and <paramref name="reason"/>; an empty one
+        /// passes.
+        /// </summary>
+        public static void RequireEmpty(IList<string> requested, string reason)
+        {
+            if (requested != null && requested.Count > 0)
+                throw new InvalidRunParameterException(
+                    $"{KEY} cannot select {Quote(requested.Distinct())}: {reason}.");
         }
 
         private static string Available(IList<string> available) =>
