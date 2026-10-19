@@ -29,6 +29,7 @@ import sys
 import tempfile
 import zipfile
 
+import psutil
 import requests
 import veneer
 from veneer import manage
@@ -162,9 +163,13 @@ def build(v, base_url) -> None:
     put_recorders(base_url, [recorder_path(ITEM_X)])
     on = tree(base_url)
     require(len(on) == 1 and on[0].startswith(ITEM_X + "|"), "the tree recording X alone", on)
-    line, status = run_script(base_url, CREATE_SET_SCRIPT).split("\n")
+    # The script returns the instructions and the parse status on two lines, so a third line
+    # means the tree generated more than one instruction.
+    created = run_script(base_url, CREATE_SET_SCRIPT).split("\n")
+    require(len(created) == 2, f"{SET_X}'s instructions as a single line", created)
+    line, status = created
     print(f"{SET_X} instructions: {line}")
-    require(line.count("\n") == 0 and ITEM_X in line, f"{SET_X}'s instructions", line)
+    require(ITEM_X in line, f"{SET_X}'s instructions", line)
     require(status == "Complete", f"parsing {SET_X}'s instructions", status)
 
     # The tree: item Y alone. The selection: SET_X alone.
@@ -178,7 +183,6 @@ def build(v, base_url) -> None:
 
 def started_veneer_cmds():
     """This process's VeneerCmd descendants."""
-    import psutil
     found = []
     for child in psutil.Process().children(recursive=True):
         try:
