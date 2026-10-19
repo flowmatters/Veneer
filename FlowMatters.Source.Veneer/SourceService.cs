@@ -40,6 +40,7 @@ using RiverSystem.Functions.Variables;
 using RiverSystem.ManagedExtensions;
 using RiverSystem.PreProcessing.ProjectionInfo;
 using RiverSystem.ScenarioExplorer.ParameterSet;
+using RiverSystem.ScenarioSets.RecorderSets;
 using TIME.Core;
 using TIME.DataTypes;
 using TIME.DataTypes.Utils;
@@ -388,6 +389,7 @@ namespace FlowMatters.Source.WebServer
                 }
             };
             HashSet<int> runNumbersBefore = null;
+            ScenarioInvoker invoker;
 
             lock (_runLock)
             {
@@ -402,8 +404,20 @@ namespace FlowMatters.Source.WebServer
                         HttpStatusCode.Conflict);
                 }
 
+                // A run whose task was still executing when RunScenario finished (a cancel whose
+                // wait timed out, or an exception that left Execute running) has released its claim,
+                // and its recorder set selection is restored only when the task stops. A run started
+                // before then would overlap that Execute, and could snapshot its applied selection.
+                if (ScenarioInvoker.IsRestorePending)
+                {
+                    throw new WebFaultException<SimulationFault>(
+                        new SimulationFault(new InvalidOperationException("A previous simulation is still stopping. Try again once it has stopped.")),
+                        HttpStatusCode.Conflict);
+                }
+
                 // Nothing that can throw between here and the try: the finally is what releases this claim, and both this check and evaluate refuse while it is set.
-                _currentScenarioInvoker = new ScenarioInvoker { Scenario = Scenario };
+                invoker = new ScenarioInvoker { Scenario = Scenario };
+                _currentScenarioInvoker = invoker;
             }
 
             try
@@ -417,7 +431,25 @@ namespace FlowMatters.Source.WebServer
                 runNumbersBefore = new HashSet<int>(
                     Scenario.Project.ResultManager.AllRuns().Select(run => run.RunNumber));
 
-                _currentScenarioInvoker.RunScenario(parameters, RunningInGUI, _sharedLogGenerator);
+                try
+                {
+                    invoker.RunScenario(parameters, RunningInGUI, _sharedLogGenerator);
+                }
+                finally
+                {
+                    // Added here, while runLogger is still attached and before any
+                    // messages.ToArray(), so the run's log always carries them. A deferred restore
+                    // finishes after this and reaches the console or GUI log only.
+                    foreach (var restoreError in invoker.RestoreErrors)
+                        messages.Enqueue(RunLogFormatter.FormatLine(LogType.Error.ToString(), null, restoreError));
+                }
+            }
+            catch (InvalidRunParameterException e)
+            {
+                Log("Run refused: " + e.Message, LogLevel.Warning);
+                throw new WebFaultException<SimulationFault>(
+                    new SimulationFault(e) { Log = messages.ToArray() },
+                    HttpStatusCode.BadRequest);
             }
             catch (Exception e)
             {
@@ -826,8 +858,10 @@ namespace FlowMatters.Source.WebServer
                 // _runLock for the whole batch keeps TriggerRun from claiming a run mid-batch; it
                 // also delays TriggerRun, GetRunStatus and CancelRun (they take the same lock),
                 // which is acceptable because batches are short. A run started from the Source GUI
-                // (not via Veneer) never sets _currentScenarioInvoker and is not detected here.
-                if (_currentScenarioInvoker != null)
+                // (not via Veneer) never sets _currentScenarioInvoker and is not detected here. A
+                // pending restore is a Veneer run still executing after its claim was released;
+                // TriggerRun refuses during it too.
+                if (_currentScenarioInvoker != null || ScenarioInvoker.IsRestorePending)
                     throw Fault(HttpStatusCode.Conflict, new InvalidOperationException("A simulation is running; evaluate after it finishes."));
                 var evaluator = new TransientFunctionEvaluator(Scenario,
                     msg => Log(msg, msg.StartsWith("WARNING", StringComparison.Ordinal) ? LogLevel.Warning : LogLevel.Info));
@@ -1039,6 +1073,49 @@ namespace FlowMatters.Source.WebServer
             Log("Applying inout set " + inputSetName);
             var sets = new InputSets(Scenario);
             sets.Run(inputSetName);
+        }
+
+        /// <summary>
+        /// GET /recorderSets: the recorder sets the scenario defines and the ones its current
+        /// configuration selects. 404 with a null body when no scenario is loaded; empty arrays when
+        /// the scenario has no RecorderSetManager.
+        /// </summary>
+        [OperationContract]
+        [WebInvoke(Method = "GET", UriTemplate = UriTemplates.RecorderSets, ResponseFormat = WebMessageFormat.Json)]
+        public RecorderSetsSummary GetRecorderSets()
+        {
+            Log("Requested recorder sets");
+            if (Scenario == null)
+            {
+                WebOperationContext.Current.OutgoingResponse.StatusCode = HttpStatusCode.NotFound;
+                return null;
+            }
+
+            // GetPluginModel returns null when the manager is absent and never creates it. Reading
+            // SelectedRecorderSets does create it, so the selection is read only when it exists.
+            var manager = Scenario.GetPluginModel<RecorderSetManager>();
+            if (manager == null)
+                return new RecorderSetsSummary { Sets = new string[0], Selected = new string[0] };
+
+            // Reading SelectedRecorderSets while it is empty adds the Current Recorder Tree to it,
+            // so an empty selection is reported as ["Current Recorder Tree"]. Both mean the tree
+            // governs recording. PersistedSelectedRecorderSets is never read: its getter rewrites
+            // the persisted collection.
+            var configuration = Scenario.CurrentRiverSystemConfiguration;
+            var summary = new RecorderSetsSummary();
+            // On the GUI thread when hosted in the GUI, and under the lock a run changes and
+            // restores the selection under: see ScenarioInvoker.OnGuiThread.
+            ScenarioInvoker.OnGuiThread(RunningInGUI, () =>
+            {
+                lock (ScenarioInvoker.SelectionLock)
+                {
+                    summary.Sets = manager.Sets.Select(set => set.Name).ToArray();
+                    summary.Selected = configuration == null
+                        ? new string[0]
+                        : configuration.SelectedRecorderSets.Select(set => set.Name).ToArray();
+                }
+            });
+            return summary;
         }
 
         [OperationContract]

@@ -255,6 +255,7 @@
     <Compile Include="DomainActions\InputSets.cs" />
     <Compile Include="DomainActions\ModelTabulator.cs" />
     <Compile Include="DomainActions\OneShotLifecycle.cs" />
+    <Compile Include="DomainActions\RecorderSetSelection.cs" />
     <Compile Include="DomainActions\ScenarioInvoker.cs" />
     <Compile Include="DomainActions\TimeSeriesFunctions.cs" />
     <Compile Include="DomainActions\TrimNetwork.cs" />
@@ -311,6 +312,7 @@
     <Compile Include="Tests\AddonMenuItemStateTests.cs" />
     <Compile Include="Tests\OneShotLifecycleTests.cs" />
     <Compile Include="Tests\TriggerRunGuardTests.cs" />
+    <Compile Include="Tests\RecorderSetSelectionTests.cs" />
     <Compile Include="Tests\ExpressionSubstitutionTests.cs" />
     <Compile Include="Tests\EvaluateItemTests.cs" />
     <Compile Include="Tests\EvaluateRequestValidationTests.cs" />
@@ -321,6 +323,7 @@
     <Compile Include="Functions\ExpressionSubstitution.cs" />
     <Compile Include="Functions\EvaluateRequestValidation.cs" />
     <Compile Include="ExchangeObjects\InputSetSummary.cs" />
+    <Compile Include="ExchangeObjects\RecorderSetsSummary.cs" />
     <Compile Include="AutoStart\InitialiseOnLoadAttribute.cs" />
     <Compile Include="AutoStart\ProjectLoadListener.cs" />
     <Compile Include="RemoteScripting\CustomEndPoint.cs" />

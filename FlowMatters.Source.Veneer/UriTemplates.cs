@@ -68,6 +68,8 @@ namespace FlowMatters.Source.WebServer
 
         public const string RunInputSet = "/inputSets/{inputSetName}/{action}";
 
+        public const string RecorderSets = "/recorderSets";
+
         public const string DataSources = "/dataSources";
 
         public const string DataSourceGroup = DataSources+"/{dataSourceGroup}";
