@@ -23,9 +23,12 @@ using FlowMatters.Source.Veneer.ExchangeObjects;
 using RiverSystem.ScenarioSets.RecorderSets;
 using TIME.Management;
 using TIME.Tools.Reflection;
-// The element type of RecorderSetManager.Sets and SelectedRecorderSets: RecorderSet on Source 4.x,
-// IRecorderSet from 5.x (5.16 is the earliest 5.x checked).
-#if BEFORE_V5
+// The element type of RecorderSetManager.Sets and SelectedRecorderSets: RecorderSet up to Source
+// 4.8 (4.5.0 and 4.8.3 checked), IRecorderSet from 4.11 (4.11.0 checked; 4.9 and 4.10 unseen).
+// 4.8.3 already defines IRecorderSet, but its manager is still typed by RecorderSet, so the switch
+// is the manager API's, not the interface's. compile_all defines BEFORE_V4_11 for 4.0 to 4.10 and
+// BEFORE_V4 for 3.x.
+#if BEFORE_V4 || BEFORE_V4_11
 using SelectableRecorderSet = RiverSystem.ScenarioSets.RecorderSets.RecorderSet;
 #else
 using SelectableRecorderSet = RiverSystem.ScenarioSets.RecorderSets.IRecorderSet;
