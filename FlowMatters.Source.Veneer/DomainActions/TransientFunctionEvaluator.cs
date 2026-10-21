@@ -390,7 +390,7 @@ namespace FlowMatters.Source.Veneer.DomainActions
                 // it, not later in finally. When TryParse itself fails the lists are empty, so the
                 // wait in Release costs nothing; ValidateUsages cannot fail for this transient
                 // (default EvaluationTimes = StartOfTimeStep, no Usages).
-                registrationLaunched = !fm.CachedDisableReferenceFunctions;
+                registrationLaunched = !ReferenceRegistrationDisabled(fm);
                 if (!parsed)
                 {
                     // A reference the guard refuses can itself fail Parse — on a never-run
@@ -597,6 +597,42 @@ namespace FlowMatters.Source.Veneer.DomainActions
                 throw new NotSupportedException("this Source version exposes no Function.FunctionManager setter");
             _setFunctionManager = setter;
             return setter;
+        }
+
+        private static PropertyInfo _cachedDisableReferenceFunctions;
+        private static FieldInfo _disableFunctionReferencesOption;
+        private static bool _disableReferenceFunctionsResolved;
+
+        /// <summary>
+        /// Whether Parse skips launching its ReferencingFunctions registrations, read as Parse
+        /// itself reads it. Found by reflection because master must compile against EVERY CoreWCF
+        /// Source version, and the flag is not in all of them: the instance property
+        /// FunctionManager.CachedDisableReferenceFunctions first appears in Source 6.2 (6.0 and
+        /// 6.1 lack it), and older versions read the static user option
+        /// RiverSystem.Options.RiverSystemOptions.DISABLE_FUNCTION_REFERENCES instead. legacy_ci
+        /// reads it the same way. When neither member is found, or reading it throws, the answer
+        /// is false (registration launched): the safe side, since Release then waits for the adds
+        /// before giving up, and SweepStrays backs it up.
+        /// </summary>
+        private static bool ReferenceRegistrationDisabled(FunctionManager fm)
+        {
+            try
+            {
+                if (!_disableReferenceFunctionsResolved)
+                {
+                    _cachedDisableReferenceFunctions = typeof(FunctionManager).GetProperty("CachedDisableReferenceFunctions",
+                        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                    if (_cachedDisableReferenceFunctions == null)
+                        _disableFunctionReferencesOption = typeof(Function).Assembly
+                            .GetType("RiverSystem.Options.RiverSystemOptions", false)
+                            ?.GetField("DISABLE_FUNCTION_REFERENCES", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                    _disableReferenceFunctionsResolved = true;
+                }
+                if (_cachedDisableReferenceFunctions != null) return (bool)_cachedDisableReferenceFunctions.GetValue(fm);
+                if (_disableFunctionReferencesOption != null) return (bool)_disableFunctionReferencesOption.GetValue(null);
+            }
+            catch (Exception e) when (!(e is OutOfMemoryException)) { }
+            return false;
         }
 
         /// <summary>
