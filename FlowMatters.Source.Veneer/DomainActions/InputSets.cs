@@ -106,20 +106,43 @@ namespace FlowMatters.Source.Veneer.DomainActions
 
         private ParameterSet GetOrCreateParameterSet(InputSet inputSet)
         {
-            ParameterSet parameterSet = ParameterSet(inputSet);
-            if (parameterSet == null)
+            return LinkedParameterSet(ParameterSetManager(), inputSet).Parameters;
+        }
+
+        /// <summary>
+        /// The input set's InputSetParameterSet, created if missing, with its Parent linked to the
+        /// parent input set's (itself created and linked if missing). Source's
+        /// InputSetParameterSet.Apply applies Parent first and then the set's own lines, so a child
+        /// left with Parent = null silently loses everything it should inherit when a run selects
+        /// it. Source's own ParameterSetManager.AddParamterSetForInputSet links the chain the same
+        /// way, but throws if a parent has no parameter set yet; this creates the parent's instead.
+        /// Re-linking on every call also repairs children an earlier Veneer created unlinked.
+        /// </summary>
+        public static InputSetParameterSet LinkedParameterSet(ParameterSetManager manager, InputSet inputSet)
+        {
+            return LinkedParameterSet(manager, inputSet, new HashSet<InputSet>());
+        }
+
+        private static InputSetParameterSet LinkedParameterSet(ParameterSetManager manager, InputSet inputSet, HashSet<InputSet> visiting)
+        {
+            var entry = manager.ParameterSets.FirstOrDefault(x => x.InputSet == inputSet);
+            if (entry == null)
             {
-                parameterSet = new ParameterSet();
-                var inputSetParameterSet = new InputSetParameterSet
+                entry = new InputSetParameterSet
                 {
                     InputSet = inputSet,
-                    Parent = null,
-                    Parameters = parameterSet
+                    Parameters = new ParameterSet()
                 };
-                ParameterSetManager().ParameterSets.Add(inputSetParameterSet);
+                manager.ParameterSets.Add(entry);
             }
 
-            return parameterSet;
+            visiting.Add(inputSet);
+            var parent = inputSet.ParentInputSet;
+            // A parent chain that loops back (never valid in Source) is cut rather than recursed.
+            entry.Parent = parent == null || visiting.Contains(parent)
+                ? null
+                : LinkedParameterSet(manager, parent, visiting);
+            return entry;
         }
 
         private ParameterSet ParameterSet(InputSet inputSet)

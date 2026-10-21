@@ -299,6 +299,7 @@
     <Compile Include="Formatting\RunLogFormatter.cs" />
     <Compile Include="Formatting\SchematicSvgBuilder.cs" />
     <Compile Include="Tests\SchematicSvgBuilderTests.cs" />
+    <Compile Include="Tests\InputSetParameterSetLinkTests.cs" />
     <Compile Include="Tests\AddonCommandLineTests.cs" />
     <Compile Include="Tests\AddonEnvironmentTests.cs" />
     <Compile Include="Tests\VeneerConfigurationResolverTests.cs" />
