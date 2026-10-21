@@ -20,6 +20,7 @@
        Veneer project's; copied to the output as before. -->
   <ItemGroup>
     <Reference Include="RiverSystem" />
+    <Reference Include="RiverSystem.ScenarioExplorer" />
     <Reference Include="TIME" />
   </ItemGroup>
   
