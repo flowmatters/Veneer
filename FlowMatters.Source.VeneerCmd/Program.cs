@@ -250,7 +250,14 @@ namespace FlowMatters.Source.VeneerCmd
 #else
             if (!loadRegistered)
             {
-                PluginManager.ManagementFile = Path.GetTempFileName();
+                // ManagementFilePath is the full path the manager actually reads, and Source's static
+                // initialiser computes it from ManagementFile before this line runs (reading
+                // ManagementFile is enough to trigger it), so setting ManagementFile alone left the
+                // user's registry in use. Both are public static fields on every Source this
+                // branch builds against (4.5 to 5.61).
+                var emptyRegistry = Path.GetTempFileName();
+                PluginManager.ManagementFile = emptyRegistry;
+                PluginManager.ManagementFilePath = emptyRegistry;
             }
             var manager = PluginManager.Instance;
 #endif
