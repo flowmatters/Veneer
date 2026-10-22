@@ -29,7 +29,7 @@ This **already happened once while writing this plan** and is the normal state a
 Restage a Source 6.x reference set (verified working — this is what produced the 134 baseline):
 
 ```powershell
-$s='C:\Geospatial\Source\Source_6.10.0.14373'; $o='C:\src\projects\Output'
+$s='<SOURCE_6_10_INSTALL>'; $o='C:\src\projects\Output'
 Get-ChildItem $s -File | Where-Object { $_.Extension -in '.dll','.exe' } |
   ForEach-Object { Copy-Item $_.FullName (Join-Path $o $_.Name) -Force }
 New-Item -ItemType Directory -Force (Join-Path $o 'Plugins') | Out-Null

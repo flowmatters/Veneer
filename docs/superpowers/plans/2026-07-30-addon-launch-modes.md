@@ -46,7 +46,7 @@ Verified state of this machine:
 | `C:\Program Files\eWater\Source*` | **no installed Source at all** |
 | `dotnet test` on the main csproj | **FAILS** — cannot resolve those five references |
 | VS 2022 MSBuild on the main csproj | **FAILS** — same `CS0234` errors |
-| `C:\Geospatial\Source\Source_6.10.0.14373` | exists and **does** contain all five |
+| `<SOURCE_6_10_INSTALL>` | exists and **does** contain all five |
 | `vstest.console.exe` | `C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\Extensions\TestPlatform\vstest.console.exe` |
 
 So the supported build path is `build.bat` → `python compile_all.py --refpath ..\Output Veneer.sln`, which reads the uncommented lines of `Veneer.sln.include` and, for each version, **clears and repopulates `..\Output`** (i.e. `C:\src\projects\Output` — see `build_version` in `compile_all.py`, around lines 404-441), then builds into `Compiled/<version>/`.
@@ -113,7 +113,7 @@ If it fails, stop and report — do not proceed. A likely cause is a Source path
 To get the fast inner loop working, restage a Source 6.x reference set over `..\Output` afterwards — the same two copies `compile_all.py` does per version (`copy_references`):
 
 ```powershell
-$s='C:\Geospatial\Source\Source_6.10.0.14373'; $o='C:\src\projects\Output'
+$s='<SOURCE_6_10_INSTALL>'; $o='C:\src\projects\Output'
 Get-ChildItem $s -File | Where-Object { $_.Extension -in '.dll','.exe' } |
   ForEach-Object { Copy-Item $_.FullName (Join-Path $o $_.Name) -Force }
 New-Item -ItemType Directory -Force (Join-Path $o 'Plugins') | Out-Null
