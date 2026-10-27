@@ -175,6 +175,55 @@ namespace FlowMatters.Source.Veneer.Tests
             Assert.That(_dm.DataGroups.Single().DataDetails.Select(d => d.Name), Is.EqualTo(new[] { "A" }));
         }
 
+        // C: names Source keeps
+
+        [Test] public void ADataSourceIsNamedAsSourceWillKeepIt()
+        {
+            // The Source GUI renames data sources with DataManager.RestrictName; doing it here
+            // gives the same name with or without the GUI.
+            var created = InMemory("fire.tss@v2", "A").CreateIn(_dm, _inputSets, RunOnUiThread);
+
+            Assert.That(created.Name, Is.EqualTo("fire_tss_v2"));
+            Assert.That(_dm.DataGroups.Select(g => g.Name), Is.EqualTo(new[] { "fire_tss_v2" }));
+        }
+
+        [Test] public void AFileNamedOnlyByItsPathStillLoadsFromThePath()
+        {
+            var path = WriteCsv("inflows.csv", "A");
+            var created = FromFile(path).CreateIn(_dm, _inputSets, RunOnUiThread);
+
+            Assert.That(created.Name, Is.EqualTo(DataManager.RestrictName(path)));
+            Assert.That(FilenameOf(created), Is.EqualTo(path));
+            Assert.That(created.DataDetails.Count, Is.EqualTo(1));
+        }
+
+        [Test] public void CreatingUnderTheSameNameAgainReplacesTheDataSource()
+        {
+            var first = InMemory("fire.tss", "A").CreateIn(_dm, _inputSets, RunOnUiThread);
+            var second = InMemory("fire.tss", "A").CreateIn(_dm, _inputSets, RunOnUiThread);
+
+            Assert.That(second, Is.Not.SameAs(first));
+            Assert.That(_dm.DataGroups, Is.EqualTo(new[] { second }));
+        }
+
+        [Test] public void ADataSourceAnOlderVeneerNamedUnrestrictedIsReplaced()
+        {
+            // Created before names were restricted, on a command line, which keeps any name.
+            var older = InMemory("fire.tss", "A").CreateIn(_dm, _inputSets, RunOnUiThread);
+            older.Name = "fire.tss";
+
+            var replacement = InMemory("fire.tss", "A").CreateIn(_dm, _inputSets, RunOnUiThread);
+
+            Assert.That(_dm.DataGroups, Is.EqualTo(new[] { replacement }));
+            Assert.That(replacement.Name, Is.EqualTo("fire_tss"));
+        }
+
+        [Test] public void ADataSourceNeedsAName()
+        {
+            Assert.Throws<ArgumentException>((TestDelegate)(() => InMemory(" ", "A").CreateIn(_dm, _inputSets, RunOnUiThread)));
+            Assert.That(_dm.DataGroups, Is.Empty);
+        }
+
         [Test] public void AReplacementIsMadeOnTheUiThread()
         {
             InMemory("flows", "A", "B").AddTo(_dm, _inputSets, RunOnUiThread);

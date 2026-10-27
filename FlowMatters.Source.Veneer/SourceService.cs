@@ -1164,44 +1164,47 @@ namespace FlowMatters.Source.WebServer
         [OperationContract]
         [WebInvoke(Method = "POST", UriTemplate = UriTemplates.DataSources, RequestFormat = WebMessageFormat.Json, ResponseFormat = WebMessageFormat.Json)]
         [FaultContract(typeof(SimulationFault))]
-        public void CreateDataSource(SimpleDataGroupItem newItem)
+        /// <summary>
+        /// Create a data source, replacing any already of its name, and return it (as a summary),
+        /// under the name Source gave it - see SimpleDataGroupItem.KeptName.
+        /// </summary>
+        public SimpleDataGroupItem CreateDataSource(SimpleDataGroupItem newItem)
         {
-            AsDataSourceFault(() =>
-            {
-                var dm = Scenario.Network.DataManager;
-                var existing = Enumerable.FirstOrDefault(dm.DataGroups, ds => ds.Name == newItem.Name);
-
-                if (existing != null)
-                {
-                    newItem.ReplaceInScenario(Scenario, existing, OnGuiThread);
-                }
-                else
-                {
-                    newItem.AddToScenario(Scenario, OnGuiThread);
-                }
-            });
+            return AsDataSourceFault(() =>
+                new SimpleDataGroupItem(newItem.CreateInScenario(Scenario, OnGuiThread), summary: true));
         }
 
         /// <summary>
         /// Run a data source request, reporting a failure as a SimulationFault (a JSON body with
         /// the message and stack trace), rather than the bare HTML error page the host would
-        /// otherwise send, which tells a client nothing.
+        /// otherwise send, which tells a client nothing. A request that is itself invalid is a
+        /// 400; anything else a 500.
         /// </summary>
-        private void AsDataSourceFault(Action request)
+        private T AsDataSourceFault<T>(Func<T> request)
         {
             try
             {
-                request();
+                return request();
             }
             catch (WebFaultException<SimulationFault>)
             {
                 throw;
+            }
+            catch (ArgumentException e)
+            {
+                Log("Data source request refused: " + e.Message, LogLevel.Warning);
+                throw Fault(HttpStatusCode.BadRequest, e);
             }
             catch (Exception e)
             {
                 Log("Data source request failed: " + e.Message, LogLevel.Error);
                 throw Fault(HttpStatusCode.InternalServerError, e);
             }
+        }
+
+        private void AsDataSourceFault(Action request)
+        {
+            AsDataSourceFault<object>(() => { request(); return null; });
         }
 
         /// <summary>
@@ -1216,10 +1219,10 @@ namespace FlowMatters.Source.WebServer
         [OperationContract]
         [WebInvoke(Method = "PUT", UriTemplate = UriTemplates.DataSourceGroup, ResponseFormat = WebMessageFormat.Json)]
         [FaultContract(typeof(SimulationFault))]
-        public void UpdateDataSource(string dataSourceGroup, SimpleDataGroupItem newItem)
+        public SimpleDataGroupItem UpdateDataSource(string dataSourceGroup, SimpleDataGroupItem newItem)
         {
             newItem.Name = dataSourceGroup;
-            this.CreateDataSource(newItem);
+            return this.CreateDataSource(newItem);
         }
 
         private SimpleDataGroupItem GetSimpleDataSourceInternal(string dataSourceGroup, bool summary)
