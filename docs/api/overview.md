@@ -171,7 +171,7 @@ In practice this means any origin is allowed. There is no credentialed-CORS conf
 ## Protocol version
 
 `GET /` returns a [`VeneerStatus`](schemas.md#veneerstatus) whose `Version` field is the
-**protocol version** — an integer date stamp (currently `20261019`). Clients can read this to
+**protocol version** — an integer date stamp (currently `20261027`). Clients can read this to
 detect API-surface changes. The constant lives in
 [`VeneerStatus.cs`](../../FlowMatters.Source.Veneer/ExchangeObjects/VeneerStatus.cs) as
 `PROTOCOL_VERSION` and is bumped whenever the REST surface changes.
