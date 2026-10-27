@@ -13,7 +13,7 @@ Veneer can be used to:
 ## Setup
 
 1. Download and compile the code, or download one of the releases.
-2. Load the `FlowMatters.Source.Veneer.dll` plugin using Source's Plugin Manager. You'll need to restart Source.
+2. Load the `FlowMatters.Source.Veneer.dll` plugin using Source's Plugin Manager. You'll need to restart Source. If your Source already bundles Veneer, see [Updating a bundled Veneer](#updating-a-bundled-veneer) instead.
 3. Load a model (rsproj file) and then start Veneer using the Tools|Web Server Monitoring option.
 4. Test the connection by opening a web browser and entering the following in the URL bar:
 
@@ -22,6 +22,20 @@ Veneer can be used to:
     ```
 
 This should return a GeoJSON representation of the node-link network for the current model. It'll just be a wall of text, but it indicates that everything is working. You can now use Veneer to control Source, such as by using [veneer-py](https://github.com/flowmatters/veneer-py).
+
+### Updating a bundled Veneer
+
+Many Source releases ship Veneer as a community plugin, under `Plugins\CommunityPlugins\` in the Source install directory. When Source was installed with the MSI installer, the Source user interface **always loads that bundled copy**, even if you select a different `FlowMatters.Source.Veneer.dll` in the Plugin Manager. Registering a newer build from another folder has no effect.
+
+To use a newer Veneer with an installed Source, for example an updated release or your own build for that Source version, replace the bundled copy:
+
+1. Close Source.
+2. Find `FlowMatters.Source.Veneer.dll` under `Plugins\CommunityPlugins\`. Depending on the Source version it is directly in `CommunityPlugins` or in a subfolder such as `CommunityPlugins\Veneer`. Some versions have a copy in both places.
+3. Back up that folder's Veneer files if you might want to go back.
+4. Copy **all** the files from the new Veneer build over the top of the existing copy (every location from step 2), not just `FlowMatters.Source.Veneer.dll`. The supporting DLLs, `FlowMatters.Source.VeneerCmd.exe` and (for Source 6) the `.deps.json`/`.runtimeconfig.json` files must come from the same build. Under `C:\Program Files` this needs administrator rights.
+5. Restart Source.
+
+Use a Veneer build for the same Source version as the install. Builds are version-specific.
 
 ## Options
 
