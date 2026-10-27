@@ -31,15 +31,35 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects.DataSources
             Items = dgi.InputSetItems.Select(isi => new SimpleDataItem(isi,summary)).ToArray();
         }
 
-        public DataGroupItem AddToScenario(RiverSystemScenario scenario)
+        /// <summary>
+        /// Create this data source in scenario. onUiThread runs a change the Source GUI observes
+        /// (see GuiThread); null runs it directly.
+        /// </summary>
+        public DataGroupItem AddToScenario(RiverSystemScenario scenario, Action<Action> onUiThread = null)
         {
-            var dm = scenario.Network.DataManager;
+            return AddTo(scenario.Network.DataManager, scenario.Network.InputSets, onUiThread);
+        }
+
+        internal DataGroupItem AddTo(DataManager dm, IEnumerable<InputSet> inputSets, Action<Action> onUiThread = null)
+        {
+            DataGroupItem result = null;
+            Directly(onUiThread)(() => result = Build(dm, inputSets));
+            return result;
+        }
+
+        private static Action<Action> Directly(Action<Action> onUiThread)
+        {
+            return onUiThread ?? (action => action());
+        }
+
+        private DataGroupItem Build(DataManager dm, IEnumerable<InputSet> inputSets)
+        {
             var asFile = Items.All(i => i.DetailsAsCSV == null);
             var dataGroupType = asFile
                 ? typeof(FileCentralDataSource)
                 : typeof(GeneratedCentralDataSource);
 
-            var dataGroup = DataGroupItem.CreateGroup(dataGroupType,scenario.Network.InputSets);
+            var dataGroup = DataGroupItem.CreateGroup(dataGroupType,inputSets);
             dataGroup.Name = Name;
             if (asFile)
             {
@@ -61,7 +81,7 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects.DataSources
             for (int i = 0; i < Items.Length; i++)
             {
                 var item = Items[i];
-                item.AddToGroup(scenario, dataGroup, i);
+                item.AddToGroup(dataGroup, i);
             }
             return dataGroup;
         }
@@ -106,28 +126,43 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects.DataSources
             return UriTemplates.DataSources + "/" + SourceService.URLSafeString(MakeFullName(i).Substring(1)).Replace("%2F","/");
         }
 
-        public void ReplaceInScenario(RiverSystemScenario scenario, DataGroupItem existing)
+        /// <summary>
+        /// Replace existing, a data source of the same name, with this one, moving its usages
+        /// across. onUiThread is as for AddToScenario.
+        /// </summary>
+        public DataGroupItem ReplaceInScenario(RiverSystemScenario scenario, DataGroupItem existing,
+                                               Action<Action> onUiThread = null)
         {
-            var dm = scenario.Network.DataManager;
-            var name = Name;
-            Name = string.Format("TMP___{0}", name);
+            return ReplaceIn(scenario.Network.DataManager, scenario.Network.InputSets, existing, onUiThread);
+        }
 
-            var newItem = AddToScenario(scenario);
-
-            foreach (var origDetail in existing.DataDetails)
+        internal DataGroupItem ReplaceIn(DataManager dm, IEnumerable<InputSet> inputSets, DataGroupItem existing,
+                                         Action<Action> onUiThread = null)
+        {
+            DataGroupItem newItem = null;
+            Directly(onUiThread)(() =>
             {
-                var destDetail = newItem.DataDetails.First(dd => dd.Name == origDetail.Name);
-                foreach (var usage in origDetail.Usages)
-                {
-                    destDetail.Usages.Add(usage);
-                }
+                var name = Name;
+                Name = string.Format("TMP___{0}", name);
 
-                origDetail.Usages.Clear();
-            }
-            Name = name;
-            newItem.Name = name;
-            dm.RemoveGroup(existing);
-            dm.Refresh();
+                newItem = Build(dm, inputSets);
+
+                foreach (var origDetail in existing.DataDetails)
+                {
+                    var destDetail = newItem.DataDetails.First(dd => dd.Name == origDetail.Name);
+                    foreach (var usage in origDetail.Usages)
+                    {
+                        destDetail.Usages.Add(usage);
+                    }
+
+                    origDetail.Usages.Clear();
+                }
+                Name = name;
+                newItem.Name = name;
+                dm.RemoveGroup(existing);
+                dm.Refresh();
+            });
+            return newItem;
         }
     }
 }

@@ -302,6 +302,7 @@
     <Compile Include="Tests\SchematicSvgBuilderTests.cs" />
     <Compile Include="Tests\InputSetParameterSetLinkTests.cs" />
     <Compile Include="Tests\GuiThreadTests.cs" />
+    <Compile Include="Tests\DataSourceCreationTests.cs" />
     <Compile Include="Tests\AddonCommandLineTests.cs" />
     <Compile Include="Tests\AddonEnvironmentTests.cs" />
     <Compile Include="Tests\VeneerConfigurationResolverTests.cs" />

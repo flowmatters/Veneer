@@ -68,6 +68,12 @@ namespace FlowMatters.Source.WebServer
         private static bool _runningInGUI = true;
         private static CustomEndPoint[] _customEndpoints = null;
 
+        /// <summary>
+        /// Whether the service is hosted in the Source GUI (rather than VeneerCmd), for code with
+        /// no service instance to ask: script helpers, say.
+        /// </summary>
+        internal static bool HostedInGui => _runningInGUI;
+
         // Backstop only. Hosts install this much earlier (VeneerCmd's entry point and the
         // in-Source plugin attribute); by the time SourceService is first touched, plugin
         // and project loading have already logged. See LogDispatchGuard.
@@ -1164,12 +1170,21 @@ namespace FlowMatters.Source.WebServer
 
             if (existing != null)
             {
-                newItem.ReplaceInScenario(Scenario, existing);
+                newItem.ReplaceInScenario(Scenario, existing, OnGuiThread);
             }
             else
             {
-                newItem.AddToScenario(Scenario);
+                newItem.AddToScenario(Scenario, OnGuiThread);
             }
+        }
+
+        /// <summary>
+        /// Run a change the Source GUI observes - adding or removing a data source, say - on its UI
+        /// thread when hosted there. See GuiThread.
+        /// </summary>
+        private void OnGuiThread(Action change)
+        {
+            GuiThread.Run(RunningInGUI, change);
         }
 
         [OperationContract]
@@ -1208,7 +1223,7 @@ namespace FlowMatters.Source.WebServer
                 ResourceNotFound();
                 return;
             }
-            dm.RemoveGroup(existing);
+            OnGuiThread(() => dm.RemoveGroup(existing));
         }
 
         [OperationContract]

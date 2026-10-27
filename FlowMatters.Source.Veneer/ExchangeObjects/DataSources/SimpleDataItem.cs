@@ -65,7 +65,7 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects.DataSources
             return InputSets.Any(iSet => SourceService.URLSafeString(iSet) == inputSet);
         }
 
-        internal void AddToGroup(RiverSystemScenario scenario, DataGroupItem dataGroup,int index)
+        internal void AddToGroup(DataGroupItem dataGroup,int index)
         {
             DataSourceItem sourceItem = dataGroup.InputSetItems[index].DataSource;
             sourceItem.Name = Name;
