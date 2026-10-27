@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using FlowMatters.Source.Veneer.DomainActions;
 using FlowMatters.Source.Veneer.ExchangeObjects.DataSources;
 using FlowMatters.Source.WebServer;
 using RiverSystem;
@@ -59,28 +60,34 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
             var ri = GetReflectedItem(target, element);
 
             var dm = scenario.Network.DataManager;
-            dm.RemoveUsage(ri);
 
-            var dataGroup = dm.DataGroups.Where(dg => dg.Name == dataGroupName).FirstOrDefault();
-            if (dataGroup == null)
+            // Creating a data source, or a column of one, is seen by the Source GUI's data sources
+            // tree, which must see it on the UI thread. Scripts run on a request thread.
+            GuiThread.Run(SourceService.HostedInGui, () =>
             {
-                dataGroup = DataGroupItem.CreateGroup<GeneratedCentralDataSource>(scenario.Network.DefaultInputSet);
-                dataGroup.Name = dataGroupName;
-                dm.DataGroups.Add(dataGroup);
-            }
+                dm.RemoveUsage(ri);
 
-            var dataGroupItem = dataGroup.DataDetails.Where(dgi => dgi.Name == dataItem).FirstOrDefault();
-            if (dataGroupItem == null)
-            {
-                Data[] loaded = NonInteractiveIO.Load(dataItem);
-                TimeSeries ts = loaded[column] as TimeSeries;
-                ts.name = dataItem;
-                dataGroup.CreateUsage<GeneratedDataDetails>(ri, ts);
-            }
-            else
-            {
-                dataGroupItem.Usages.Add(new DataUsage {ReflectedItem = ri});
-            }
+                var dataGroup = dm.DataGroups.Where(dg => dg.Name == dataGroupName).FirstOrDefault();
+                if (dataGroup == null)
+                {
+                    dataGroup = DataGroupItem.CreateGroup<GeneratedCentralDataSource>(scenario.Network.DefaultInputSet);
+                    dataGroup.Name = dataGroupName;
+                    dm.DataGroups.Add(dataGroup);
+                }
+
+                var dataGroupItem = dataGroup.DataDetails.Where(dgi => dgi.Name == dataItem).FirstOrDefault();
+                if (dataGroupItem == null)
+                {
+                    Data[] loaded = NonInteractiveIO.Load(dataItem);
+                    TimeSeries ts = loaded[column] as TimeSeries;
+                    ts.name = dataItem;
+                    dataGroup.CreateUsage<GeneratedDataDetails>(ri, ts);
+                }
+                else
+                {
+                    dataGroupItem.Usages.Add(new DataUsage {ReflectedItem = ri});
+                }
+            });
         }
 
         private static ReflectedItem GetReflectedItem(object target, string element)
