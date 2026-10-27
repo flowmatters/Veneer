@@ -1162,19 +1162,45 @@ namespace FlowMatters.Source.WebServer
         }
 
         [OperationContract]
-        [WebInvoke(Method = "POST", UriTemplate = UriTemplates.DataSources, RequestFormat = WebMessageFormat.Json)]
+        [WebInvoke(Method = "POST", UriTemplate = UriTemplates.DataSources, RequestFormat = WebMessageFormat.Json, ResponseFormat = WebMessageFormat.Json)]
+        [FaultContract(typeof(SimulationFault))]
         public void CreateDataSource(SimpleDataGroupItem newItem)
         {
-            var dm = Scenario.Network.DataManager;
-            var existing = Enumerable.FirstOrDefault(dm.DataGroups, ds => ds.Name == newItem.Name);
+            AsDataSourceFault(() =>
+            {
+                var dm = Scenario.Network.DataManager;
+                var existing = Enumerable.FirstOrDefault(dm.DataGroups, ds => ds.Name == newItem.Name);
 
-            if (existing != null)
+                if (existing != null)
+                {
+                    newItem.ReplaceInScenario(Scenario, existing, OnGuiThread);
+                }
+                else
+                {
+                    newItem.AddToScenario(Scenario, OnGuiThread);
+                }
+            });
+        }
+
+        /// <summary>
+        /// Run a data source request, reporting a failure as a SimulationFault (a JSON body with
+        /// the message and stack trace), rather than the bare HTML error page the host would
+        /// otherwise send, which tells a client nothing.
+        /// </summary>
+        private void AsDataSourceFault(Action request)
+        {
+            try
             {
-                newItem.ReplaceInScenario(Scenario, existing, OnGuiThread);
+                request();
             }
-            else
+            catch (WebFaultException<SimulationFault>)
             {
-                newItem.AddToScenario(Scenario, OnGuiThread);
+                throw;
+            }
+            catch (Exception e)
+            {
+                Log("Data source request failed: " + e.Message, LogLevel.Error);
+                throw Fault(HttpStatusCode.InternalServerError, e);
             }
         }
 
@@ -1189,6 +1215,7 @@ namespace FlowMatters.Source.WebServer
 
         [OperationContract]
         [WebInvoke(Method = "PUT", UriTemplate = UriTemplates.DataSourceGroup, ResponseFormat = WebMessageFormat.Json)]
+        [FaultContract(typeof(SimulationFault))]
         public void UpdateDataSource(string dataSourceGroup, SimpleDataGroupItem newItem)
         {
             newItem.Name = dataSourceGroup;
@@ -1214,6 +1241,7 @@ namespace FlowMatters.Source.WebServer
         [OperationContract]
         [WebInvoke(Method = "DELETE", UriTemplate = UriTemplates.DataSourceGroup, ResponseFormat = WebMessageFormat.Json
          )]
+        [FaultContract(typeof(SimulationFault))]
         public void DeleteDataSource(string dataSourceGroup)
         {
             var dm = Scenario.Network.DataManager;
@@ -1223,7 +1251,7 @@ namespace FlowMatters.Source.WebServer
                 ResourceNotFound();
                 return;
             }
-            OnGuiThread(() => dm.RemoveGroup(existing));
+            AsDataSourceFault(() => OnGuiThread(() => dm.RemoveGroup(existing)));
         }
 
         [OperationContract]
