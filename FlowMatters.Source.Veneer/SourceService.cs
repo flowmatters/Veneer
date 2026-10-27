@@ -1065,7 +1065,9 @@ namespace FlowMatters.Source.Veneer
         public SimpleDataGroupItem CreateDataSource(SimpleDataGroupItem newItem)
         {
             return AsDataSourceFault(() =>
-                new SimpleDataGroupItem(newItem.CreateInScenario(Scenario, OnGuiThread), summary: true));
+                new SimpleDataGroupItem(newItem.CreateInScenario(Scenario, OnGuiThread,
+                                                                 warning => Log(warning, LogLevel.Warning)),
+                                        summary: true));
         }
 
         /// <summary>

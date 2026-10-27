@@ -46,13 +46,16 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects.DataSources
         /// Create this data source in scenario (POST /dataSources): replace the data source
         /// already of its name if there is one, else add it. Returns the data source created.
         /// onUiThread runs a change the Source GUI observes (see GuiThread); null runs it directly.
+        /// warn, if given, is told of anything a replacement could not carry over.
         /// </summary>
-        public DataGroupItem CreateInScenario(RiverSystemScenario scenario, Action<Action> onUiThread = null)
+        public DataGroupItem CreateInScenario(RiverSystemScenario scenario, Action<Action> onUiThread = null,
+                                              Action<string> warn = null)
         {
-            return CreateIn(scenario.Network.DataManager, scenario.Network.InputSets, onUiThread);
+            return CreateIn(scenario.Network.DataManager, scenario.Network.InputSets, onUiThread, warn);
         }
 
-        internal DataGroupItem CreateIn(DataManager dm, IEnumerable<InputSet> inputSets, Action<Action> onUiThread = null)
+        internal DataGroupItem CreateIn(DataManager dm, IEnumerable<InputSet> inputSets, Action<Action> onUiThread = null,
+                                        Action<string> warn = null)
         {
             if (string.IsNullOrWhiteSpace(Name))
                 throw new ArgumentException("A data source needs a Name.");
@@ -64,7 +67,7 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects.DataSources
                            ?? dm.DataGroups.FirstOrDefault(g => g.Name == Name);
 
             return existing != null
-                ? ReplaceIn(dm, inputSets, existing, onUiThread)
+                ? ReplaceIn(dm, inputSets, existing, onUiThread, warn)
                 : AddTo(dm, inputSets, onUiThread);
         }
 
@@ -184,15 +187,21 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects.DataSources
         /// across. onUiThread is as for AddToScenario.
         /// </summary>
         public DataGroupItem ReplaceInScenario(RiverSystemScenario scenario, DataGroupItem existing,
-                                               Action<Action> onUiThread = null)
+                                               Action<Action> onUiThread = null, Action<string> warn = null)
         {
-            return ReplaceIn(scenario.Network.DataManager, scenario.Network.InputSets, existing, onUiThread);
+            return ReplaceIn(scenario.Network.DataManager, scenario.Network.InputSets, existing, onUiThread, warn);
         }
 
         internal DataGroupItem ReplaceIn(DataManager dm, IEnumerable<InputSet> inputSets, DataGroupItem existing,
-                                         Action<Action> onUiThread = null)
+                                         Action<Action> onUiThread = null, Action<string> warn = null)
         {
             var name = Name;
+            // Built under a temporary name, so that it does not clash with the one it replaces.
+            // A file named only by Name must still load from Name, not from the temporary name.
+            var filenames = Items?.Select(item => item.Filename).ToArray();
+            if (Items != null)
+                for (int i = 0; i < Items.Length; i++)
+                    Items[i].Filename = FilenameFor(i);
             Name = string.Format("TMP___{0}", name);
             DataGroupItem newItem;
             try
@@ -202,6 +211,9 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects.DataSources
             finally
             {
                 Name = name;
+                if (Items != null)
+                    for (int i = 0; i < Items.Length; i++)
+                        Items[i].Filename = filenames[i];
             }
 
             // The swap is one change on the UI thread, so the GUI never sees it half made.
@@ -210,10 +222,21 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects.DataSources
                 dm.DataGroups.Add(newItem);
                 foreach (var origDetail in existing.DataDetails)
                 {
-                    var destDetail = newItem.DataDetails.First(dd => dd.Name == origDetail.Name);
-                    foreach (var usage in origDetail.Usages)
+                    var destDetail = newItem.DataDetails.FirstOrDefault(dd => dd.Name == origDetail.Name);
+                    if (destDetail == null)
                     {
-                        destDetail.Usages.Add(usage);
+                        if (origDetail.Usages.Count > 0)
+                            warn?.Invoke(string.Format(
+                                "Data source '{0}' was replaced by one with no column '{1}': " +
+                                "{2} usage(s) of that column were dropped.",
+                                existing.Name, origDetail.Name, origDetail.Usages.Count));
+                    }
+                    else
+                    {
+                        foreach (var usage in origDetail.Usages)
+                        {
+                            destDetail.Usages.Add(usage);
+                        }
                     }
 
                     origDetail.Usages.Clear();
