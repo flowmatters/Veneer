@@ -224,6 +224,44 @@ namespace FlowMatters.Source.Veneer.Tests
             Assert.That(_dm.DataGroups, Is.Empty);
         }
 
+        // D: replacing a data source
+
+        [Test] public void AFileNamedOnlyByItsPathCanBeCreatedAgain()
+        {
+            // The replacement is built under a temporary name, which must not become its file.
+            var path = WriteCsv("inflows.csv", "A", "B");
+            FromFile(path).CreateIn(_dm, _inputSets, RunOnUiThread);
+            var again = FromFile(path).CreateIn(_dm, _inputSets, RunOnUiThread);
+
+            Assert.That(_dm.DataGroups, Is.EqualTo(new[] { again }));
+            Assert.That(FilenameOf(again), Is.EqualTo(path));
+            Assert.That(again.DataDetails.Select(d => d.Name), Is.EqualTo(new[] { "A", "B" }));
+        }
+
+        [Test] public void AReplacementTakesOverTheUsagesOfEachColumn()
+        {
+            var first = InMemory("flows", "A", "B").CreateIn(_dm, _inputSets, RunOnUiThread);
+            var usage = new DataUsage();
+            first.DataDetails.Single(d => d.Name == "A").Usages.Add(usage);
+
+            var second = InMemory("flows", "A", "B").CreateIn(_dm, _inputSets, RunOnUiThread);
+
+            Assert.That(second.DataDetails.Single(d => d.Name == "A").Usages, Is.EqualTo(new[] { usage }));
+            Assert.That(second.DataDetails.Single(d => d.Name == "B").Usages, Is.Empty);
+        }
+
+        [Test] public void AColumnTheReplacementLacksDropsItsUsagesWithAWarning()
+        {
+            var first = InMemory("flows", "A", "Gone").CreateIn(_dm, _inputSets, RunOnUiThread);
+            first.DataDetails.Single(d => d.Name == "Gone").Usages.Add(new DataUsage());
+            var warnings = new List<string>();
+
+            var second = InMemory("flows", "A").CreateIn(_dm, _inputSets, RunOnUiThread, warnings.Add);
+
+            Assert.That(_dm.DataGroups, Is.EqualTo(new[] { second }));
+            Assert.That(warnings, Has.Exactly(1).Contains("Gone"));
+        }
+
         [Test] public void AReplacementIsMadeOnTheUiThread()
         {
             InMemory("flows", "A", "B").AddTo(_dm, _inputSets, RunOnUiThread);
