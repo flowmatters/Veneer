@@ -81,6 +81,44 @@ namespace FlowMatters.Source.Veneer.Tests
             Assert.That(_changesOffUiThread, Is.Empty);
         }
 
+        // A1: built before it is added
+
+        [Test] public void ADataSourceJoinsTheDataManagerWithItsColumnsAlreadyLoaded()
+        {
+            var columnsWhenAdded = new List<int>();
+            _dm.DataGroups.CollectionChanged += (s, e) =>
+            {
+                if (e.Action == NotifyCollectionChangedAction.Add)
+                    columnsWhenAdded.AddRange(e.NewItems.Cast<DataGroupItem>().Select(g => g.DataDetails.Count));
+            };
+
+            InMemory("flows", "A", "B").AddTo(_dm, _inputSets, RunOnUiThread);
+
+            Assert.That(columnsWhenAdded, Is.EqualTo(new[] { 2 }));
+        }
+
+        [Test] public void OnlyTheAddingIsDoneOnTheUiThread()
+        {
+            // Loading a large file on the UI thread would freeze Source's interface.
+            // The columns are loaded before the group joins (see above), so the UI thread is
+            // asked once, for the adding alone.
+            int runs = 0;
+            InMemory("flows", "A", "B").AddTo(_dm, _inputSets, change => { runs++; RunOnUiThread(change); });
+            Assert.That(runs, Is.EqualTo(1));
+        }
+
+        [Test] public void AFileThatWillNotLoadLeavesNoDataSourceBehind()
+        {
+            var fromFile = new SimpleDataGroupItem
+            {
+                Name = @"C:\no\such\folder\flows.csv",
+                Items = new[] { new SimpleDataItem { InputSets = new[] { "Default Input Set" } } }
+            };
+
+            Assert.Catch((TestDelegate)(() => fromFile.AddTo(_dm, _inputSets, RunOnUiThread)));
+            Assert.That(_dm.DataGroups, Is.Empty);
+        }
+
         [Test] public void AReplacementIsMadeOnTheUiThread()
         {
             InMemory("flows", "A", "B").AddTo(_dm, _inputSets, RunOnUiThread);

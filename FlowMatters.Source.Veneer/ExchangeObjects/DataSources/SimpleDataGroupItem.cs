@@ -42,9 +42,12 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects.DataSources
 
         internal DataGroupItem AddTo(DataManager dm, IEnumerable<InputSet> inputSets, Action<Action> onUiThread = null)
         {
-            DataGroupItem result = null;
-            Directly(onUiThread)(() => result = Build(dm, inputSets));
-            return result;
+            // Built in full - its file loaded - before it joins the data manager: whatever
+            // observes the data manager sees a complete data source, a file that will not load
+            // leaves nothing behind, and only the adding itself needs the UI thread.
+            var dataGroup = Build(inputSets);
+            Directly(onUiThread)(() => dm.DataGroups.Add(dataGroup));
+            return dataGroup;
         }
 
         private static Action<Action> Directly(Action<Action> onUiThread)
@@ -52,7 +55,10 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects.DataSources
             return onUiThread ?? (action => action());
         }
 
-        private DataGroupItem Build(DataManager dm, IEnumerable<InputSet> inputSets)
+        /// <summary>
+        /// The data source this describes, loaded, but not yet in any data manager.
+        /// </summary>
+        private DataGroupItem Build(IEnumerable<InputSet> inputSets)
         {
             var asFile = Items.All(i => i.DetailsAsCSV == null);
             var dataGroupType = asFile
@@ -72,8 +78,6 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects.DataSources
 #if !BEFORE_V5
             dataGroup.DataDetailsMatchMethod = ReloadMatchesOnName ? DataDetailsMatchMethod.ByName : DataDetailsMatchMethod.ByPosition;
 #endif
-
-            dm.DataGroups.Add(dataGroup);
 
             if (Items == null)
                 return dataGroup;
@@ -139,14 +143,22 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects.DataSources
         internal DataGroupItem ReplaceIn(DataManager dm, IEnumerable<InputSet> inputSets, DataGroupItem existing,
                                          Action<Action> onUiThread = null)
         {
-            DataGroupItem newItem = null;
+            var name = Name;
+            Name = string.Format("TMP___{0}", name);
+            DataGroupItem newItem;
+            try
+            {
+                newItem = Build(inputSets);
+            }
+            finally
+            {
+                Name = name;
+            }
+
+            // The swap is one change on the UI thread, so the GUI never sees it half made.
             Directly(onUiThread)(() =>
             {
-                var name = Name;
-                Name = string.Format("TMP___{0}", name);
-
-                newItem = Build(dm, inputSets);
-
+                dm.DataGroups.Add(newItem);
                 foreach (var origDetail in existing.DataDetails)
                 {
                     var destDetail = newItem.DataDetails.First(dd => dd.Name == origDetail.Name);
@@ -157,7 +169,6 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects.DataSources
 
                     origDetail.Usages.Clear();
                 }
-                Name = name;
                 newItem.Name = name;
                 dm.RemoveGroup(existing);
                 dm.Refresh();
