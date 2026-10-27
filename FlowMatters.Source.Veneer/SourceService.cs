@@ -672,7 +672,10 @@ namespace FlowMatters.Source.WebServer
             var job = Scenario.Project.ResultManager.AllJobs.FirstOrDefault(j=>ListExtensions.FirstOrDefault(j.Runs,r=>r.RunNumber==id)!=null);
             if (job != null)
             {
-                Scenario.Project.ResultManager.RemoveJob(job);
+                // RemoveJob raises RunDeleted, and the GUI's Results Manager removes the run from
+                // its tree in response: a change to a WPF-bound collection, which must happen on
+                // the UI thread. See GuiThread.
+                OnGuiThread(() => Scenario.Project.ResultManager.RemoveJob(job));
             }
 #endif
         }
