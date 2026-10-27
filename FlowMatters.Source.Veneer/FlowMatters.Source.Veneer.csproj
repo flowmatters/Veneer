@@ -252,6 +252,7 @@
     <Compile Include="DomainActions\AddonLauncher.cs" />
     <Compile Include="DomainActions\AddonScript.cs" />
     <Compile Include="DomainActions\ShellLink.cs" />
+    <Compile Include="DomainActions\GuiThread.cs" />
     <Compile Include="DomainActions\InputSets.cs" />
     <Compile Include="DomainActions\ModelTabulator.cs" />
     <Compile Include="DomainActions\OneShotLifecycle.cs" />
@@ -300,6 +301,7 @@
     <Compile Include="Formatting\SchematicSvgBuilder.cs" />
     <Compile Include="Tests\SchematicSvgBuilderTests.cs" />
     <Compile Include="Tests\InputSetParameterSetLinkTests.cs" />
+    <Compile Include="Tests\GuiThreadTests.cs" />
     <Compile Include="Tests\AddonCommandLineTests.cs" />
     <Compile Include="Tests\AddonEnvironmentTests.cs" />
     <Compile Include="Tests\VeneerConfigurationResolverTests.cs" />
