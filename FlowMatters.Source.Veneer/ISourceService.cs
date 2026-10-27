@@ -185,12 +185,12 @@ namespace FlowMatters.Source.Veneer
         [OperationContract]
         [WebInvoke(Method = "POST", UriTemplate = UriTemplates.DataSources, RequestFormat = WebMessageFormat.Json, ResponseFormat = WebMessageFormat.Json)]
         [FaultContract(typeof(SimulationFault))]
-        void CreateDataSource(SimpleDataGroupItem newItem);
+        SimpleDataGroupItem CreateDataSource(SimpleDataGroupItem newItem);
 
         [OperationContract]
         [WebInvoke(Method = "PUT", UriTemplate = UriTemplates.DataSourceGroup, ResponseFormat = WebMessageFormat.Json)]
         [FaultContract(typeof(SimulationFault))]
-        void UpdateDataSource(string dataSourceGroup, SimpleDataGroupItem newItem);
+        SimpleDataGroupItem UpdateDataSource(string dataSourceGroup, SimpleDataGroupItem newItem);
 
         [OperationContract]
         [WebInvoke(Method = "DELETE", UriTemplate = UriTemplates.DataSourceGroup,

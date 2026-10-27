@@ -32,8 +32,45 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects.DataSources
         }
 
         /// <summary>
-        /// Create this data source in scenario. onUiThread runs a change the Source GUI observes
-        /// (see GuiThread); null runs it directly.
+        /// The name a data source called name is given: Source's DataManager.RestrictName, which
+        /// replaces '.', '@', '>', ',' and backslash with '_', cuts it to 200 characters and
+        /// trims it. The Source GUI renames every data source it shows that way, so applying it
+        /// here gives the same name with or without the GUI.
+        /// </summary>
+        public static string KeptName(string name)
+        {
+            return DataManager.RestrictName(name);
+        }
+
+        /// <summary>
+        /// Create this data source in scenario (POST /dataSources): replace the data source
+        /// already of its name if there is one, else add it. Returns the data source created.
+        /// onUiThread runs a change the Source GUI observes (see GuiThread); null runs it directly.
+        /// </summary>
+        public DataGroupItem CreateInScenario(RiverSystemScenario scenario, Action<Action> onUiThread = null)
+        {
+            return CreateIn(scenario.Network.DataManager, scenario.Network.InputSets, onUiThread);
+        }
+
+        internal DataGroupItem CreateIn(DataManager dm, IEnumerable<InputSet> inputSets, Action<Action> onUiThread = null)
+        {
+            if (string.IsNullOrWhiteSpace(Name))
+                throw new ArgumentException("A data source needs a Name.");
+
+            // A data source an older Veneer created under the name as given (on a command line,
+            // which keeps any name) is replaced too, by one named as Source keeps it.
+            var kept = KeptName(Name);
+            var existing = dm.DataGroups.FirstOrDefault(g => g.Name == kept)
+                           ?? dm.DataGroups.FirstOrDefault(g => g.Name == Name);
+
+            return existing != null
+                ? ReplaceIn(dm, inputSets, existing, onUiThread)
+                : AddTo(dm, inputSets, onUiThread);
+        }
+
+        /// <summary>
+        /// Add this data source to scenario, whatever else it holds. onUiThread is as for
+        /// CreateInScenario.
         /// </summary>
         public DataGroupItem AddToScenario(RiverSystemScenario scenario, Action<Action> onUiThread = null)
         {
@@ -75,7 +112,7 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects.DataSources
                 : typeof(GeneratedCentralDataSource);
 
             var dataGroup = DataGroupItem.CreateGroup(dataGroupType,inputSets);
-            dataGroup.Name = Name;
+            dataGroup.Name = KeptName(Name);
             if (asFile)
             {
                 // Each item may name its file. Clients that predate Filename send the file as
@@ -181,7 +218,7 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects.DataSources
 
                     origDetail.Usages.Clear();
                 }
-                newItem.Name = name;
+                newItem.Name = KeptName(name);
                 dm.RemoveGroup(existing);
                 dm.Refresh();
             });
