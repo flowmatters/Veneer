@@ -56,6 +56,15 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects.DataSources
         }
 
         /// <summary>
+        /// The file item i loads from: its Filename, or failing that the data source's Name.
+        /// </summary>
+        private string FilenameFor(int i)
+        {
+            var item = (Items != null && i < Items.Length) ? Items[i] : null;
+            return string.IsNullOrEmpty(item?.Filename) ? Name : item.Filename;
+        }
+
+        /// <summary>
         /// The data source this describes, loaded, but not yet in any data manager.
         /// </summary>
         private DataGroupItem Build(IEnumerable<InputSet> inputSets)
@@ -69,11 +78,14 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects.DataSources
             dataGroup.Name = Name;
             if (asFile)
             {
-                dataGroup.InputSetItems.ForEachItem(i =>
+                // Each item may name its file. Clients that predate Filename send the file as
+                // the data source's Name, so that is the fall-back.
+                var inputSetItems = dataGroup.InputSetItems.ToList();
+                for (int i = 0; i < inputSetItems.Count; i++)
                 {
-                    FileCentralDataSource ds = i.DataSource.SourceInformation as FileCentralDataSource;
-                    ds.Filename = Name;
-                });
+                    FileCentralDataSource ds = inputSetItems[i].DataSource.SourceInformation as FileCentralDataSource;
+                    ds.Filename = FilenameFor(i);
+                }
             }
 #if !BEFORE_V5
             dataGroup.DataDetailsMatchMethod = ReloadMatchesOnName ? DataDetailsMatchMethod.ByName : DataDetailsMatchMethod.ByPosition;

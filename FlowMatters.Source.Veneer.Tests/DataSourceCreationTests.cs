@@ -119,6 +119,62 @@ namespace FlowMatters.Source.Veneer.Tests
             Assert.That(_dm.DataGroups, Is.Empty);
         }
 
+        // B: a file data source's name and filename
+
+        private string _folder;
+
+        private string WriteCsv(string fileName, params string[] columns)
+        {
+            if (_folder == null)
+            {
+                _folder = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "veneer-tests-" + Guid.NewGuid().ToString("N"));
+                System.IO.Directory.CreateDirectory(_folder);
+            }
+            var path = System.IO.Path.Combine(_folder, fileName);
+            System.IO.File.WriteAllText(path,
+                "Date," + string.Join(",", columns) + "\n" +
+                "2000-01-01," + string.Join(",", columns.Select(c => "1")) + "\n" +
+                "2000-01-02," + string.Join(",", columns.Select(c => "2")) + "\n");
+            return path;
+        }
+
+        [TearDown] public void RemoveFiles()
+        {
+            if (_folder != null && System.IO.Directory.Exists(_folder))
+                System.IO.Directory.Delete(_folder, true);
+            _folder = null;
+        }
+
+        private static SimpleDataGroupItem FromFile(string name, string filename = null) => new SimpleDataGroupItem
+        {
+            Name = name,
+            Items = new[] { new SimpleDataItem { InputSets = new[] { "Default Input Set" }, Filename = filename } }
+        };
+
+        private static string FilenameOf(DataGroupItem group) =>
+            ((RiverSystem.DataManagement.DataManager.DataSources.FileCentralDataSource)
+                group.InputSetItems.Single().DataSource.SourceInformation).Filename;
+
+        [Test] public void AFileDataSourceCanBeNamedApartFromItsFile()
+        {
+            var path = WriteCsv("inflows.csv", "A", "B");
+            FromFile("inflow_series", path).AddTo(_dm, _inputSets, RunOnUiThread);
+
+            var group = Group("inflow_series");
+            Assert.That(FilenameOf(group), Is.EqualTo(path));
+            Assert.That(group.DataDetails.Select(d => d.Name), Is.EqualTo(new[] { "A", "B" }));
+        }
+
+        [Test] public void WithNoFilenameTheNameIsTheFile()
+        {
+            // As every client before Filename was honoured sends it.
+            var path = WriteCsv("inflows.csv", "A");
+            FromFile(path).AddTo(_dm, _inputSets, RunOnUiThread);
+
+            Assert.That(FilenameOf(_dm.DataGroups.Single()), Is.EqualTo(path));
+            Assert.That(_dm.DataGroups.Single().DataDetails.Select(d => d.Name), Is.EqualTo(new[] { "A" }));
+        }
+
         [Test] public void AReplacementIsMadeOnTheUiThread()
         {
             InMemory("flows", "A", "B").AddTo(_dm, _inputSets, RunOnUiThread);
