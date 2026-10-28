@@ -39,6 +39,8 @@ python compile_all.py -h
 import os
 import re
 import sys
+import json
+import struct
 import fnmatch
 import argparse
 import subprocess
@@ -439,6 +441,113 @@ def extract_build_errors(output_lines, max_lines=25):
 	tail = [l.strip() for l in output_lines if l.strip()]
 	return tail[-max_lines:]
 
+# --- Unsigned Source assemblies in an app's deps.json (CoreWCF builds) ---
+
+# The Source GUI's own dependency manifest, in the main Source directory.
+SOURCE_APP_DEPS = 'RiverSystem.Forms.deps.json'
+
+def has_strong_name(path):
+	"""Return True if the .NET assembly at `path` is strong named, False if it is not, and
+	None if it is not a .NET assembly (native DLL, or not a PE file at all).
+
+	Reads the CLI header's StrongNameSignature directory, which the compiler reserves whenever
+	the assembly carries a public key (fully, delay or publicly signed)."""
+	try:
+		with open(path, 'rb') as f:
+			data = f.read()
+		if data[:2] != b'MZ':
+			return None
+		pe = struct.unpack_from('<I', data, 0x3c)[0]
+		if data[pe:pe+4] != b'PE\0\0':
+			return None
+		num_sections = struct.unpack_from('<H', data, pe+6)[0]
+		opt_size = struct.unpack_from('<H', data, pe+20)[0]
+		opt = pe + 24
+		dirs = opt + (96 if struct.unpack_from('<H', data, opt)[0] == 0x10b else 112)   # PE32 : PE32+
+		if struct.unpack_from('<I', data, dirs-4)[0] <= 14:
+			return None
+		cli_rva = struct.unpack_from('<I', data, dirs + 14*8)[0]   # directory 14: CLI header
+		if not cli_rva:
+			return None
+		sections = opt + opt_size
+		for i in range(num_sections):
+			virtual_size, virtual_address, raw_size, raw_pointer = struct.unpack_from('<IIII', data, sections + i*40 + 8)
+			if virtual_address <= cli_rva < virtual_address + max(virtual_size, raw_size):
+				cli = cli_rva - virtual_address + raw_pointer
+				return struct.unpack_from('<II', data, cli + 32)[1] > 0   # StrongNameSignature size
+		return None
+	except (OSError, struct.error):
+		return None
+
+def deps_target(deps):
+	"""The runtime target's library map from a parsed .deps.json."""
+	return deps['targets'][deps['runtimeTarget']['name']]
+
+def unsigned_source_packages(source_dir):
+	"""File names of the unsigned NuGet-package assemblies Source ships, as listed in the
+	Source GUI's deps.json. Empty if Source has no such manifest."""
+	manifest = os.path.join(source_dir, SOURCE_APP_DEPS)
+	if not os.path.isfile(manifest):
+		return []
+	with open(manifest, encoding='utf-8-sig') as f:
+		deps = json.load(f)
+	names = set()
+	for key, library in deps_target(deps).items():
+		if deps['libraries'].get(key, {}).get('type') != 'package':
+			continue
+		for asset in (library.get('runtime') or {}):
+			name = os.path.basename(asset)
+			if has_strong_name(os.path.join(source_dir, name)) is False:
+				names.add(name)
+	return sorted(names, key=str.lower)
+
+def list_in_app_deps(deps_path, names):
+	"""Add `names` as runtime assets of the app's own project entry in `deps_path`, skipping
+	any file name the manifest already lists. Returns the names added."""
+	with open(deps_path, encoding='utf-8-sig') as f:
+		deps = json.load(f)
+	target = deps_target(deps)
+	app = os.path.basename(deps_path)[:-len('.deps.json')]
+	app_key = next((k for k in target if k.split('/')[0] == app
+		and deps['libraries'].get(k, {}).get('type') == 'project'), None)
+	if app_key is None:
+		logger.warning('No project entry for %s in %s; not listing Source assemblies' % (app, deps_path))
+		return []
+	listed = {os.path.basename(a).lower() for library in target.values() for a in (library.get('runtime') or {})}
+	added = [n for n in names if n.lower() not in listed]
+	if added:
+		runtime = target[app_key].setdefault('runtime', {})
+		for name in added:
+			runtime[name] = {}
+		with open(deps_path, 'w', encoding='utf-8') as f:
+			json.dump(deps, f, indent=2)
+	return added
+
+def list_unsigned_source_assemblies(version_dest, source_dir):
+	"""List Source's unsigned NuGet-package assemblies in the deps.json of each app (an .exe
+	with a .deps.json) in `version_dest`, as the Source GUI's own deps.json does.
+
+	A dependency listed in an app's deps.json is a trusted platform assembly, and .NET binds a
+	reference to a strong-named assembly to an unsigned trusted platform assembly of the same
+	name. It will not bind it to an unsigned copy loaded from elsewhere: that fails with "A
+	strongly-named assembly is required" (0x80131044). This matters when a plugin was compiled
+	against a signed build of a package that Source ships unsigned. The GUI loads such a plugin;
+	an app that only loads Source's assemblies from the Source directory does not.
+
+	Only the manifest changes: the files are not copied. Where Source's files sit beside the app
+	(as when veneer-py stages Source and Veneer together), the host finds them. Elsewhere the host
+	skips the missing entries and the app behaves as before."""
+	names = unsigned_source_packages(source_dir)
+	if not names:
+		return
+	for deps_path in glob(os.path.join(version_dest, '*.deps.json')):
+		if not os.path.isfile(deps_path[:-len('.deps.json')] + '.exe'):
+			continue
+		added = list_in_app_deps(deps_path, names)
+		if added:
+			logger.info('Listed %d unsigned Source assemblies in %s: %s' % (
+				len(added), os.path.basename(deps_path), ', '.join(added)))
+
 # --- Per-version build/harvest ---
 
 def build_version(branch_key, fullpath, version, custom, solution, effective_refpath,
@@ -561,6 +670,7 @@ def build_version(branch_key, fullpath, version, custom, solution, effective_ref
 		# deployment structure matches the legacy WCF layout.
 		if branch_key == 'corewcf':
 			flatten_subdirectory(version_dest, 'Veneer', ref_sizes=ref_sizes)
+			list_unsigned_source_assemblies(version_dest, main_ref_dir)
 
 		if custom and args.copy_to_source:
 			for artifact in [fn for fn in glob(effective_source + os.path.sep + "*")]:
