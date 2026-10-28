@@ -1068,7 +1068,7 @@ namespace FlowMatters.Source.Veneer
         public SimpleDataGroupItem CreateDataSource(SimpleDataGroupItem newItem)
         {
             return AsDataSourceFault(() =>
-                new SimpleDataGroupItem(newItem.CreateInScenario(Scenario, OnGuiThread,
+                new SimpleDataGroupItem(newItem.CreateInScenario(Scenario, ChangeDataGroups,
                                                                  warning => Log(warning, LogLevel.Warning)),
                                         summary: true));
         }
@@ -1115,6 +1115,22 @@ namespace FlowMatters.Source.Veneer
             GuiThread.Run(RunningInGUI, change);
         }
 
+        /// <summary>
+        /// Run a change to the scenario's data sources on the GUI's UI thread (see OnGuiThread),
+        /// then, if it removed any, rebuild the GUI's data sources panels, which would otherwise
+        /// keep entries for the removed data sources (see DataSourcesTree). VeneerCmd has no
+        /// panels, and none are looked for.
+        /// </summary>
+        private void ChangeDataGroups(Action change)
+        {
+            Action<string> warn = warning => Log(warning, LogLevel.Warning);
+            Action refresh = null;
+            if (RunningInGUI)
+                refresh = () => DataSourcesTree.RebindPanels(warn);
+            OnGuiThread(() => DataSourcesTree.ChangeThenRefreshIfRemoved(
+                Scenario.Network.DataManager, change, refresh, warn));
+        }
+
         public SimpleDataGroupItem UpdateDataSource(string dataSourceGroup, SimpleDataGroupItem newItem)
         {
             newItem.Name = dataSourceGroup;
@@ -1146,7 +1162,7 @@ namespace FlowMatters.Source.Veneer
                 ResourceNotFound();
                 return;
             }
-            AsDataSourceFault(() => OnGuiThread(() => dm.RemoveGroup(existing)));
+            AsDataSourceFault(() => ChangeDataGroups(() => dm.RemoveGroup(existing)));
         }
 
         public SimpleDataItem GetDataGroupItem(string dataSourceGroup,string inputSet)
