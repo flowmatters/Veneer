@@ -61,10 +61,11 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects.DataSources
                 throw new ArgumentException("A data source needs a Name.");
 
             // A data source an older Veneer created under the name as given (on a command line,
-            // which keeps any name) is replaced too, by one named as Source keeps it.
+            // which keeps any name) is replaced too, by one named as Source keeps it. Names match
+            // as Source matches them, regardless of case: its GUI refuses "Flows" beside "flows".
             var kept = KeptName(Name);
-            var existing = dm.DataGroups.FirstOrDefault(g => g.Name == kept)
-                           ?? dm.DataGroups.FirstOrDefault(g => g.Name == Name);
+            var existing = dm.DataGroups.FirstOrDefault(g => DataGroupItem.AreGroupNamesEqual(g.Name, kept))
+                           ?? dm.DataGroups.FirstOrDefault(g => DataGroupItem.AreGroupNamesEqual(g.Name, Name));
 
             return existing != null
                 ? ReplaceIn(dm, inputSets, existing, onUiThread, warn)
