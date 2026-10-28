@@ -43,6 +43,16 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects.DataSources
         }
 
         /// <summary>
+        /// Whether two data source names are the same to Source: regardless of case. Mirrors
+        /// DataGroupItem.AreGroupNamesEqual (string.Equals, CurrentCultureIgnoreCase), which Source
+        /// 4.x lacks; legacy_ci also builds for 4.x, so the rule is copied rather than called.
+        /// </summary>
+        internal static bool AreGroupNamesEqual(string name1, string name2)
+        {
+            return string.Equals(name1, name2, StringComparison.CurrentCultureIgnoreCase);
+        }
+
+        /// <summary>
         /// Create this data source in scenario (POST /dataSources): replace the data source
         /// already of its name if there is one, else add it. Returns the data source created.
         /// onUiThread runs a change the Source GUI observes (see GuiThread); null runs it directly.
@@ -61,10 +71,11 @@ namespace FlowMatters.Source.Veneer.ExchangeObjects.DataSources
                 throw new ArgumentException("A data source needs a Name.");
 
             // A data source an older Veneer created under the name as given (on a command line,
-            // which keeps any name) is replaced too, by one named as Source keeps it.
+            // which keeps any name) is replaced too, by one named as Source keeps it. Names match
+            // as Source matches them, regardless of case: its GUI refuses "Flows" beside "flows".
             var kept = KeptName(Name);
-            var existing = dm.DataGroups.FirstOrDefault(g => g.Name == kept)
-                           ?? dm.DataGroups.FirstOrDefault(g => g.Name == Name);
+            var existing = dm.DataGroups.FirstOrDefault(g => AreGroupNamesEqual(g.Name, kept))
+                           ?? dm.DataGroups.FirstOrDefault(g => AreGroupNamesEqual(g.Name, Name));
 
             return existing != null
                 ? ReplaceIn(dm, inputSets, existing, onUiThread, warn)

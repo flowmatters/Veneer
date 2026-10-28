@@ -218,6 +218,18 @@ namespace FlowMatters.Source.Veneer.Tests
             Assert.That(replacement.Name, Is.EqualTo("fire_tss"));
         }
 
+        [Test] public void ANameDifferingOnlyInCaseReplacesTheDataSource()
+        {
+            // Source treats data source names case-insensitively (DataGroupItem.AreGroupNamesEqual):
+            // its GUI refuses a second "Flows" beside "flows".
+            var lower = InMemory("flows", "A").CreateIn(_dm, _inputSets, RunOnUiThread);
+            var upper = InMemory("FLOWS", "A").CreateIn(_dm, _inputSets, RunOnUiThread);
+
+            Assert.That(_dm.DataGroups, Is.EqualTo(new[] { upper }));
+            Assert.That(upper, Is.Not.SameAs(lower));
+            Assert.That(upper.Name, Is.EqualTo("FLOWS"));
+        }
+
         [Test] public void ADataSourceNeedsAName()
         {
             Assert.Throws<ArgumentException>((TestDelegate)(() => InMemory(" ", "A").CreateIn(_dm, _inputSets, RunOnUiThread)));

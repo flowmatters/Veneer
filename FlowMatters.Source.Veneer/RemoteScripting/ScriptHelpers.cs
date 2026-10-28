@@ -76,7 +76,8 @@ namespace FlowMatters.Source.Veneer.RemoteScripting
             {
                 dm.RemoveUsage(ri);
 
-                var dataGroup = dm.DataGroups.Where(dg => dg.Name == dataGroupName).FirstOrDefault();
+                // Matched as Source matches data source names, regardless of case.
+                var dataGroup = dm.DataGroups.Where(dg => SimpleDataGroupItem.AreGroupNamesEqual(dg.Name, dataGroupName)).FirstOrDefault();
                 if (dataGroup == null)
                 {
                     dataGroup = DataGroupItem.CreateGroup<GeneratedCentralDataSource>(scenario.Network.DefaultInputSet);
