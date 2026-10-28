@@ -252,6 +252,7 @@
     <Compile Include="DomainActions\AddonLauncher.cs" />
     <Compile Include="DomainActions\AddonScript.cs" />
     <Compile Include="DomainActions\ShellLink.cs" />
+    <Compile Include="DomainActions\DataSourcesTree.cs" />
     <Compile Include="DomainActions\GuiThread.cs" />
     <Compile Include="DomainActions\InputSets.cs" />
     <Compile Include="DomainActions\ModelTabulator.cs" />
@@ -303,6 +304,7 @@
     <Compile Include="Tests\InputSetParameterSetLinkTests.cs" />
     <Compile Include="Tests\GuiThreadTests.cs" />
     <Compile Include="Tests\DataSourceCreationTests.cs" />
+    <Compile Include="Tests\DataSourcesTreeTests.cs" />
     <Compile Include="Tests\AddonCommandLineTests.cs" />
     <Compile Include="Tests\AddonEnvironmentTests.cs" />
     <Compile Include="Tests\VeneerConfigurationResolverTests.cs" />
