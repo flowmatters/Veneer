@@ -1,0 +1,98 @@
+<Project>
+  <!-- Import parent props if it exists -->
+  <!--<PropertyGroup>
+    <ParentProps>$([MSBuild]::GetPathOfFileAbove(Directory.Build.props, $(MSBuildThisFileDirectory)..))</ParentProps>
+  </PropertyGroup>
+  <Import Project="$(ParentProps)" Condition="'$(ParentProps)' != ''" />-->
+
+  <PropertyGroup>
+    <Company>Flow Matters</Company>
+    <Authors>$(Company)</Authors>
+    <Copyright>Copyright © $(Company) $([System.DateTime]::UtcNow.ToString("yyyy"))</Copyright>
+    <Product>FlowMatters.Source.Veneer</Product>
+    <AssemblyName Condition="$(AssemblyName) == ''">$(MSBuildProjectName)</AssemblyName>
+    <TargetFrameworkIdentifier>.NETCoreApp</TargetFrameworkIdentifier>
+
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+    <AppendPlatformToOutputPath>false</AppendPlatformToOutputPath>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+
+    <!-- Use a common output directory -->
+    <RootPath>$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)..\'))</RootPath>
+    <RootOutDir>$(RootPath)Output\</RootOutDir>
+    
+    <RestoreProjectStyle>PackageReference</RestoreProjectStyle>
+    <!-- Dynamic loading is required for plugins to copy references -->
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+
+    <UseVSHostingProcess>false</UseVSHostingProcess>
+
+    <!-- Treat warnings as errors except for specific ones -->
+    <!-- See additional entries added at the end of the file after importing other props files -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <NoWarn>$(NoWarn);1591;1587</NoWarn>
+      
+    <!-- This will be automatically set in Visual Studio and when using the dotnet cli with newer SDK versions.
+         It will not be set when building individual projects (using dotnet cli or msbuild) unless explicitly set. -->
+    <!-- TODO: Work out a better way so this works correctly with Cake and dotnet cli without additional properties being set. --> 
+    <SolutionDir Condition="'$(SolutionDir)' == ''">$(MSBuildThisFileDirectory)</SolutionDir>
+    <!-- Being built together with Source (SourceCommunityPlugins.sln) -->
+    <IsSourceBuild Condition="'$(IsSourceBuild)' == '' AND $(SolutionDir.StartsWith('$(RootPath)RiverSystem'))">true</IsSourceBuild>
+    <IsSourceBuild Condition="'$(IsSourceBuild)' == ''">false</IsSourceBuild>
+    <!-- Being built stand alone (targeting an existing Source release) (Veneer.sln) -->
+    <IsVeneerBuild Condition="'$(IsVeneerBuild)' == '' AND $(SolutionDir.StartsWith('$(RootPath)Veneer'))">true</IsVeneerBuild>
+    <IsVeneerBuild Condition="'$(IsVeneerBuild)' == '' AND '$(IsSourceBuild)' != 'true'">true</IsVeneerBuild>
+    <IsVeneerBuild Condition="'$(IsVeneerBuild)' == ''">false</IsVeneerBuild>
+
+    <!-- Use Source imports if they exist. -->
+    <!-- Should Source imports only be used for Source builds? -->
+    <UseSourceImports Condition="Exists('$(RootPath)RiverSystem\Solutions\SDK.build.props')">true</UseSourceImports>
+    <UseVeneerImports Condition="'$(UseSourceImports)' != 'true'">true</UseVeneerImports>
+  </PropertyGroup>
+
+  <!-- SourceCommunityPlugins.sln specific settings -->
+  <PropertyGroup Condition="'$(IsSourceBuild)' == 'true'">
+    <!-- Source builds have an additional TeamCity configuration -->
+    <Configurations>Debug;Release;TeamCity</Configurations>
+    <!-- And target 'Any CPU' and 'x86' (but do they really?) -->
+    <Platforms>AnyCPU;x86</Platforms>
+    <RuntimeIdentifiers>win-x64;win-x86</RuntimeIdentifiers>
+
+    <!-- Build to Source CommunityPlugins folder -->
+    <SharedOutDir>$(RootOutDir)Plugins\CommunityPlugins\Veneer</SharedOutDir>
+    <OutDir Condition="'$(OutDir)' == ''">$(SharedOutDir)</OutDir>
+  </PropertyGroup>
+
+  <!-- 'TeamCity' configuration settings are the same as 'Release' -->
+  <PropertyGroup Condition="'$(Configuration)' == 'TeamCity'">
+    <Optimize>true</Optimize>
+    <DefineTrace>true</DefineTrace>
+  </PropertyGroup>
+
+  <!-- Veneer.sln specific settings -->
+  <PropertyGroup Condition="'$(IsVeneerBuild)' == 'true'">
+    <Platforms>x64</Platforms>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+
+    <!-- Exclude EWater Pdb Path Map (shouldn't be needed anymore without NormalisePdbBuildRoot.targets being imported) -->
+    <ExcludeEWaterPdbPathMap>true</ExcludeEWaterPdbPathMap>
+
+    <!-- Build to a more convenient location -->
+    <SharedOutDir>$(RootOutDir)Veneer</SharedOutDir>
+    <OutDir Condition="'$(OutDir)' == ''">$(SharedOutDir)</OutDir>
+  </PropertyGroup> 
+
+  <!-- Import Source SDK.build.props -->
+  <Import Condition="'$(UseSourceImports)' == 'true'" Project="$(RootPath)RiverSystem\Solutions\SDK.build.props" />
+
+  <!-- Or import Veneer.props instead (e.g. when building against files from a Source release) -->
+  <Import Condition="'$(UseVeneerImports)' == 'true'" Project="Veneer.props" />
+
+  <PropertyGroup>
+    <!-- Veneer projects fail to build with TreatWarningAsErrors unless additional warnings are ignored -->
+    <!-- Set to true to see those errors -->
+    <StrictWarnings>false</StrictWarnings>
+    <NoWarn Condition="'$(StrictWarnings)' == 'false'">$(NoWarn);VSTHRD003;MSB4011;MSB3277;CS8981;CS1717;CS0219;CS0414;CS0642;CS0168;CS0169;CS9057;</NoWarn>
+  </PropertyGroup>
+</Project>

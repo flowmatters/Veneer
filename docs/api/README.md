@@ -18,6 +18,11 @@ mirror produced by [veneer-py](https://github.com/flowmatters/veneer-py)'s
 > [`VeneerStatus.cs`](../../FlowMatters.Source.Veneer/ExchangeObjects/VeneerStatus.cs)
 > whenever the API surface changes.
 
+> **Source versions.** These pages also describe Veneer's 5.x legacy line, the Veneer built for
+> Source 5.x and 4.x. Where a page states behaviour for particular Source versions, the rest
+> were not checked. For recorder sets, the earliest Source checked is 5.16. Source 4.x has no
+> constant for the Current Recorder Tree's name, and was not run.
+
 ## How to read these docs
 
 1. Start with **[overview.md](overview.md)** — base URL, JSON conventions, the error model,
@@ -39,8 +44,8 @@ mirror produced by [veneer-py](https://github.com/flowmatters/veneer-py)'s
 | [server-and-lifecycle.md](server-and-lifecycle.md) | `GET /`, `GET /ping`, `POST /shutdown`, `POST /scenario/{scenario}` |
 | [network.md](network.md) | `GET /network`, `/network/geographic`, `schematic.svg` (+`/tags`), nodes & links |
 | [runs-and-results.md](runs-and-results.md) | Triggering, listing, deleting runs; run status & cancel; time series, aggregated & tabulated results |
-| [functions-and-variables.md](functions-and-variables.md) | `/functions`, `/variables` (incl. `TimeSeries` and `Piecewise`) |
-| [input-sets.md](input-sets.md) | `/inputSets` family, applying an input set, `PUT /recorders` |
+| [functions-and-variables.md](functions-and-variables.md) | `/functions`, `POST /functions/evaluate`, `/variables` (incl. `TimeSeries` and `Piecewise`) |
+| [input-sets.md](input-sets.md) | `/inputSets` family, applying an input set, `PUT /recorders`, `GET /recorderSets` |
 | [data-sources.md](data-sources.md) | `/dataSources` CRUD, items and details, `__all__` matching |
 | [tables-and-config.md](tables-and-config.md) | `/tables`, `/configuration/{element}`, `PUT /projection`, `/doc`, `/resources` |
 | [scripting.md](scripting.md) | `POST /ironpython` and `POST /custom/{action}` (server-side IronPython) |
@@ -77,6 +82,7 @@ live. See [network.md](network.md#not-implemented).)
 | `GET` | `…/variable/{v}/tabulated/{functions}` | [runs-and-results](runs-and-results.md) |
 | `GET` | `/functions` | [functions-and-variables](functions-and-variables.md) |
 | `PUT` | `/functions/{functionName}` | [functions-and-variables](functions-and-variables.md) |
+| `POST` | `/functions/evaluate` | [functions-and-variables](functions-and-variables.md) |
 | `GET` | `/variables` | [functions-and-variables](functions-and-variables.md) |
 | `GET` | `/variables/{variableName}` | [functions-and-variables](functions-and-variables.md) |
 | `GET` | `/variables/{variableName}/TimeSeries` | [functions-and-variables](functions-and-variables.md) |
@@ -88,6 +94,7 @@ live. See [network.md](network.md#not-implemented).)
 | `PUT` | `/inputSets/{inputSetName}` | [input-sets](input-sets.md) |
 | `POST` | `/inputSets/{inputSetName}/{action}` | [input-sets](input-sets.md) |
 | `PUT` | `/recorders` | [input-sets](input-sets.md) |
+| `GET` | `/recorderSets` | [input-sets](input-sets.md) |
 | `GET` | `/dataSources` | [data-sources](data-sources.md) |
 | `POST` | `/dataSources` | [data-sources](data-sources.md) |
 | `GET` | `/dataSources/{dataSourceGroup}` | [data-sources](data-sources.md) |

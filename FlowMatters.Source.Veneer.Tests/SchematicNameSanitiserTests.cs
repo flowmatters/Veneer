@@ -1,6 +1,4 @@
-using System.Collections.Generic;
 using FlowMatters.Source.Veneer.Formatting;
-using NUnit.Framework;
 
 namespace FlowMatters.Source.Veneer.Tests
 {
@@ -8,15 +6,15 @@ namespace FlowMatters.Source.Veneer.Tests
     public class SchematicNameSanitiserTests
     {
         [TestCase("Storage @ Site #3", "storage_site_3")]
-        [TestCase("Link  -- 5",        "link_5")]
-        [TestCase("Burrendong Dam",    "burrendong_dam")]
-        [TestCase("  ALL CAPS  ",      "all_caps")]
+        [TestCase("Link  -- 5", "link_5")]
+        [TestCase("Burrendong Dam", "burrendong_dam")]
+        [TestCase("  ALL CAPS  ", "all_caps")]
         [TestCase("__leading-trailing__", "leading_trailing")]
         [TestCase("Already_snake_case", "already_snake_case")]
-        [TestCase("123Start",          "123start")]
-        [TestCase("",                  "")]
-        [TestCase("---",               "")]
-        [TestCase("café",              "caf")]
+        [TestCase("123Start", "123start")]
+        [TestCase("", "")]
+        [TestCase("---", "")]
+        [TestCase("café", "caf")]
         public void Sanitise_ProducesExpectedOutput(string input, string expected)
         {
             Assert.That(SchematicNameSanitiser.Sanitise(input), Is.EqualTo(expected));

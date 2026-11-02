@@ -1,0 +1,25 @@
+﻿<Project>
+  <!-- Settings from RiverSystem\Solutions\SDK.build.targets -->
+  <!-- Used when SDK.build.targets doesn't exist (e.g. when building against files from a Source release) -->
+  <Choose>
+    <When Condition="'$(NETCoreSdkVersion)' != '' AND $([MSBuild]::VersionGreaterThanOrEquals('$(NETCoreSdkVersion)', '7.0'))">
+      <PropertyGroup>
+        <GenerateResourceUsePreserializedResources>true</GenerateResourceUsePreserializedResources>
+      </PropertyGroup>
+      <ItemGroup>
+        <PackageReference Include="System.Resources.Extensions" />
+      </ItemGroup>
+    </When>
+  </Choose>
+
+  <Target Name="RemoveMsCoverageFiles" AfterTargets="AfterBuild">
+    <ItemGroup>
+      <!-- OutDir, not OutputPath: Directory.Build.props sets OutDir directly, and OutputPath
+           does not follow it (it stays at bin\$(Configuration)\), so these globs would clean
+           a directory nothing is ever written to. -->
+      <MsCoverageFilesToDelete Include="$(OutDir)*.msCoverageSourceRootsMapping_*" />
+      <MsCoverageFilesToDelete Include="$(OutDir)CoverletSourceRootsMapping_*" />
+    </ItemGroup>
+    <Delete Files="@(MsCoverageFilesToDelete)" ContinueOnError="true"/>
+  </Target>
+</Project>

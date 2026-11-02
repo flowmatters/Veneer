@@ -92,14 +92,14 @@ namespace FlowMatters.Source.Veneer
         [WebInvoke(Method = "GET", ResponseFormat = WebMessageFormat.Json, UriTemplate = UriTemplates.TimeSeries)]
         TimeSeriesResponse GetTimeSeries(string runId, string networkElement, string recordingElement,
                                                 string variable, string fromDate, string toDate, string precision,
-                                                string aggregation, string aggfn);
+                                                string content, string aggregation, string aggfn);
 
         [OperationContract]
         [WebInvoke(Method = "GET", ResponseFormat = WebMessageFormat.Json,
                    UriTemplate = UriTemplates.AggregatedTimeSeries)]
         TimeSeriesResponse GetAggregatedTimeSeries(string runId, string networkElement, string recordingElement,
                                                    string variable, string aggregation, string fromDate, string toDate,
-                                                   string precision);
+                                                   string precision, string content);
 
         [OperationContract]
         [WebInvoke(Method = "GET", ResponseFormat = WebMessageFormat.Json, UriTemplate = UriTemplates.TabulatedResults)]
@@ -113,6 +113,11 @@ namespace FlowMatters.Source.Veneer
         [OperationContract]
         [WebInvoke(Method = "GET", UriTemplate = "/functions", ResponseFormat = WebMessageFormat.Json)]
         FunctionValue[] GetFunctionList();
+
+        [OperationContract]
+        [WebInvoke(Method = "POST", UriTemplate = "/functions/evaluate", RequestFormat = WebMessageFormat.Json, ResponseFormat = WebMessageFormat.Json)]
+        [FaultContract(typeof(SimulationFault))]
+        EvaluateResponse EvaluateFunctions(EvaluateRequest request);
 
         [OperationContract]
         [WebInvoke(Method = "GET", UriTemplate = "/variables", ResponseFormat = WebMessageFormat.Json)]
@@ -162,6 +167,10 @@ namespace FlowMatters.Source.Veneer
         void RunInputSet(string inputSetName, string action);
 
         [OperationContract]
+        [WebInvoke(Method = "GET", UriTemplate = UriTemplates.RecorderSets, ResponseFormat = WebMessageFormat.Json)]
+        RecorderSetsSummary GetRecorderSets();
+
+        [OperationContract]
         [WebInvoke(Method = "PUT", UriTemplate = "/recorders", RequestFormat = WebMessageFormat.Json)]
         void UpdateRecorders(RecordingInstructions ri);
 
@@ -174,16 +183,19 @@ namespace FlowMatters.Source.Veneer
         SimpleDataGroupItem GetDataSource(string dataSourceGroup);
 
         [OperationContract]
-        [WebInvoke(Method = "POST", UriTemplate = UriTemplates.DataSources, RequestFormat = WebMessageFormat.Json)]
-        void CreateDataSource(SimpleDataGroupItem newItem);
+        [WebInvoke(Method = "POST", UriTemplate = UriTemplates.DataSources, RequestFormat = WebMessageFormat.Json, ResponseFormat = WebMessageFormat.Json)]
+        [FaultContract(typeof(SimulationFault))]
+        SimpleDataGroupItem CreateDataSource(SimpleDataGroupItem newItem);
 
         [OperationContract]
         [WebInvoke(Method = "PUT", UriTemplate = UriTemplates.DataSourceGroup, ResponseFormat = WebMessageFormat.Json)]
-        void UpdateDataSource(string dataSourceGroup, SimpleDataGroupItem newItem);
+        [FaultContract(typeof(SimulationFault))]
+        SimpleDataGroupItem UpdateDataSource(string dataSourceGroup, SimpleDataGroupItem newItem);
 
         [OperationContract]
         [WebInvoke(Method = "DELETE", UriTemplate = UriTemplates.DataSourceGroup,
                    ResponseFormat = WebMessageFormat.Json)]
+        [FaultContract(typeof(SimulationFault))]
         void DeleteDataSource(string dataSourceGroup);
 
         [OperationContract]

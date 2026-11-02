@@ -1,0 +1,10 @@
+﻿<Project>
+  <!-- Settings from RiverSystem\Solutions\SDK.build.props -->
+  <!-- Used when SDK.build.props doesn't exist (e.g. when building against files from a Source release) -->
+  <PropertyGroup>
+    <EnableUnsafeBinaryFormatterSerialization>true</EnableUnsafeBinaryFormatterSerialization>
+  </PropertyGroup>
+  <ItemGroup>
+    <RuntimeHostConfigurationOption Include="System.Globalization.UseNls" Value="true" />
+  </ItemGroup>
+</Project>

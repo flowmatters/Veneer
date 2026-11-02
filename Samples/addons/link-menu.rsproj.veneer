@@ -1,0 +1,7 @@
+{
+  "addons": [
+    { "name": "Project wiki",    "type": "url", "url": "https://wiki.example.org/catchment", "menu": "Help" },
+    { "name": "Veneer API root", "type": "url", "url": "http://localhost:%VENEER_PORT%/",    "menu": "Help" },
+    { "name": "Email support",   "type": "url", "url": "mailto:support@example.org",         "menu": "Help" }
+  ]
+}

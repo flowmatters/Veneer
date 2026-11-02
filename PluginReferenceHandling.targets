@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <!--
+    PluginReferenceHandling.targets
+    - Unmarks references that already exist in the base app output so they are not copied when possible
+    - As a reliable fallback, deletes duplicate files from the plugin output folder after CopyFilesToOutputDirectory
+    Usage: either import the .targets at the end of your plugin .csproj or add to Directory.Build.targets
+  -->
+
+  <PropertyGroup>
+    <!-- Make sure properties are defined -->
+    <RootPath Condition="$(RootPath) == ''">$(MSBuildThisFileDirectory)..\</RootPath>
+    <RootOutDir Condition="$(RootOutDir) == ''">$(RootPath)Output\</RootOutDir>
+    <_PluginOutDir>$([MSBuild]::NormalizePath('$(TargetDir)'))</_PluginOutDir>
+    <_RootOutDir>$([MSBuild]::NormalizePath('$(RootOutDir)'))</_RootOutDir>
+
+    <!-- Properties for controlling duplicate handling Targets -->
+    <!-- RemoveDuplicatesAfterBuild is a fall-back target only needed when ExcludeReferencesInRootOutDir isn't working  -->
+    <RemoveDuplicatesAfterBuild Condition="'$(RemoveDuplicatesAfterBuild)' == ''">false</RemoveDuplicatesAfterBuild>
+    <ExcludeDuplicates Condition="'$(ExcludeDuplicates)' == ''">true</ExcludeDuplicates>
+
+    <!-- Allow unit test duplicates to enable testing in Visual Studio. -->
+    <!-- TODO: Get list of files from NuGet packages instead. -->
+    <!-- TODO: Don't build tests to the same output folders as program files. -->
+    <!-- <AllowedDuplicates>
+      nunit*.*;
+      testhost*.*;
+      testcentric.engine.metadata.dll;
+      Microsoft*TestPlatform*.*
+    </AllowedDuplicates> -->
+
+    <AllowedDuplicates>
+      Microsoft.TestPlatform.CoreUtilities.dll;
+      Microsoft.TestPlatform.PlatformAbstractions.dll;
+      Microsoft.VisualStudio.TestPlatform.ObjectModel.dll;
+      Microsoft.TestPlatform.CommunicationUtilities.dll;
+      Microsoft.TestPlatform.CrossPlatEngine.dll;
+      Microsoft.TestPlatform.Utilities.dll;
+      Microsoft.VisualStudio.TestPlatform.Common.dll;
+      nunit.engine.dll;
+      nunit.engine.api.dll;
+      nunit.engine.core.dll;
+      nunit.framework.dll;
+      nunit.framework.legacy.dll;
+      NUnit3.TestAdapter.dll;
+      NUnit3.TestAdapter.exe;
+      testcentric.engine.metadata.dll;
+      testhost.dll;
+      testhost.exe;
+    </AllowedDuplicates>
+
+    <PrepareForRunDependsOn>
+      ExcludeReferencesInRootOutDir;
+      $(PrepareForRunDependsOn)
+    </PrepareForRunDependsOn>
+  </PropertyGroup>
+
+  <ItemDefinitionGroup>
+    <_AllowedCopyLocalFiles>
+      <DestinationSubPath />
+    </_AllowedCopyLocalFiles>
+
+    <_AllowedCopyLocalPaths>
+      <DestinationSubPath />
+      <DestinationSubDirectory />
+    </_AllowedCopyLocalPaths>
+  </ItemDefinitionGroup>
+
+  <ItemGroup>
+    <!-- AllowedDuplicates is a property, so it must be dereferenced with $(), not @().
+         Item syntax on a property yields nothing at all, silently.
+
+         Test projects only. These are test-host assemblies that a test project needs beside
+         itself even though the base app also has them; a plugin or executable that ships must
+         not carry them. The distinction only started to matter once the two bugs above were
+         fixed, because until then this list was always empty. -->
+    <_AllowedCopyLocalFiles Condition="'$(IsTestProject)' == 'true'"
+                            Include="$(AllowedDuplicates)" DestinationSubPath="%(Identity)" />
+  </ItemGroup>
+
+  <!-- Try to prevent copy by marking matching resolved references Private=false -->
+  <Target Name="ExcludeReferencesInRootOutDir" Condition="'$(ExcludeDuplicates)' == 'true'">
+    <!-- Exclude only ever compares ItemSpec, and ReferenceCopyLocalPaths ItemSpecs are source
+         paths (usually in the NuGet cache), so an allow-list expressed as destination paths can
+         never match one. Test membership against the destination path instead. Both sides are
+         lowercased because String.Contains is ordinal. -->
+    <PropertyGroup>
+      <_AllowedDuplicateList>;@(_AllowedCopyLocalFiles->'%(DestinationSubPath)');</_AllowedDuplicateList>
+      <_AllowedDuplicateList>$(_AllowedDuplicateList.ToLowerInvariant())</_AllowedDuplicateList>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <!-- Make sure all ReferenceCopyLocalPaths have a DestinationSubDirectory -->
+      <ReferenceCopyLocalPaths
+          Update="@(ReferenceCopyLocalPaths)"
+          Condition="'%(ReferenceCopyLocalPaths.DestinationSubDirectory)' == ''"
+          DestinationSubDirectory=""/>
+      <!-- Make sure all ReferenceCopyLocalPaths have a DestinationSubPath -->
+      <ReferenceCopyLocalPaths
+          Update="@(ReferenceCopyLocalPaths)"
+          Condition="'%(ReferenceCopyLocalPaths.DestinationSubPath)' == ''"
+          DestinationSubPath="%(ReferenceCopyLocalPaths.DestinationSubDirectory)%(ReferenceCopyLocalPaths.FileName)%(ReferenceCopyLocalPaths.Extension)" />
+      <_ReferenceCopyLocalPathsExclusions
+          Include="@(ReferenceCopyLocalPaths)"
+          Condition="Exists('$(_RootOutDir)%(ReferenceCopyLocalPaths.DestinationSubPath)') AND !$(_AllowedDuplicateList.Contains($([System.String]::Copy(';%(ReferenceCopyLocalPaths.DestinationSubPath);').ToLowerInvariant())))" />
+      <_ReferenceCopyLocalPathsWithoutExclusions Include="@(ReferenceCopyLocalPaths)" Exclude="@(_ReferenceCopyLocalPathsExclusions)" />
+    </ItemGroup>
+
+    <!-- Replace ReferenceCopyLocalPaths with the filtered lists.
+         We must first remove all and then include the filter list rather than just
+         remove the exclusions, since removal is based only on ItemSpec and duplicate
+         ItemSpecs may exist with different metadata (eg: HintPath) -->
+    <ItemGroup>
+      <ReferenceCopyLocalPaths Remove="@(ReferenceCopyLocalPaths)" />
+      <ReferenceCopyLocalPaths Include="@(_ReferenceCopyLocalPathsWithoutExclusions)" />
+    </ItemGroup>
+
+    <Message Text="References present in $(_RootOutDir) excluded from copying:%0D%0A@(_ReferenceCopyLocalPathsExclusions, '%0D%0A')" Importance="Normal" />
+    <!-- <Message Text="References to be copied:%0D%0A@(_ReferenceCopyLocalPathsWithoutExclusions, '%0D%0A')" Importance="Normal" /> -->
+  </Target>
+
+  <!-- Fallback: remove duplicates copied to the plugin output folder -->
+  <Target Name="RemoveDuplicateFilesFromPluginOutput" AfterTargets="CopyFilesToOutputDirectory" Condition="'$(RemoveDuplicatesAfterBuild)' == 'true'">
+    <ItemGroup>
+      <_AllowedCopyLocalPaths Include="@(_AllowedCopyLocalFiles->'$(TargetDir)%(DestinationSubPath)')" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <!-- all files in plugin output -->
+      <_PluginFiles Include="$(_PluginOutDir)**\*.*"
+                    Exclude="@(_AllowedCopyLocalPaths)" />
+      <!-- Keep only those that also exist in the base app output AT THE SAME RELATIVE PATH.
+           %(RecursiveDir) is essential: matching on file name alone would treat
+           runtimes\win-x64\native\Foo.dll as a duplicate of a top-level Foo.dll and delete
+           native assets and satellite resources that have no counterpart in the base output. -->
+      <_Duplicates Include="@(_PluginFiles)" Condition="Exists('$(_RootOutDir)%(RecursiveDir)%(Filename)%(Extension)')" />
+    </ItemGroup>
+
+    <!-- <Message Text="Plugin files in plugin output:%0D%0A@(_PluginFiles, '%0D%0A')" Importance="Normal" Condition=" '@(_PluginFiles)' != '' " /> -->
+    <!-- <Message Text="Excluded duplicates:%0D%0A@(_AllowedCopyLocalPaths, '%0D%0A')" Importance="Normal" Condition=" '@(_AllowedCopyLocalPaths)' != '' " /> -->
+    <Message Text="Deleting duplicate files from plugin output:%0D%0A@(_Duplicates, '%0D%0A')" Importance="Normal" Condition=" '@(_Duplicates)' != '' " />
+
+    <Delete Files="@(_Duplicates)" ContinueOnError="false" />
+
+    <ItemGroup>
+      <_AllowedCopyLocalPaths Remove="@(_AllowedCopyLocalPaths)" />
+    </ItemGroup>
+  </Target>
+</Project>

@@ -1,0 +1,193 @@
+# Addon launch modes
+
+A `.veneer` file sits beside a Source project as `<project>.rsproj.veneer` and
+registers entries in Source's menu bar. This directory has worked examples of the
+three launch modes.
+
+## `type: "exe"` — run a program
+
+```json
+{
+  "name": "Calibrate",
+  "type": "exe",
+  "path": "tools/calib.exe",
+  "args": ["--port", "%VENEER_PORT%", "--out", "results 2026"],
+  "env": { "RUN_LABEL": "nightly" },
+  "workingDirectory": "tools",
+  "menu": "Veneer|Calibration"
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `path` | program to run, relative to the project directory unless rooted |
+| `args` | array of arguments. Veneer quotes each one, so write them as the program should receive them — do not add your own quotes |
+| `env` | environment variables for the child process |
+| `workingDirectory` | relative to the project directory; defaults to it |
+
+`args` is an array only. There is no single-string command-line form — use
+`type: "script"` with one line if you need to hand a raw command line to a shell.
+
+A `.bat` or `.cmd` target still works and now accepts `args` too. It runs via
+`cmd.exe /D /V:OFF /C`, which matters for the limitations below.
+
+## `type: "script"` — run several commands
+
+```json
+{
+  "name": "Nightly run",
+  "type": "script",
+  "env": { "RUN_LABEL": "nightly" },
+  "script": [
+    "cd %VENEER_PROJECT_DIR%",
+    "python calibrate.py --run %RUN_LABEL%",
+    "python report.py"
+  ]
+}
+```
+
+The lines run in **one `cmd.exe` session**, fed over its standard input. Nothing
+is written to disk, so a locked-down temp directory cannot block it. Because it is
+a single session, `set`, `cd`, `&&` and `%VAR%` all persist from one line to the
+next.
+
+Execution **stops at the first line that fails** (non-zero exit). This is not
+configurable. The failing line number is reported in the log.
+
+`path` and `script` are mutually exclusive; an entry with both is rejected.
+
+## `type: "url"` — open a link
+
+```json
+{
+  "name": "Project wiki",
+  "type": "url",
+  "url": "https://wiki.example.org/catchment",
+  "menu": "Help"
+}
+```
+
+See `link-menu.rsproj.veneer` for a menu of three links.
+
+The URL must begin with `http://`, `https://` or `mailto:`. Anything else is
+rejected and the item is greyed out.
+
+`file://` is **deliberately excluded**: it would admit
+`file://server/share/tool.exe`, and without it `type: "url"` cannot launch a
+local program by any spelling. For a document on a network share, serve it over
+HTTP or ship an `exe` addon.
+
+**The scheme must be written literally.** `https://%HOST%/help` is fine — a
+variable may appear anywhere after the scheme — but `%HELP_URL%` is rejected,
+because entries are validated when the menu is built, before anything is
+expanded.
+
+`path`, `script` and `url` are mutually exclusive; use exactly one.
+
+Unlike the other two modes this does **not** open the Veneer panel — a link
+produces no output to route there. It also does not need the server running,
+unless of course the link points at it.
+
+## Injected variables
+
+Available in `path`, `args`, `workingDirectory`, `url`, `env` values and script lines:
+
+| Variable | Value |
+|---|---|
+| `VENEER_PORT` | the configured port. **Not** a promise the server is listening — it is set whether or not the server is running, so handle connection failure yourself |
+| `VENEER_PROJECT_DIR` | the project directory |
+| `VENEER_PROJECT_FILE` | full path to the `.rsproj` |
+
+Your own `env` entries win over these. They cannot reference each other — one
+`env` value referring to another `env` value is left unexpanded, because the
+result would depend on JSON key order.
+
+An unknown `%VAR%` is left as literal text rather than blanked, so a typo is
+visible in the log instead of silently producing a truncated argument.
+
+## Limitations of `type: "script"`
+
+Feeding commands to `cmd.exe` over stdin is not identical to running a `.bat`
+file. Three differences matter:
+
+- **A command that reads stdin will consume the rest of your script.** `pause`,
+  an interactive CLI, `more`, `sort` with no input file — any of these read from
+  the same pipe the remaining lines arrive on. If such a command then waits for
+  input that never comes, the addon never finishes. This is the most likely
+  problem in practice.
+- **`goto` and labels do not work, and fail silently.** `goto :skip` does not
+  jump, nothing is printed, and `:skip` is ignored. There is no diagnostic at all.
+- **`for` loops take a single `%`**, not the `%%` used in batch files. The `%%i`
+  form silently does nothing.
+
+If you need any of these, ship a `.bat` and use `type: "exe"` — which now takes
+`args`, so it is no longer a dead end. Note the escape hatch is itself
+shell-dependent: a `.bat` target still routes through `cmd.exe`, so it does not
+help in a deployment where `cmd.exe` is blocked outright. There, invoke a real
+executable directly.
+
+## Output
+
+No console window appears. Output goes to the **Veneer log** in the Web Server
+Monitoring panel, which is raised on every launch.
+
+Veneer's own lifecycle lines are visible there by default: `Launching '<name>'...`
+and `Addon '<name>' finished` at `Info`, and failures at `Error`. The panel's
+default minimum Log Level is `Info`, so you do not have to change it to see that
+a click was acknowledged and how it ended.
+
+The addon's **own** output is a different matter. Its standard output is written
+at `Debug` and so is hidden until you lower the Log Level dropdown; its standard
+error is written at `Warning`. Errors also go to Source's own log, where they
+survive the panel being closed.
+
+In script mode the log reads as a transcript: each command followed by its
+output. The command echo shows the line **before** `%VAR%` expansion, so you will
+see `cd %VENEER_PROJECT_DIR%` rather than the resolved path.
+
+## Diagnosing a menu item that does nothing
+
+An entry that is greyed out has a tooltip explaining why. Most causes are also
+written to Source's log, though not all alike: a scenario-filter mismatch is
+logged every time the menu is opened, while the configuration errors are
+de-duplicated and logged once per distinct problem until the project changes.
+The *already running* case is deliberately silent — see that entry. Causes:
+
+- a scenario filter that does not match the active scenario
+- an unrecognised `type`
+- more than one of `path`, `script` and `url` present
+- `type: "script"` with no lines
+- `type: "url"` with no `url`
+- a `url` outside the `http://` / `https://` / `mailto:` allowlist
+- a `url` on an entry whose `type` is not `"url"`
+- none of `path`, `script` or `url` — there is nothing to launch
+- an instance is **already running**. The item reads `<name> (running)` and stays
+  disabled until that instance exits; reopen the menu to pick up the change. Set
+  `"allowMultiple": true` on the addon if running several at once is safe. This
+  one is not written to the log at all: it is not a problem, and the menu is
+  rebuilt every time the dropdown opens, so a log line would repeat endlessly.
+
+## A personal `global.veneer` alongside a shared model
+
+Put this at `%USERPROFILE%\.veneer\global.veneer` and it applies to every project
+you open, without touching any repository:
+
+```json
+{
+  "addons": [
+    { "name": "My calibration", "type": "exe",
+      "path": "%VENEER_CONFIG_DIR%/tools/calibrate.bat", "menu": "My Tools" },
+    { "name": "Team wiki", "type": "url",
+      "url": "https://wiki.example.org/models", "menu": "My Tools" }
+  ],
+  "options": { "defaultPort": 9877 }
+}
+```
+
+`%VENEER_CONFIG_DIR%` is used for `path` because relative paths resolve against
+the *project* directory, which is not where a personal tool lives.
+
+To supply machine-specific paths to a model whose `.veneer` file is committed,
+name the file for the project — `%USERPROFILE%\.veneer\ExampleProject.rsproj.veneer` —
+and give it an `env` block. The sidecar keeps providing the addons; your file
+provides the paths they use.

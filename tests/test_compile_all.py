@@ -173,3 +173,137 @@ def test_extract_build_errors_fallback_to_tail_when_no_diagnostics():
 	out = compile_all.extract_build_errors(lines, max_lines=2)
 	# no coded diagnostics -> last 2 non-empty lines
 	assert out == ["Segmentation fault", "make: *** [all] Error 1"]
+
+def test_report_results_failure_returns_nonzero_and_records_fails(tmp_path):
+	fails_fn = tmp_path / '_last_fails.txt'
+	code = compile_all.report_results({'6.0.0': 1, '5.60.0': 0, '6.2.0': 1},
+		{'6.0.0': ['error X']}, str(fails_fn))
+	assert code != 0
+	assert fails_fn.read_text().splitlines() == ['6.0.0', '6.2.0']
+
+def test_report_results_all_success_returns_zero_and_clears_stale_fails(tmp_path):
+	# A retry pass that fixes every earlier failure must not leave the earlier
+	# pass's list behind, or the next run would treat them as still failing.
+	fails_fn = tmp_path / '_last_fails.txt'
+	fails_fn.write_text('6.0.0')
+	code = compile_all.report_results({'6.0.0': 0, '6.2.0': 0}, {}, str(fails_fn))
+	assert code == 0
+	assert not fails_fn.exists()
+
+def test_report_results_any_nonzero_returncode_is_a_failure(tmp_path):
+	# Windows crash codes can be large or negative; anything but 0 is a failure.
+	code = compile_all.report_results({'6.0.0': -1}, {}, str(tmp_path / 'f.txt'))
+	assert code != 0
+
+def test_report_results_no_versions_is_success(tmp_path):
+	assert compile_all.report_results({}, {}, str(tmp_path / 'f.txt')) == 0
+
+def test_select_versions_matches_shortname_glob():
+	info = [('/a', 'Veneer_for_Source_6.10.0', True),
+	        ('/b', 'Veneer_for_Source_6.1.0', True),
+	        ('/c', 'Source_5.30.0', True)]
+	assert compile_all.select_versions(info, ['Veneer_for_Source_6.10*']) == [info[0]]
+	assert compile_all.select_versions(info, ['*6.1.0', 'Source_5*']) == [info[1], info[2]]
+	assert compile_all.select_versions(info, ['nomatch']) == []
+
+# --- Unsigned Source assemblies in an app's deps.json ---
+
+def write_assembly(path, strong_name):
+	"""Write a minimal PE32 file whose CLI header reserves a strong-name signature, or not.
+	strong_name=None writes a PE with no CLI header (a native DLL)."""
+	import struct
+	data = bytearray(0x400)
+	data[0:2] = b'MZ'
+	struct.pack_into('<I', data, 0x3c, 0x40)
+	data[0x40:0x44] = b'PE\0\0'
+	struct.pack_into('<HH', data, 0x44, 0x14c, 1)        # machine, one section
+	struct.pack_into('<H', data, 0x54, 224)              # size of the PE32 optional header
+	opt = 0x58
+	struct.pack_into('<H', data, opt, 0x10b)             # PE32
+	struct.pack_into('<I', data, opt + 92, 16)           # number of data directories
+	if strong_name is not None:
+		struct.pack_into('<II', data, opt + 96 + 14*8, 0x2000, 72)   # CLI header
+		struct.pack_into('<IIII', data, opt + 224 + 8, 0x200, 0x2000, 0x200, 0x200)  # .text
+		struct.pack_into('<I', data, 0x200, 72)
+		if strong_name:
+			struct.pack_into('<II', data, 0x200 + 32, 0x2100, 128)
+	path.write_bytes(bytes(data))
+
+def write_deps(path, libraries):
+	"""Write a deps.json. libraries: {'Name/1.0': (type, [runtime asset paths])}."""
+	import json
+	path.write_text(json.dumps({
+		'runtimeTarget': {'name': '.NETCoreApp,Version=v8.0', 'signature': ''},
+		'targets': {'.NETCoreApp,Version=v8.0': {
+			k: {'runtime': {a: {} for a in assets}} for k, (_, assets) in libraries.items()}},
+		'libraries': {k: {'type': t, 'serviceable': False, 'sha512': ''} for k, (t, _) in libraries.items()},
+	}))
+
+def runtime_assets(deps_path, key):
+	import json
+	deps = json.loads(deps_path.read_text())
+	return sorted(deps['targets'][deps['runtimeTarget']['name']][key]['runtime'])
+
+def test_has_strong_name_reads_the_cli_header(tmp_path):
+	write_assembly(tmp_path / 'signed.dll', True)
+	write_assembly(tmp_path / 'unsigned.dll', False)
+	write_assembly(tmp_path / 'native.dll', None)
+	(tmp_path / 'text.dll').write_text('not a PE file')
+	assert compile_all.has_strong_name(str(tmp_path / 'signed.dll')) is True
+	assert compile_all.has_strong_name(str(tmp_path / 'unsigned.dll')) is False
+	assert compile_all.has_strong_name(str(tmp_path / 'native.dll')) is None
+	assert compile_all.has_strong_name(str(tmp_path / 'text.dll')) is None
+	assert compile_all.has_strong_name(str(tmp_path / 'missing.dll')) is None
+
+def make_source(tmp_path):
+	"""A Source directory whose GUI manifest lists signed, unsigned and project assemblies."""
+	source = tmp_path / 'Source'; source.mkdir()
+	write_deps(source / compile_all.SOURCE_APP_DEPS, {
+		'RiverSystem.Forms/1.0.0': ('project', ['RiverSystem.Forms.dll']),
+		'Unsigned.Package/6.3.0': ('package', ['lib/netcoreapp2.2/Unsigned.Package.dll']),
+		'Shared.Package/1.0.0': ('package', ['lib/net8.0/Shared.Package.dll']),
+		'Signed.Package/2.0.0': ('package', ['lib/net8.0/Signed.Package.dll']),
+		'Absent.Package/1.0.0': ('package', ['lib/net8.0/Absent.Package.dll']),
+	})
+	write_assembly(source / 'RiverSystem.Forms.dll', False)
+	write_assembly(source / 'Unsigned.Package.dll', False)
+	write_assembly(source / 'Shared.Package.dll', False)
+	write_assembly(source / 'Signed.Package.dll', True)
+	return source
+
+def test_unsigned_source_packages_keeps_only_unsigned_package_assemblies(tmp_path):
+	source = make_source(tmp_path)
+	assert compile_all.unsigned_source_packages(str(source)) == ['Shared.Package.dll', 'Unsigned.Package.dll']
+
+def test_unsigned_source_packages_without_a_gui_manifest_is_empty(tmp_path):
+	assert compile_all.unsigned_source_packages(str(tmp_path)) == []
+
+def test_list_unsigned_source_assemblies_adds_to_the_app_project_entry(tmp_path):
+	source = make_source(tmp_path)
+	out = tmp_path / 'out'; out.mkdir()
+	(out / 'App.exe').write_bytes(b'')
+	write_deps(out / 'App.deps.json', {
+		'App/1.0.0': ('project', ['App.dll']),
+		'Shared.Package/1.0.0': ('package', ['lib/net8.0/shared.package.dll']),   # already listed
+	})
+	compile_all.list_unsigned_source_assemblies(str(out), str(source))
+	assert runtime_assets(out / 'App.deps.json', 'App/1.0.0') == ['App.dll', 'Unsigned.Package.dll']
+	assert not (out / 'Unsigned.Package.dll').exists()   # the manifest changes; no file is copied
+
+def test_list_unsigned_source_assemblies_is_idempotent(tmp_path):
+	source = make_source(tmp_path)
+	out = tmp_path / 'out'; out.mkdir()
+	(out / 'App.exe').write_bytes(b'')
+	write_deps(out / 'App.deps.json', {'App/1.0.0': ('project', ['App.dll'])})
+	compile_all.list_unsigned_source_assemblies(str(out), str(source))
+	first = (out / 'App.deps.json').read_text()
+	compile_all.list_unsigned_source_assemblies(str(out), str(source))
+	assert (out / 'App.deps.json').read_text() == first
+
+def test_list_unsigned_source_assemblies_leaves_libraries_alone(tmp_path):
+	source = make_source(tmp_path)
+	out = tmp_path / 'out'; out.mkdir()
+	write_deps(out / 'Plugin.deps.json', {'Plugin/1.0.0': ('project', ['Plugin.dll'])})   # no Plugin.exe
+	before = (out / 'Plugin.deps.json').read_text()
+	compile_all.list_unsigned_source_assemblies(str(out), str(source))
+	assert (out / 'Plugin.deps.json').read_text() == before

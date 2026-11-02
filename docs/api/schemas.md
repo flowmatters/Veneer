@@ -39,18 +39,21 @@ properties.
 `ExchangeObjects/RunParameters.cs` · request body of `POST /runs`
 
 A **flat, open key/value object** (implemented via `ISerializable`, not fixed `DataMember`s).
-Whatever keys you send become run parameters passed to Source. There is no fixed schema; the
-accepted keys depend on the model and Source version. Commonly used keys:
+Each key is a property path on the scenario's running configuration, and is applied for that
+run only. There is no fixed schema; the accepted keys depend on the configuration and the
+Source version. A date property takes a `dd/MM/yyyy` string. See
+[`POST /runs`](runs-and-results.md#post-runs--trigger-a-run) for the conversions and the
+errors. Commonly used keys:
 
 | Key | Type | Meaning |
 |-----|------|---------|
-| `Start` | string | Run start date |
-| `End` | string | Run end date |
-| `InputSet` | string | Input set to apply |
-| `ForecastLength` | number (int) | Forecast horizon (where applicable) |
+| `StartDate` | string | Run start date, `dd/MM/yyyy` |
+| `EndDate` | string | Run end date, `dd/MM/yyyy` |
+| `_RunName` | string | Name for the resulting run (not a configuration property; ignored, with a warning, where the Source version does not support it) |
+| `SelectedRecorderSets` | string[] | Recorder set names to select for this run only (not a configuration property). `[]` means the Current Recorder Tree only. An invalid value is a `400`. See [Choosing recorder sets for one run](runs-and-results.md#choosing-recorder-sets-for-one-run). **Added in protocol `20261019`.** |
 
 ```json
-{ "Start": "1990-01-01", "End": "2000-12-31", "InputSet": "Baseline" }
+{ "StartDate": "01/01/1990", "EndDate": "31/12/2000" }
 ```
 
 An empty object `{}` runs with the scenario's configured settings.
@@ -110,13 +113,13 @@ An empty object `{}` runs with the scenario's configured settings.
 | `PercentComplete` | number | 0–100, only when running |
 
 ### SimulationFault
-`ExchangeObjects/SimulationFault.cs` · fault body of `POST /runs` (409/500) and `POST /runs/cancel` (500)
+`ExchangeObjects/SimulationFault.cs` · fault body of `POST /runs` (400/409/500), `POST /runs/cancel` (500), and `POST /functions/evaluate` (400/409)
 
 | Field | Type | Notes |
 |-------|------|-------|
 | `Message` | string | |
 | `StackTrace` | string | Present when the fault wraps a thrown exception |
-| `Log` | string[] | Diagnostic messages captured from Source during the run. Present when a run completes without producing a result. Omitted when empty. |
+| `Log` | string[] | Diagnostic messages captured from Source during the run. Present on the `400` and `500` faults of `POST /runs`, where it may be an empty array; omitted from the other faults. |
 
 ---
 
@@ -155,25 +158,35 @@ Returned for a single-match time series GET; also the request/response body for
 | `Date` | string |
 | `Value` | number |
 
-### SlimTimeSeries
-`ExchangeObjects/SlimTimeSeries.cs` — a compact form: values only (no per-event dates), plus
-locator metadata. Used in bulk/`__all__` retrieval.
+### TimeSeriesFullSummary
+`ExchangeObjects/TimeSeriesResponse.cs` — the meta fields plus locators, with **no values**.
+Returned as the element type of a `MultipleTimeSeries` when
+[`?content=headers`](runs-and-results.md#the-content-query-parameter) is requested.
 
 | Field | Type | Notes |
 |-------|------|-------|
 | *(all meta fields)* | | |
-| `Values` | number[] | Values in series order |
 | `RunNumber` | number (int) | |
 | `SingleURL` | string | URL of the individual series |
 | `NetworkElement` / `RecordingElement` / `RecordingVariable` / `FunctionalUnit` | string | Locators |
 
-### MultipleTimeSeries
-`ExchangeObjects/MultipleTimeSeries.cs` — wrapper returned when a request matches several
-series (e.g. via `__all__`).
+### SlimTimeSeries
+`ExchangeObjects/SlimTimeSeries.cs` — extends `TimeSeriesFullSummary` with the values only (no
+per-event dates). Used in bulk/`__all__` retrieval and for `?content=full`.
 
 | Field | Type | Notes |
 |-------|------|-------|
-| `TimeSeries` | TimeSeriesReponseMeta[] | Each element is a `SlimTimeSeries`/full-summary entry |
+| *(all `TimeSeriesFullSummary` fields)* | | |
+| `Values` | number[] | Values in series order |
+
+### MultipleTimeSeries
+`ExchangeObjects/MultipleTimeSeries.cs` — wrapper returned when a request matches several
+series (e.g. via `__all__`), or whenever
+[`?content=`](runs-and-results.md#the-content-query-parameter) is supplied.
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `TimeSeries` | TimeSeriesReponseMeta[] | `SlimTimeSeries` entries normally; `TimeSeriesFullSummary` (no `Values`) under `?content=headers` |
 
 ---
 
@@ -189,6 +202,7 @@ series (e.g. via `__all__`).
 | `Expression` | string | The only field applied on `PUT` |
 | `Units` | string | |
 | `InitialValue` | number | |
+| `TimeOfEvaluation` | string | Flags-enum comma form, e.g. `"EndOfTimeStep, StartOfTimeStep"`. Read-only (ignored on `PUT`) |
 
 ### VariableSummary
 `VariableSummary.cs` · `GET /variables` (array), `GET /variables/{name}`
@@ -204,6 +218,8 @@ series (e.g. via `__all__`).
 | `TimeSeries` | string \| null | URL to the variable's `/TimeSeries`, if applicable |
 | `PiecewiseFunction` | string \| null | URL to the variable's `/Piecewise`, if applicable |
 | `TimeSeriesDataSources` | object (map string→string) | Input set → data source URL |
+| `TimeOfEvaluation` | string \| null | Time-of-evaluation flags for kinds that carry it; else `null` |
+| `DateRange` | string \| null | Modelled-variable date-range setting (e.g. `"current time step"`); else `null` |
 
 ### SimplePiecewise
 `ExchangeObjects/SimplePiecewise.cs` · `GET`/`PUT /variables/{name}/Piecewise`
@@ -213,6 +229,57 @@ series (e.g. via `__all__`).
 | `XName` | string | X-axis label |
 | `YName` | string | Y-axis label |
 | `Entries` | number[][] | Array of `[x, y]` pairs |
+
+The five types below back `POST /functions/evaluate` — see
+[functions-and-variables.md](functions-and-variables.md#post-functionsevaluate) for the full
+behaviour. Field names on all five are **lowercase**, like the GeoJSON types below, not
+PascalCase like the rest of this page.
+
+### EvaluateBinding
+`ExchangeObjects/FunctionEvaluation.cs` · element of `EvaluateItem.bindings`
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `token` | string | The text to replace, verbatim as it appears in `expression` (e.g. `"$v_Rain"`). Required (missing → the whole request is rejected by the framework). |
+| `value` | number | The literal to substitute, invariant-culture. Required (missing → the whole request is rejected by the framework); must be finite. |
+
+A **list** of `{token, value}` pairs, not a `token → value` object — the server's JSON
+serialiser (`DataContractJsonSerializer`) silently drops any object member whose name isn't a
+legal XML name, which every `$`-prefixed token is.
+
+### EvaluateItem
+`ExchangeObjects/FunctionEvaluation.cs` · element of `EvaluateRequest.items`
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `id` | string | Client-assigned; echoed back on the matching result. Required. Need not be unique — duplicates are accepted; results come back in request order. |
+| `date` | string | `yyyy-MM-dd`. Required. |
+| `context` | string \| omitted | `Name` or `FullName` of an existing function whose folder the expression is evaluated in, so leaf names resolve relative to it. Omitted → no containing folder (only full names resolve). |
+| `expression` | string | The Source function expression to evaluate. Required. |
+| `bindings` | [EvaluateBinding](#evaluatebinding)[] \| omitted | Tokens to substitute before evaluation. Unbound built-ins are supplied by Veneer and lookup tables resolve; any other unbound reference is an item error (see [functions-and-variables.md](functions-and-variables.md#post-functionsevaluate)). |
+
+### EvaluateRequest
+`ExchangeObjects/FunctionEvaluation.cs` · request body of `POST /functions/evaluate`
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `items` | [EvaluateItem](#evaluateitem)[] | Up to `MAX_ITEMS` = 2000; more is `400 Bad Request`. Missing/`null` is treated as empty. |
+
+### EvaluateResultItem
+`ExchangeObjects/FunctionEvaluation.cs` · element of `EvaluateResponse.results`
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `id` | string | Copied from the matching request item. |
+| `value` | number \| omitted | Present only on success. |
+| `error` | string \| omitted | Present only on failure. Exactly one of `value`/`error` is present. A NaN/±Infinity result is reported as the error `"non-finite result"`. |
+
+### EvaluateResponse
+`ExchangeObjects/FunctionEvaluation.cs` · response body of `POST /functions/evaluate`
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `results` | [EvaluateResultItem](#evaluateresultitem)[] | One per request item, in request order. |
 
 ---
 
@@ -240,6 +307,18 @@ series (e.g. via `__all__`).
 
 Selectors use the network-element grammar (`location/.../element/.../variable/...`, with
 `__all__` wildcards and `@@` functional-unit suffixes).
+
+### RecorderSetsSummary
+`ExchangeObjects/RecorderSetsSummary.cs` · response of `GET /recorderSets` · **Added in protocol `20261019`.**
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `Sets` | string[] | The name of every recorder set the scenario defines, in Source's order, including the Current Recorder Tree on Source 5.16 and later. Empty when the scenario has no recorder set manager. |
+| `Selected` | string[] | The names of the sets selected in the current configuration, in order. `[]` and `["Current Recorder Tree"]` both mean the tree alone governs recording. |
+
+```json
+{ "Sets": ["Current Recorder Tree", "SetX"], "Selected": ["SetX"] }
+```
 
 ---
 

@@ -31,7 +31,7 @@ Accept: application/json
   "Projection": { "Projection": "UTM", "Zone": 55, "Hemisphere": "South" },
   "PID": 18244,
   "HostExe": "C:\\Program Files\\eWater\\Source 5.16\\RiverSystem.exe",
-  "User": "joelr",
+  "User": "source-user",
   "PluginsLoaded": [
     "C:\\...\\FlowMatters.Source.Veneer.dll"
   ]
