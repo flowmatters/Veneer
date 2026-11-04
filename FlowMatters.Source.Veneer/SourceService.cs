@@ -568,6 +568,25 @@ namespace FlowMatters.Source.Veneer
         public RunSummary GetRunResults(string runId)
         {
             Log(String.Format("Requested run results ({0})",runId));
+            try
+            {
+                return RunResults(runId);
+            }
+            catch (WebFaultException<SimulationFault>)
+            {
+                throw;
+            }
+            catch (Exception e)
+            {
+                // Left to CoreWCF, this would be an HTTP 400 with an HTML page and nothing logged.
+                Log(string.Format("Could not build the summary of run {0}: {1}", runId, e.Message), LogLevel.Error);
+                Log(e.ToString(), LogLevel.Error);
+                throw new WebFaultException<SimulationFault>(new SimulationFault(e), HttpStatusCode.InternalServerError);
+            }
+        }
+
+        private RunSummary RunResults(string runId)
+        {
             string msg = "";
             string[] log;
             string lastStackTrace = null;
@@ -581,6 +600,16 @@ namespace FlowMatters.Source.Veneer
             {
                 msg = string.Format("run with id={0}", runId);
             }
+
+            Log("Requested " + msg);
+
+            if (run == null)
+            {
+                Log(string.Format("Run {0} not found", runId));
+                ResourceNotFound();
+                return null;
+            }
+
             if (RunLogs.ContainsKey(run.RunNumber))
             {
                 var captured = RunLogs[run.RunNumber];
@@ -596,17 +625,44 @@ namespace FlowMatters.Source.Veneer
                 };
             }
 
-            Log("Requested " + msg);
-
-            if (run == null)
-            {
-                Log(string.Format("Run {0} not found", runId));
-                return null;
-            }
             var result = new RunSummary(run);
+            if (result.Skipped.Count > 0)
+            {
+                // Fail rather than return a partial list the client cannot tell from a complete one.
+                var fault = SkippedResultsFault(run.RunNumber, result.Skipped);
+                Log(fault.Message, LogLevel.Error);
+                foreach (var line in fault.Log)
+                    Log("  " + line, LogLevel.Error);
+                Log(fault.StackTrace, LogLevel.Error);
+                throw new WebFaultException<SimulationFault>(fault, HttpStatusCode.InternalServerError);
+            }
             result.RunLog = log;
             result.LastStackTrace = lastStackTrace;
             return result;
+        }
+
+        /// <summary>
+        /// The fault for a run summary with recorded results that could not be listed: the count
+        /// and first failure in Message, one line per failure (up to a limit) in Log, and the
+        /// first failure in full in StackTrace.
+        /// </summary>
+        internal static SimulationFault SkippedResultsFault(int runNumber, List<RunSummary.SkippedResult> skipped)
+        {
+            const int listed = 20;
+            Func<RunSummary.SkippedResult, string> describe =
+                s => string.Format("{0}: {1}: {2}", s.Row, s.Error.GetType().Name, s.Error.Message);
+
+            var lines = skipped.Take(listed).Select(describe).ToList();
+            if (skipped.Count > listed)
+                lines.Add(string.Format("... and {0} more", skipped.Count - listed));
+
+            return new SimulationFault(
+                string.Format("{0} recorded result(s) of run {1} could not be listed. First: {2}",
+                    skipped.Count, runNumber, describe(skipped[0])),
+                lines.ToArray())
+            {
+                StackTrace = skipped[0].Error.ToString()
+            };
         }
 
         // TODO: Can't delete a run. Should delete a job which may contain multiple runs.
@@ -1435,12 +1491,12 @@ namespace FlowMatters.Source.Veneer
 
 #if BEFORE_RECORDING_ATTRIBUTES_REFACTOR
             return (URLSafeString(er.Key.KeyString) == URLSafeString(variable)) ||
-                ((er.Key.KeyString == "") && (row.ElementName == variable));
+                (string.IsNullOrEmpty(er.Key.KeyString) && (row.ElementName == variable));
 #else
             var recordableItemDisplayName = RecordableItemTransitionUtil.GetLegacyKeyString(er.Key);
 
             return (URLSafeString(recordableItemDisplayName) == URLSafeString(variable)) ||
-                    ((recordableItemDisplayName == "") && (row.ElementName == variable));
+                    (string.IsNullOrEmpty(recordableItemDisplayName) && (row.ElementName == variable));
 #endif
         }
 
@@ -1471,6 +1527,7 @@ namespace FlowMatters.Source.Veneer
 
         public static string URLSafeString(string src)
         {
+            if (src == null) return "";
             return src.Replace("#","").Replace("/","%2F").Replace(":","");
         }
 

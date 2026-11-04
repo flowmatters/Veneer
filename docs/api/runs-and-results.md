@@ -224,8 +224,15 @@ Follow `RunUrl` to get the full summary.
 Full summary for one run, including the list of recorded time series and the run log.
 
 - **`{runId}`**: the numeric run number, or the literal `latest` for the most recent run.
-- **Response**: [`RunSummary`](schemas.md#runsummary) (`200 OK`). If the run isn't found the
-  body is `null`.
+- **Response**: [`RunSummary`](schemas.md#runsummary) (`200 OK`).
+- **Errors** (from protocol `20261104`; before that, each of these was a `400` with an HTML
+  "Request Error" page and nothing logged):
+  - `404`, body `null`: the run isn't found.
+  - `500`, a [`SimulationFault`](schemas.md#simulationfault) body: the summary could not be built.
+    When recorded series could not be listed (their recorder rows throw), `Message` gives the
+    count and the first failure, `Log` has one `row: exception: message` line per failure (up to
+    20, then a count of the rest), and `StackTrace` has the first failure in full. Veneer logs
+    the same. The request fails rather than return a partial `Results` list.
 - **veneer-py**: `v.retrieve_run(run='latest')`
 
 ```json

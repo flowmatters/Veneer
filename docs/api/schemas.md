@@ -113,13 +113,13 @@ An empty object `{}` runs with the scenario's configured settings.
 | `PercentComplete` | number | 0–100, only when running |
 
 ### SimulationFault
-`ExchangeObjects/SimulationFault.cs` · fault body of `POST /runs` (400/409/500), `POST /runs/cancel` (500), and `POST /functions/evaluate` (400/409)
+`ExchangeObjects/SimulationFault.cs` · fault body of `POST /runs` (400/409/500), `POST /runs/cancel` (500), `GET /runs/{runId}` (500), and `POST /functions/evaluate` (400/409)
 
 | Field | Type | Notes |
 |-------|------|-------|
 | `Message` | string | |
 | `StackTrace` | string | Present when the fault wraps a thrown exception |
-| `Log` | string[] | Diagnostic messages captured from Source during the run. Present on the `400` and `500` faults of `POST /runs`, where it may be an empty array; omitted from the other faults. |
+| `Log` | string[] | Diagnostic messages captured from Source during the run. Present on the `400` and `500` faults of `POST /runs`, where it may be an empty array, and on the `500` of `GET /runs/{runId}` when recorded series could not be listed (one line per failure); omitted from the other faults. |
 
 ---
 
