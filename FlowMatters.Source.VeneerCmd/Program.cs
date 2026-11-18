@@ -32,25 +32,62 @@ namespace FlowMatters.Source.VeneerCmd
         private static LogLevel _minimumLogLevel = LogLevel.Info;
 
         /// <summary>
+        /// Maximum number of directory levels to walk up from the executable when looking for Source.
+        /// Four covers the deepest supported layout (a deployed Veneer three levels under the Source root).
+        /// </summary>
+        private const int MaxSourceProbeDepth = 4;
+
+        /// <summary>
         /// List of dynamic search paths for RiverSystem related assemblies. This may change depending on the passed in -d argument.
         /// </summary>
-        private static List<string> _dynamicSearchPaths = new()
-                                                          {
-                                                              Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", ".."),  // Output folder
-                                                              Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "Plugins"),  // Output/Plugins folder
-                                                              Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "Plugins", "CommunityPlugins") // Output/Plugins/CommunityPlugins folder
-                                                          };
+        private static List<string> _dynamicSearchPaths = FindDefaultSearchPaths();
+
+        /// <summary>
+        /// Locate the Source installation by walking up from the executable's own directory until a
+        /// directory containing RiverSystem.dll is found.
+        /// </summary>
+        /// <remarks>
+        /// The relative depth varies by layout: Veneer and Source assemblies may be colocated in one
+        /// working directory (zero levels), a development build may sit directly under the staged output
+        /// directory (one level), and a deployed Veneer sits in Plugins\CommunityPlugins\Veneer_for_X
+        /// under the Source root (three levels). Probing for RiverSystem.dll handles all of them without
+        /// hard-coding a depth. Returns an empty list when Source is not found, so the caller reports the
+        /// missing directory and suggests -d rather than silently searching paths that do not exist.
+        ///
+        /// Skip the Plugins and CommunityPlugins folders. They are not the Source folder, but in a
+        /// development build they can contain a copy of RiverSystem.dll. If we picked one of them,
+        /// Source would look for fbclient.dll there and fail to open the project.
+        /// </remarks>
+        private static List<string> FindDefaultSearchPaths()
+        {
+            var directory = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
+            for (var level = 0; directory != null && level <= MaxSourceProbeDepth; level++, directory = directory.Parent)
+            {
+                if (IsPluginsDirectory(directory) || !File.Exists(Path.Combine(directory.FullName, "RiverSystem.dll")))
+                    continue;
+
+                return new List<string>
+                       {
+                           directory.FullName,
+                           Path.Combine(directory.FullName, "Plugins"),
+                           Path.Combine(directory.FullName, "Plugins", "CommunityPlugins")
+                       };
+            }
+
+            return new List<string>();
+        }
+
+        private static bool IsPluginsDirectory(DirectoryInfo directory)
+        {
+            return string.Equals(directory.Name, "Plugins", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(directory.Name, "CommunityPlugins", StringComparison.OrdinalIgnoreCase);
+        }
 
         static void Main(string[] args)
         {
             // Required for log4net used in RiverSystem.Persistence
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
-            // Set up configuration (no RiverSystem dependencies here)
-            _configuration = new ConfigurationBuilder()
-                .SetBasePath(AppDomain.CurrentDomain.BaseDirectory)
-                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-                .Build();
 
             // Parse command line arguments (no RiverSystem dependencies)
             var result = Parser.Default.ParseArguments<Options>(args);
@@ -76,6 +113,15 @@ namespace FlowMatters.Source.VeneerCmd
 
                 // Catch any assemblies that fail to load and try them in the Source directory itself
                 AppDomain.CurrentDomain.AssemblyResolve += CurrentDomain_AssemblyResolve;
+
+                // Keep this after the AssemblyResolve handler. Reading JSON needs System.Text.Json,
+                // which only the handler can load (from the Source folder), so moving this earlier fails.
+
+                // Set up configuration (no RiverSystem dependencies here)
+                _configuration = new ConfigurationBuilder()
+                    .SetBasePath(AppDomain.CurrentDomain.BaseDirectory)
+                    .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+                    .Build();
 
                 // NOW call the method that has RiverSystem dependencies
                 // This is where assembly loading will happen, but now paths are set up
@@ -188,6 +234,11 @@ namespace FlowMatters.Source.VeneerCmd
         // This method contains all the RiverSystem dependencies and must be called AFTER the search paths are set up
         private static void RunWithRiverSystemDependencies(Options options)
         {
+            // Before anything logs: LoadPlugins and LoadProject both write to
+            // TIME.Management.Log, and any message written before this call can still
+            // hit the dispatch race that kills the process.
+            LogDispatchGuard.Install();
+
             SynchronizationContext.SetSynchronizationContext(new SynchronizationContext());
             FlowMatters.Source.Veneer.AutoStart.InitialiseOnLoadAttribute.MarkInitialised();
             Constants.SetLargeDataOptions();

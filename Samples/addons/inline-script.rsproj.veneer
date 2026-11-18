@@ -1,0 +1,25 @@
+{
+  "addons": [
+    {
+      "name": "Nightly run",
+      "type": "script",
+      "env": { "RUN_LABEL": "nightly" },
+      "script": [
+        "cd %VENEER_PROJECT_DIR%",
+        "python calibrate.py --run %RUN_LABEL%",
+        "python report.py"
+      ],
+      "menu": "Veneer|Calibration"
+    },
+    {
+      "name": "Status check (read-only)",
+      "type": "script",
+      "allowMultiple": true,
+      "script": [
+        "echo Reading status of %VENEER_PROJECT_FILE% via port %VENEER_PORT%",
+        "echo Nothing is written, so several of these can run side by side."
+      ],
+      "menu": "Veneer"
+    }
+  ]
+}

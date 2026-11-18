@@ -99,7 +99,7 @@ namespace FlowMatters.Source.Veneer
             if (previous != null)
             {
                 await StopServer();
-                ReportingMenu.Instance.ClearMenu();
+                VeneerMenu.Instance.ClearMenu();
             }
             if (next != null)
             {
@@ -110,9 +110,9 @@ namespace FlowMatters.Source.Veneer
 
         private void PopulateMenu()
         {
-            Form parent = ReportingMenu.FindMainForm();
-            ReportingMenu.Instance.Control = this;
-            ReportingMenu.Instance.InitialiseRequiredMenus(parent, _scenario);
+            Form parent = VeneerMenu.FindMainForm();
+            VeneerMenu.Instance.Control = this;
+            VeneerMenu.Instance.InitialiseRequiredMenus(parent, _scenario);
         }
 
         private AbstractSourceServer _server;
@@ -216,7 +216,19 @@ namespace FlowMatters.Source.Veneer
             get { return (_server != null) && _server.Running; }
         }
 
+        /// <summary>
+        /// Signature is FIXED: this is subscribed as a ServerLogListener delegate in
+        /// StartServer, and C# delegate compatibility requires matching arity. A trailing
+        /// `bool forceScroll = false` is a CS0123 build break, not a convenience -- the
+        /// existing `LogLevel level = LogLevel.Info` default gets away with it only
+        /// because the arity still matches.
+        /// </summary>
         void ServerLogEvent(object sender, string msg, LogLevel level = LogLevel.Info)
+        {
+            Append(msg, level, false);
+        }
+
+        private void Append(string msg, LogLevel level, bool forceScroll)
         {
             _originalContext.Post(delegate
             {
@@ -229,9 +241,29 @@ namespace FlowMatters.Source.Veneer
 
                 LogBox.AppendText(msg + "\n");
 
-                if (wasAtBottom)
+                if (forceScroll || wasAtBottom)
                     LogBox.ScrollToEnd();
             }, null);
+        }
+
+        /// <summary>
+        /// Log entry point for addon output, usable regardless of server state.
+        /// The LogBox sink is otherwise only wired up inside StartServer
+        /// (server.LogGenerator += ServerLogEvent), but addons can be launched with
+        /// the server stopped, so their output needs a path that does not depend on
+        /// it. Append marshals to the UI thread via _originalContext -- which is what
+        /// OutputDataReceived, raised on a threadpool thread, requires.
+        ///
+        /// Info and Error are tested explicitly, NOT `level >= LogLevel.Info`. Child
+        /// stderr is logged at Warning, and Warning >= Info -- a Dash app writes its whole
+        /// startup to stderr, so that predicate would yank the log to the bottom on every
+        /// line and destroy the scrollback this is meant to preserve. Across the addon
+        /// path Info and Error are used only by Veneer's own lifecycle and failure lines,
+        /// while both child streams are Debug (stdout) and Warning (stderr).
+        /// </summary>
+        internal void LogAddonMessage(string msg, LogLevel level)
+        {
+            Append(msg, level, level == LogLevel.Info || level == LogLevel.Error);
         }
 
         private static ScrollViewer GetScrollViewer(DependencyObject depObj)

@@ -155,6 +155,15 @@ namespace FlowMatters.Source.Veneer.AutoStart
 
         private void ApplyScenarioChange(RiverSystem.RiverSystemScenario newScenario)
         {
+            // Diagnostics only. Option defaults stay a load-time concern, so this
+            // deliberately does not re-apply them.
+            //
+            // This Load duplicates the one the menu rebuild below performs. Both
+            // are cheap -- at most three Exists and three small reads -- and this
+            // path runs at human speed, so sharing one result is not worth having
+            // the log line and the menu disagree about what was on disk.
+            LogConfigurationChain(VeneerConfiguration.Load(newScenario), newScenario);
+
             var control = WebServerStatusControl.ActiveInstance;
             if (control != null)
             {
@@ -162,10 +171,10 @@ namespace FlowMatters.Source.Veneer.AutoStart
             }
             else
             {
-                ReportingMenu.Instance.ClearMenu();
+                VeneerMenu.Instance.ClearMenu();
                 if (newScenario != null)
                 {
-                    ReportingMenu.Instance.InitialiseRequiredMenus(MainForm.Instance, newScenario);
+                    VeneerMenu.Instance.InitialiseRequiredMenus(MainForm.Instance, newScenario);
                 }
             }
         }
@@ -190,9 +199,9 @@ namespace FlowMatters.Source.Veneer.AutoStart
             var port = WebServerStatusControl.DefaultPort;
 
             var config = VeneerConfiguration.Load(MainForm.Instance.CurrentScenario);
-            if (config?.options != null && config.options.defaultPort > 0)
+            if (config?.options != null && config.options.defaultPort.GetValueOrDefault() > 0)
             {
-                port = config.options.defaultPort;
+                port = config.options.defaultPort.Value;
             }
 
             var envPort = Environment.GetEnvironmentVariable("VENEER_PORT");
@@ -202,11 +211,44 @@ namespace FlowMatters.Source.Veneer.AutoStart
             }
 
             WebServerStatusControl.DefaultPort = port;
+            LogConfigurationChain(config, MainForm.Instance.CurrentScenario);
+        }
+
+        private static string _lastLoggedChain;
+
+        /// <summary>
+        /// With up to three files feeding one menu, "where did this item come
+        /// from?" is a question a user will ask, and the answer is not guessable
+        /// from the menu itself.
+        ///
+        /// Deduplicated rather than fired once per load, because the Rebind
+        /// transition also covers a scenario change within one project, where the
+        /// resolved files are identical and a second line would be noise.
+        ///
+        /// The project is part of the key, not just the chain: two projects that
+        /// both resolve to nothing both produce "none", and suppressing the second
+        /// would read as "Veneer did not look" rather than "Veneer found nothing".
+        ///
+        /// Call on the UI thread only -- _lastLoggedChain is unsynchronised. Both
+        /// call sites reach here inside MainForm.Instance.Invoke.
+        /// </summary>
+        private void LogConfigurationChain(
+            ResolvedVeneerConfiguration config, RiverSystem.RiverSystemScenario scenario)
+        {
+            var chain = config.SourceFiles.Length == 0
+                ? "none"
+                : String.Join(", ", config.SourceFiles);
+
+            var key = scenario?.RiverSystemProject?.FullFilename + " -> " + chain;
+            if (key == _lastLoggedChain) return;
+            _lastLoggedChain = key;
+
+            TIME.Management.Log.WriteInfo(this, "Veneer configuration: " + chain);
         }
 
         private void PopulateReportingMenu()
         {
-            ReportingMenu.Instance.InitialiseRequiredMenus(MainForm.Instance, MainForm.Instance.CurrentScenario);
+            VeneerMenu.Instance.InitialiseRequiredMenus(MainForm.Instance, MainForm.Instance.CurrentScenario);
         }
 
         private void StartVeneer()

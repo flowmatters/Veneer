@@ -22,6 +22,7 @@ using FlowMatters.Source.Veneer.DomainActions;
 using FlowMatters.Source.Veneer.ExchangeObjects;
 using FlowMatters.Source.Veneer.ExchangeObjects.DataSources;
 using FlowMatters.Source.Veneer.Formatting;
+using FlowMatters.Source.Veneer.Functions;
 using FlowMatters.Source.Veneer.RemoteScripting;
 using FlowMatters.Source.WebServer;
 using FlowMatters.Source.WebServer.ExchangeObjects;
@@ -31,6 +32,7 @@ using RiverSystem.DataManagement.DataManager;
 using RiverSystem.Functions;
 using RiverSystem.ManagedExtensions;
 using RiverSystem.PreProcessing.ProjectionInfo;
+using RiverSystem.ScenarioSets.RecorderSets;
 using TIME.DataTypes;
 using TIME.DataTypes.Utils;
 using TIME.Management;
@@ -59,18 +61,18 @@ namespace FlowMatters.Source.Veneer
         private static bool _runningInGUI = true;
         private static List<CustomEndPoint> _customEndpoints = new List<CustomEndPoint>();
 
-        // TIME.Management.Log.OnMessageRecieved null-checks MessageRecieved on the logging
-        // thread but re-reads the field inside the work item it queues to the thread pool.
-        // If the last subscriber detaches between those two points (TriggerRun's finally
-        // block racing a message logged near run completion), the queued work item invokes
-        // a null delegate: a NullReferenceException on a thread-pool thread, which
-        // terminates the process. A permanent no-op subscriber keeps the field non-null,
-        // so a message that loses the race is dropped instead of fatal.
-        private static readonly LogAction _logDispatchKeepAlive = (sender, args) => { };
+        /// <summary>
+        /// Whether the service is hosted in the Source GUI (rather than VeneerCmd), for code with
+        /// no service instance to ask: script helpers, say.
+        /// </summary>
+        internal static bool HostedInGui => _runningInGUI;
 
+        // Backstop only. Hosts install this much earlier (VeneerCmd's entry point and the
+        // in-Source plugin attribute); by the time SourceService is first touched, plugin
+        // and project loading have already logged. See LogDispatchGuard.
         static SourceService()
         {
-            TIME.Management.Log.MessageRecieved += _logDispatchKeepAlive;
+            LogDispatchGuard.Install();
         }
 
         public Dictionary<int,CapturedRunLog> RunLogs
@@ -362,18 +364,6 @@ namespace FlowMatters.Source.Veneer
         {
             Log("Triggering a run.");
 
-            lock (_runLock)
-            {
-                if (_currentScenarioInvoker?.IsRunning == true)
-                {
-                    throw new WebFaultException<SimulationFault>(
-                        new SimulationFault(new InvalidOperationException("A simulation is already running. Cancel the current run before starting a new one.")),
-                        HttpStatusCode.Conflict);
-                }
-
-                _currentScenarioInvoker = new ScenarioInvoker { Scenario = Scenario };
-            }
-
             ConcurrentQueue<string> messages = new ConcurrentQueue<string>();
             object stackTraceLock = new object();
             string lastStackTrace = null;
@@ -390,18 +380,68 @@ namespace FlowMatters.Source.Veneer
                     }
                 }
             };
-            TIME.Management.Log.MessageRecieved += runLogger;
+            HashSet<int> runNumbersBefore = null;
+            ScenarioInvoker invoker;
 
-            // Snapshot the existing runs so we can detect whether this invocation actually
-            // produced a new one. RunManager.Execute() can return without throwing yet abort the
-            // simulation internally (e.g. a data file fails to load), reporting the cause only
-            // through the log stream captured above.
-            var runNumbersBefore = new HashSet<int>(
-                Scenario.Project.ResultManager.AllRuns().Select(run => run.RunNumber));
+            lock (_runLock)
+            {
+                // Non-null means a run is claimed or in progress: it is set below, under _runLock,
+                // before RunScenario starts, and released in the finally. IsRunning would miss the
+                // gap between the claim and RunScenario starting its task, letting a second POST
+                // /runs replace the claim. The same guard as EvaluateFunctions.
+                if (_currentScenarioInvoker != null)
+                {
+                    throw new WebFaultException<SimulationFault>(
+                        new SimulationFault(new InvalidOperationException("A simulation is already running. Cancel the current run before starting a new one.")),
+                        HttpStatusCode.Conflict);
+                }
+
+                // A run whose task was still executing when RunScenario finished (a cancel whose
+                // wait timed out, or an exception that left Execute running) has released its claim,
+                // and its recorder set selection is restored only when the task stops. A run started
+                // before then would overlap that Execute, and could snapshot its applied selection.
+                if (ScenarioInvoker.IsRestorePending)
+                {
+                    throw new WebFaultException<SimulationFault>(
+                        new SimulationFault(new InvalidOperationException("A previous simulation is still stopping. Try again once it has stopped.")),
+                        HttpStatusCode.Conflict);
+                }
+
+                // Nothing that can throw between here and the try: the finally is what releases this claim, and both this check and evaluate refuse while it is set.
+                invoker = new ScenarioInvoker { Scenario = Scenario };
+                _currentScenarioInvoker = invoker;
+            }
 
             try
             {
-                _currentScenarioInvoker.RunScenario(parameters, RunningInGUI, _sharedLogGenerator);
+                TIME.Management.Log.MessageRecieved += runLogger;
+
+                // Snapshot the existing runs so we can detect whether this invocation actually
+                // produced a new one. RunManager.Execute() can return without throwing yet abort the
+                // simulation internally (e.g. a data file fails to load), reporting the cause only
+                // through the log stream captured above.
+                runNumbersBefore = new HashSet<int>(
+                    Scenario.Project.ResultManager.AllRuns().Select(run => run.RunNumber));
+
+                try
+                {
+                    invoker.RunScenario(parameters, RunningInGUI, _sharedLogGenerator);
+                }
+                finally
+                {
+                    // Added here, while runLogger is still attached and before any
+                    // messages.ToArray(), so the run's log always carries them. A deferred restore
+                    // finishes after this and reaches the console or GUI log only.
+                    foreach (var restoreError in invoker.RestoreErrors)
+                        messages.Enqueue(RunLogFormatter.FormatLine(LogType.Error.ToString(), null, restoreError));
+                }
+            }
+            catch (InvalidRunParameterException e)
+            {
+                Log("Run refused: " + e.Message, LogLevel.Warning);
+                throw new WebFaultException<SimulationFault>(
+                    new SimulationFault(e) { Log = messages.ToArray() },
+                    HttpStatusCode.BadRequest);
             }
             catch (Exception e)
             {
@@ -596,7 +636,10 @@ namespace FlowMatters.Source.Veneer
             var job = Scenario.Project.ResultManager.AllJobs.FirstOrDefault(j=>ListExtensions.FirstOrDefault(j.Runs,r=>r.RunNumber==id)!=null);
             if (job != null)
             {
-                Scenario.Project.ResultManager.RemoveJob(job);
+                // RemoveJob raises RunDeleted, and the GUI's Results Manager removes the run from
+                // its tree in response: a change to a WPF-bound collection, which must happen on
+                // the UI thread. See GuiThread.
+                OnGuiThread(() => Scenario.Project.ResultManager.RemoveJob(job));
             }
 #endif
         }
@@ -616,22 +659,37 @@ namespace FlowMatters.Source.Veneer
 
         public TimeSeriesResponse GetTimeSeries(string runId, string networkElement, string recordingElement,
                                               string variable,string fromDate, string toDate,string precision,
-                                              string aggregation, string aggfn)
+                                              string content, string aggregation, string aggfn)
         {
             Log(String.Format("Requested time series {0}/{1}/{2}/{3}",runId,networkElement,recordingElement,variable));
-            return GetTimeSeriesInternal(runId, networkElement, recordingElement, variable, aggregation, aggfn, fromDate, toDate,precision);
+            return GetTimeSeriesInternal(runId, networkElement, recordingElement, variable, aggregation, aggfn, fromDate, toDate,precision,content);
         }
 
         public TimeSeriesResponse GetAggregatedTimeSeries(string runId, string networkElement, string recordingElement,
-                                              string variable, string aggregation, string fromDate, string toDate, string precision)
+                                              string variable, string aggregation, string fromDate, string toDate, string precision,
+                                              string content)
         {
             Log(String.Format("Requested {4} time series {0}/{1}/{2}/{3}", runId, networkElement, recordingElement, variable,aggregation));
-            return GetTimeSeriesInternal(runId, networkElement, recordingElement, variable, aggregation,"sum" , fromDate,toDate,precision);
+            return GetTimeSeriesInternal(runId, networkElement, recordingElement, variable, aggregation,"sum" , fromDate,toDate,precision,content);
         }
 
         private TimeSeriesResponse GetTimeSeriesInternal(string runId, string networkElement, string recordingElement,
-            string variable, string aggregation,string aggregationFunction, string fromDate, string toDate, string precision)
+            string variable, string aggregation,string aggregationFunction, string fromDate, string toDate, string precision,
+            string content)
         {
+            // ?content= modes. Both force the MultipleTimeSeries shape regardless of match count,
+            // so a single-series fetch is compact and carries its own locator fields.
+            var headersOnly = string.Equals(content, "headers", StringComparison.OrdinalIgnoreCase);
+            var forceMultiple = headersOnly ||
+                                string.Equals(content, "full", StringComparison.OrdinalIgnoreCase);
+
+            if (content != null && !forceMultiple)
+            {
+                // An unrecognised mode is a 400, never a silent fall-through to full.
+                WebOperationContext.Current.OutgoingResponse.StatusCode = HttpStatusCode.BadRequest;
+                return null;
+            }
+
             Tuple<TimeSeriesLink, TimeSeries>[] result = MatchTimeSeries(runId, networkElement, recordingElement, variable);
 
             if (fromDate != null || toDate != null)
@@ -653,9 +711,9 @@ namespace FlowMatters.Source.Veneer
                 result = TransformTimeSeriesCollection(result, ts => ts.Round(decimalPlaces) as TimeSeries);
             }
 
-            if (result.Length == 1)
+            if (result.Length == 1 && !forceMultiple)
                 return SimpleTimeSeries(result[0].Item2);
-            return CreateMultipleTimeSeries(result);
+            return CreateMultipleTimeSeries(result, !headersOnly);
         }
 
         private Tuple<TimeSeriesLink, TimeSeries>[] TransformTimeSeriesCollection(
@@ -703,11 +761,12 @@ namespace FlowMatters.Source.Veneer
                 variable == UriTemplates.MatchAll);
         }
 
-        private TimeSeriesResponse CreateMultipleTimeSeries(Tuple<TimeSeriesLink, TimeSeries>[] result)
+        private TimeSeriesResponse CreateMultipleTimeSeries(Tuple<TimeSeriesLink, TimeSeries>[] result,
+            bool includeValues = true)
         {
             if (result.Length == 0)
                 return TimeSeriesNotFound();
-            return new MultipleTimeSeries(result);
+            return new MultipleTimeSeries(result, includeValues);
         }
 
         public void SetFunction(string functionName, FunctionValue value)
@@ -735,6 +794,71 @@ namespace FlowMatters.Source.Veneer
             }
         }
 
+        /// <summary>
+        /// POST /functions/evaluate: evaluate a batch of expressions in-process against the loaded
+        /// scenario, without adding anything to its FunctionManager. Request-level problems answer
+        /// 409 (no scenario, or a run claimed or in progress via Veneer) or 400 (over the item cap, malformed); every
+        /// per-item problem is an error on that item and never fails the batch.
+        /// </summary>
+        public EvaluateResponse EvaluateFunctions(EvaluateRequest request)
+        {
+            if (Scenario == null)
+                throw Fault(HttpStatusCode.Conflict, new InvalidOperationException("No scenario is loaded."));
+            string problem;
+            var parsed = EvaluateRequestValidation.Parse(request, out problem);
+            if (parsed == null)
+                throw Fault(HttpStatusCode.BadRequest, new ArgumentException(problem));
+            Log("Evaluating " + parsed.Count + " expression(s)");
+            lock (_runLock)
+            {
+                // TriggerRun sets _currentScenarioInvoker under _runLock BEFORE it starts the run
+                // (outside the lock) and nulls it under _runLock in its finally, so non-null means a
+                // run is claimed or in progress — including the gap before IsRunning turns true,
+                // while the run parameters (TimeStep among them) are being applied. Holding
+                // _runLock for the whole batch keeps TriggerRun from claiming a run mid-batch; it
+                // also delays TriggerRun, GetRunStatus and CancelRun (they take the same lock),
+                // which is acceptable because batches are short. A run started from the Source GUI
+                // (not via Veneer) never sets _currentScenarioInvoker and is not detected here. A
+                // pending restore is a Veneer run still executing after its claim was released;
+                // TriggerRun refuses during it too.
+                if (_currentScenarioInvoker != null || ScenarioInvoker.IsRestorePending)
+                    throw Fault(HttpStatusCode.Conflict, new InvalidOperationException("A simulation is running; evaluate after it finishes."));
+                var evaluator = new TransientFunctionEvaluator(Scenario,
+                    msg => Log(msg, msg.StartsWith("WARNING", StringComparison.Ordinal) ? LogLevel.Warning : LogLevel.Info));
+                var response = new EvaluateResponse();
+                try
+                {
+                    var timeStep = evaluator.EvaluationTimeStep();
+                    foreach (var pair in parsed)
+                        response.Results.Add(evaluator.Evaluate(pair.Item, pair.Date, timeStep));
+                }
+                finally
+                {
+                    // Runs even if an item throws out of Evaluate and abandons the batch mid-way.
+                    // Both log their own warnings; do not log again here. Each is guarded so a
+                    // throw (e.g. the GUI mutating a collection mid-snapshot) neither skips the
+                    // other nor replaces the batch's results. Best effort: a re-add to a shared set
+                    // that lands after the settle window AND after this sweep stays registered on
+                    // the real entity until the NEXT batch's SweepStrays; this batch does not
+                    // clean it up.
+                    try { evaluator.SettlePending(); }
+                    catch (Exception e) when (!(e is OutOfMemoryException))
+                    {
+                        Log("WARNING: evaluate settle failed: " + e.GetBaseException().Message, LogLevel.Warning);
+                    }
+                    try { evaluator.SweepStrays(); }
+                    catch (Exception e) when (!(e is OutOfMemoryException))
+                    {
+                        Log("WARNING: evaluate sweep failed: " + e.GetBaseException().Message, LogLevel.Warning);
+                    }
+                }
+                return response;
+            }
+        }
+
+        private static WebFaultException<SimulationFault> Fault(HttpStatusCode status, Exception cause) =>
+            new WebFaultException<SimulationFault>(new SimulationFault(cause), status);
+
         public FunctionValue[] GetFunctionList()
         {
             Log("Requested function list");
@@ -748,6 +872,10 @@ namespace FlowMatters.Source.Veneer
                 fv.FullName = fn.FullName;
                 fv.Units = fn.ResultUnit.SIUnits;
                 fv.InitialValue = fn.InitialValue;
+                // Additive (SIFT A2): expose the function's time of evaluation as the flags-enum
+                // comma form. EvaluationTimes is the CLR property (confirmed via veneer-py's
+                // set_time_of_evaluation write path).
+                fv.TimeOfEvaluation = fn.EvaluationTimes.ToString();
                 result[i] = fv;
             }
             return result;
@@ -861,6 +989,47 @@ namespace FlowMatters.Source.Veneer
             sets.Run(inputSetName);
         }
 
+        /// <summary>
+        /// GET /recorderSets: the recorder sets the scenario defines and the ones its current
+        /// configuration selects. 404 with a null body when no scenario is loaded; empty arrays when
+        /// the scenario has no RecorderSetManager.
+        /// </summary>
+        public RecorderSetsSummary GetRecorderSets()
+        {
+            Log("Requested recorder sets");
+            if (Scenario == null)
+            {
+                WebOperationContext.Current.OutgoingResponse.StatusCode = HttpStatusCode.NotFound;
+                return null;
+            }
+
+            // GetPluginModel returns null when the manager is absent and never creates it. Reading
+            // SelectedRecorderSets does create it, so the selection is read only when it exists.
+            var manager = Scenario.GetPluginModel<RecorderSetManager>();
+            if (manager == null)
+                return new RecorderSetsSummary { Sets = new string[0], Selected = new string[0] };
+
+            // Reading SelectedRecorderSets while it is empty adds the Current Recorder Tree to it,
+            // so an empty selection is reported as ["Current Recorder Tree"]. Both mean the tree
+            // governs recording. PersistedSelectedRecorderSets is never read: its getter rewrites
+            // the persisted collection.
+            var configuration = Scenario.CurrentRiverSystemConfiguration;
+            var summary = new RecorderSetsSummary();
+            // On the GUI thread when hosted in the GUI, and under the lock a run changes and
+            // restores the selection under: see ScenarioInvoker.OnGuiThread.
+            ScenarioInvoker.OnGuiThread(RunningInGUI, () =>
+            {
+                lock (ScenarioInvoker.SelectionLock)
+                {
+                    summary.Sets = manager.Sets.Select(set => set.Name).ToArray();
+                    summary.Selected = configuration == null
+                        ? new string[0]
+                        : configuration.SelectedRecorderSets.Select(set => set.Name).ToArray();
+                }
+            });
+            return summary;
+        }
+
         public void UpdateRecorders(RecordingInstructions ri)
         {
 
@@ -892,25 +1061,80 @@ namespace FlowMatters.Source.Veneer
             return GetSimpleDataSourceInternal(dataSourceGroup, false);
         }
 
-        public void CreateDataSource(SimpleDataGroupItem newItem)
+        /// <summary>
+        /// Create a data source, replacing any already of its name, and return it (as a summary),
+        /// under the name Source gave it - see SimpleDataGroupItem.KeptName.
+        /// </summary>
+        public SimpleDataGroupItem CreateDataSource(SimpleDataGroupItem newItem)
         {
-            var dm = Scenario.Network.DataManager;
-            var existing = Enumerable.FirstOrDefault(dm.DataGroups, ds => ds.Name == newItem.Name);
+            return AsDataSourceFault(() =>
+                new SimpleDataGroupItem(newItem.CreateInScenario(Scenario, ChangeDataGroups,
+                                                                 warning => Log(warning, LogLevel.Warning)),
+                                        summary: true));
+        }
 
-            if (existing != null)
+        /// <summary>
+        /// Run a data source request, reporting a failure as a SimulationFault (a JSON body with
+        /// the message and stack trace), rather than the bare HTML error page the host would
+        /// otherwise send, which tells a client nothing. A request that is itself invalid is a
+        /// 400; anything else a 500.
+        /// </summary>
+        private T AsDataSourceFault<T>(Func<T> request)
+        {
+            try
             {
-                newItem.ReplaceInScenario(Scenario, existing);
+                return request();
             }
-            else
+            catch (WebFaultException<SimulationFault>)
             {
-                newItem.AddToScenario(Scenario);
+                throw;
+            }
+            catch (ArgumentException e)
+            {
+                Log("Data source request refused: " + e.Message, LogLevel.Warning);
+                throw Fault(HttpStatusCode.BadRequest, e);
+            }
+            catch (Exception e)
+            {
+                Log("Data source request failed: " + e.Message, LogLevel.Error);
+                throw Fault(HttpStatusCode.InternalServerError, e);
             }
         }
 
-        public void UpdateDataSource(string dataSourceGroup, SimpleDataGroupItem newItem)
+        private void AsDataSourceFault(Action request)
+        {
+            AsDataSourceFault<object>(() => { request(); return null; });
+        }
+
+        /// <summary>
+        /// Run a change the Source GUI observes - adding or removing a data source, say - on its UI
+        /// thread when hosted there. See GuiThread.
+        /// </summary>
+        private void OnGuiThread(Action change)
+        {
+            GuiThread.Run(RunningInGUI, change);
+        }
+
+        /// <summary>
+        /// Run a change to the scenario's data sources on the GUI's UI thread (see OnGuiThread),
+        /// then, if it removed any, rebuild the GUI's data sources panels, which would otherwise
+        /// keep entries for the removed data sources (see DataSourcesTree). VeneerCmd has no
+        /// panels, and none are looked for.
+        /// </summary>
+        private void ChangeDataGroups(Action change)
+        {
+            Action<string> warn = warning => Log(warning, LogLevel.Warning);
+            Action refresh = null;
+            if (RunningInGUI)
+                refresh = () => DataSourcesTree.RebindPanels(warn);
+            OnGuiThread(() => DataSourcesTree.ChangeThenRefreshIfRemoved(
+                Scenario.Network.DataManager, change, refresh, warn));
+        }
+
+        public SimpleDataGroupItem UpdateDataSource(string dataSourceGroup, SimpleDataGroupItem newItem)
         {
             newItem.Name = dataSourceGroup;
-            this.CreateDataSource(newItem);
+            return this.CreateDataSource(newItem);
         }
 
         private SimpleDataGroupItem GetSimpleDataSourceInternal(string dataSourceGroup, bool summary)
@@ -938,7 +1162,7 @@ namespace FlowMatters.Source.Veneer
                 ResourceNotFound();
                 return;
             }
-            dm.RemoveGroup(existing);
+            AsDataSourceFault(() => ChangeDataGroups(() => dm.RemoveGroup(existing)));
         }
 
         public SimpleDataItem GetDataGroupItem(string dataSourceGroup,string inputSet)

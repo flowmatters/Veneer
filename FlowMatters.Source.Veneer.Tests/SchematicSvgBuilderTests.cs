@@ -1,6 +1,5 @@
-using System.Drawing;
 using FlowMatters.Source.Veneer.Formatting;
-using NUnit.Framework;
+using System.Drawing;
 
 namespace FlowMatters.Source.Veneer.Tests
 {

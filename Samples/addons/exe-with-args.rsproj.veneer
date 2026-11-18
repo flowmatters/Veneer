@@ -1,0 +1,20 @@
+{
+  "addons": [
+    {
+      "name": "Calibrate",
+      "type": "exe",
+      "path": "tools/calib.exe",
+      "args": ["--port", "%VENEER_PORT%", "--out", "results 2026"],
+      "env": { "RUN_LABEL": "nightly" },
+      "workingDirectory": "tools",
+      "menu": "Veneer|Calibration"
+    },
+    {
+      "name": "Legacy batch report",
+      "type": "exe",
+      "path": "tools/report.bat",
+      "args": ["%VENEER_PROJECT_FILE%"],
+      "menu": "Veneer|Calibration"
+    }
+  ]
+}

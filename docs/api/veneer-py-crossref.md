@@ -36,7 +36,7 @@ to every path; in **live mode** no extension is added. That single switch is wha
 | GET | `/network/schematic.svg` (+`/tags`) | (mirror capture; UI tooling) |
 | GET | `/network/nodes/{id}`, `/network/link/{id}` | (via the `network()` feature collection) |
 | GET | `/runs` | `retrieve_runs()` |
-| POST | `/runs` | `run_model(params, start, end, run_async=False, name=None)` |
+| POST | `/runs` | `run_model(params, start, end, run_async=False, name=None, **kwargs)` |
 | GET | `/runs/status` | `run_status()` |
 | POST | `/runs/cancel` | `cancel_run()` |
 | GET | `/runs/{runId}` | `retrieve_run(run='latest')` |
@@ -46,6 +46,7 @@ to every path; in **live mode** no extension is added. That single switch is wha
 | GET | `/tables/{table}` | `model_table(table='fus')` (CSV) |
 | GET | `/functions` | `functions()` |
 | PUT | `/functions/{name}` | `update_function(name, value)` |
+| POST | `/functions/evaluate` | (no dedicated helper yet) |
 | GET | `/variables` | `variables()` |
 | GET | `/variables/{name}` | `variable(name)`, `function(name)` |
 | GET | `/variables/{name}/TimeSeries` | `variable_time_series(name)` |
@@ -58,6 +59,7 @@ to every path; in **live mode** no extension is added. That single switch is wha
 | DELETE | `/inputSets/{name}` | (no dedicated helper yet) |
 | POST | `/inputSets/{name}/run` | `apply_input_set(name)` |
 | PUT | `/recorders` | `configure_recording(enable=[], disable=[])` |
+| GET | `/recorderSets` | (no REST helper yet; see [Recorder sets](#recorder-sets)) |
 | GET | `/dataSources` | `data_sources()` |
 | GET | `/dataSources/{group}` | `data_source(name)` |
 | POST | `/dataSources` | `create_data_source(name, data, units, precision)` |
@@ -65,6 +67,23 @@ to every path; in **live mode** no extension is added. That single switch is wha
 | GET | `/dataSources/{group}/{inputSet}[/{item}]` | `data_source_item(source, name, input_set)` |
 | POST | `/ironpython` | `run_server_side_script(script)` |
 | POST | `/custom/{action}` | (used by addon-specific helpers) |
+
+## Recorder sets
+
+veneer-py reaches recorder sets through `v.model.simulation` (`VeneerSimulationActions` in
+`server_side.py`), which runs IronPython over `/ironpython` and so needs scripting enabled.
+The REST equivalents need no scripting:
+
+| veneer-py | REST | Difference |
+|-----------|------|------------|
+| `v.model.simulation.recorder_sets()` | `GET /recorderSets` → `Sets` | None |
+| `v.model.simulation.selected_recorder_sets()` | `GET /recorderSets` → `Selected` | None |
+| `v.model.simulation.select_recorder_sets(names)`, `clear_recorder_sets()` | `SelectedRecorderSets` on `POST /runs` | veneer-py changes the selection until it is changed again, and a project save keeps it. `SelectedRecorderSets` applies to one run, and Veneer restores the selection afterwards. |
+
+`run_model` passes extra keyword arguments through as run parameters, so
+`v.run_model(SelectedRecorderSets=[])` sends `{"SelectedRecorderSets": []}`. Both REST forms were
+added in protocol `20261019`. See
+[Choosing recorder sets for one run](runs-and-results.md#choosing-recorder-sets-for-one-run).
 
 ## Server-side scripting (`server_side.py`)
 

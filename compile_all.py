@@ -39,6 +39,9 @@ python compile_all.py -h
 import os
 import re
 import sys
+import json
+import struct
+import fnmatch
 import argparse
 import subprocess
 import tempfile
@@ -75,6 +78,11 @@ def unique_versions(all_versions:List[str], num_elements:int, prefix:str) -> Lis
 		v_num = '.'.join(v_num.split('.')[:num_elements])
 		uniq_versions[v_num] = v
 	return sorted(uniq_versions.values())
+
+def select_versions(version_info: list, patterns: List[str]) -> list:
+	"""Keep only the (fullpath, shortname, custom) entries whose shortname matches any glob in
+	`patterns`. Backs the --only switch; order is preserved."""
+	return [v for v in version_info if any(fnmatch.fnmatch(v[1], p) for p in patterns)]
 
 MAX_VERSION = [7, 99, 4]
 
@@ -159,12 +167,24 @@ def copy_references(source, dest, min_files=1):
 		copyfile(a, dest + os.path.sep + os.path.basename(a))
 	return [os.path.basename(a) for a in assemblies]
 
-def build_reference_sizes(ref_basenames, refpath):
+def matches_any(name, patterns):
+	"""Case-insensitive glob match of a basename against a list of patterns."""
+	lowered = name.lower()
+	return any(fnmatch.fnmatch(lowered, p.lower()) for p in patterns)
+
+def build_reference_sizes(ref_basenames, refpath, always_keep=()):
 	"""Build a dict of {basename: filesize} for Source reference assemblies.
 	Used to distinguish identical Source DLLs (skip) from different-version
-	NuGet DLLs that happen to share a name (keep)."""
+	NuGet DLLs that happen to share a name (keep).
+
+	Names matching always_keep are omitted, which makes is_same_as_reference report False
+	for them so they are always harvested. Needed for runtime files the plugin must ship
+	beside its own executable even though Source has an identical copy (e.g. the Firebird
+	and ICU natives, which the OS loader will only find in the app directory)."""
 	sizes = {}
 	for name in ref_basenames:
+		if always_keep and matches_any(name, always_keep):
+			continue
 		# Check main refpath and Plugins subdir
 		for candidate in [os.path.join(refpath, name), os.path.join(refpath, 'Plugins', name)]:
 			if os.path.isfile(candidate):
@@ -331,12 +351,41 @@ STUB_IMPORT_PATHS = [
 ]
 STUB_CONTENT = '<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">\n</Project>\n'
 
+def remove_stub_build_imports(root_path: str):
+	"""Delete stubs we previously created under root_path.
+	Content-checked, so a real eWater RiverSystem checkout is never touched."""
+	for rel_path in STUB_IMPORT_PATHS:
+		full_path = os.path.join(root_path, rel_path.replace('/', os.sep))
+		if not os.path.isfile(full_path):
+			continue
+		try:
+			with open(full_path) as f:
+				if f.read() != STUB_CONTENT:
+					continue
+		except OSError as e:
+			logger.warning('Could not read %s: %s' % (full_path, e))
+			continue
+		try:
+			os.remove(full_path)
+			logger.info("  Removed obsolete stub: %s" % full_path)
+		except OSError as e:
+			logger.warning('Could not remove %s: %s' % (full_path, e))
+
 def ensure_stub_build_imports(solution_path: str):
 	"""Create stub .props/.targets files if the eWater RiverSystem repo is not present.
 	The master branch csproj files import from $(RootPath)RiverSystem/Solutions/,
-	where RootPath is two levels up from the project directory (one above solution dir)."""
+	where RootPath is two levels up from the project directory (one above solution dir).
+
+	Branches carrying Directory.Build.props import those files *conditionally*, guarded on
+	Exists(SDK.build.props), and supply their own fallback settings when it is absent. A stub
+	satisfies that probe and silently suppresses the fallback, so skip stubbing there -- and
+	remove any stub an earlier run left behind, or the probe keeps succeeding."""
 	solution_dir = os.path.dirname(os.path.abspath(solution_path))
 	root_path = os.path.abspath(os.path.join(solution_dir, '..'))
+	if os.path.exists(os.path.join(solution_dir, 'Directory.Build.props')):
+		logger.info("  Directory.Build.props present; SDK.build stubs not required")
+		remove_stub_build_imports(root_path)
+		return
 	for rel_path in STUB_IMPORT_PATHS:
 		full_path = os.path.join(root_path, rel_path.replace('/', os.sep))
 		if not os.path.exists(full_path):
@@ -392,10 +441,117 @@ def extract_build_errors(output_lines, max_lines=25):
 	tail = [l.strip() for l in output_lines if l.strip()]
 	return tail[-max_lines:]
 
+# --- Unsigned Source assemblies in an app's deps.json (CoreWCF builds) ---
+
+# The Source GUI's own dependency manifest, in the main Source directory.
+SOURCE_APP_DEPS = 'RiverSystem.Forms.deps.json'
+
+def has_strong_name(path):
+	"""Return True if the .NET assembly at `path` is strong named, False if it is not, and
+	None if it is not a .NET assembly (native DLL, or not a PE file at all).
+
+	Reads the CLI header's StrongNameSignature directory, which the compiler reserves whenever
+	the assembly carries a public key (fully, delay or publicly signed)."""
+	try:
+		with open(path, 'rb') as f:
+			data = f.read()
+		if data[:2] != b'MZ':
+			return None
+		pe = struct.unpack_from('<I', data, 0x3c)[0]
+		if data[pe:pe+4] != b'PE\0\0':
+			return None
+		num_sections = struct.unpack_from('<H', data, pe+6)[0]
+		opt_size = struct.unpack_from('<H', data, pe+20)[0]
+		opt = pe + 24
+		dirs = opt + (96 if struct.unpack_from('<H', data, opt)[0] == 0x10b else 112)   # PE32 : PE32+
+		if struct.unpack_from('<I', data, dirs-4)[0] <= 14:
+			return None
+		cli_rva = struct.unpack_from('<I', data, dirs + 14*8)[0]   # directory 14: CLI header
+		if not cli_rva:
+			return None
+		sections = opt + opt_size
+		for i in range(num_sections):
+			virtual_size, virtual_address, raw_size, raw_pointer = struct.unpack_from('<IIII', data, sections + i*40 + 8)
+			if virtual_address <= cli_rva < virtual_address + max(virtual_size, raw_size):
+				cli = cli_rva - virtual_address + raw_pointer
+				return struct.unpack_from('<II', data, cli + 32)[1] > 0   # StrongNameSignature size
+		return None
+	except (OSError, struct.error):
+		return None
+
+def deps_target(deps):
+	"""The runtime target's library map from a parsed .deps.json."""
+	return deps['targets'][deps['runtimeTarget']['name']]
+
+def unsigned_source_packages(source_dir):
+	"""File names of the unsigned NuGet-package assemblies Source ships, as listed in the
+	Source GUI's deps.json. Empty if Source has no such manifest."""
+	manifest = os.path.join(source_dir, SOURCE_APP_DEPS)
+	if not os.path.isfile(manifest):
+		return []
+	with open(manifest, encoding='utf-8-sig') as f:
+		deps = json.load(f)
+	names = set()
+	for key, library in deps_target(deps).items():
+		if deps['libraries'].get(key, {}).get('type') != 'package':
+			continue
+		for asset in (library.get('runtime') or {}):
+			name = os.path.basename(asset)
+			if has_strong_name(os.path.join(source_dir, name)) is False:
+				names.add(name)
+	return sorted(names, key=str.lower)
+
+def list_in_app_deps(deps_path, names):
+	"""Add `names` as runtime assets of the app's own project entry in `deps_path`, skipping
+	any file name the manifest already lists. Returns the names added."""
+	with open(deps_path, encoding='utf-8-sig') as f:
+		deps = json.load(f)
+	target = deps_target(deps)
+	app = os.path.basename(deps_path)[:-len('.deps.json')]
+	app_key = next((k for k in target if k.split('/')[0] == app
+		and deps['libraries'].get(k, {}).get('type') == 'project'), None)
+	if app_key is None:
+		logger.warning('No project entry for %s in %s; not listing Source assemblies' % (app, deps_path))
+		return []
+	listed = {os.path.basename(a).lower() for library in target.values() for a in (library.get('runtime') or {})}
+	added = [n for n in names if n.lower() not in listed]
+	if added:
+		runtime = target[app_key].setdefault('runtime', {})
+		for name in added:
+			runtime[name] = {}
+		with open(deps_path, 'w', encoding='utf-8') as f:
+			json.dump(deps, f, indent=2)
+	return added
+
+def list_unsigned_source_assemblies(version_dest, source_dir):
+	"""List Source's unsigned NuGet-package assemblies in the deps.json of each app (an .exe
+	with a .deps.json) in `version_dest`, as the Source GUI's own deps.json does.
+
+	A dependency listed in an app's deps.json is a trusted platform assembly, and .NET binds a
+	reference to a strong-named assembly to an unsigned trusted platform assembly of the same
+	name. It will not bind it to an unsigned copy loaded from elsewhere: that fails with "A
+	strongly-named assembly is required" (0x80131044). This matters when a plugin was compiled
+	against a signed build of a package that Source ships unsigned. The GUI loads such a plugin;
+	an app that only loads Source's assemblies from the Source directory does not.
+
+	Only the manifest changes: the files are not copied. Where Source's files sit beside the app
+	(as when veneer-py stages Source and Veneer together), the host finds them. Elsewhere the host
+	skips the missing entries and the app behaves as before."""
+	names = unsigned_source_packages(source_dir)
+	if not names:
+		return
+	for deps_path in glob(os.path.join(version_dest, '*.deps.json')):
+		if not os.path.isfile(deps_path[:-len('.deps.json')] + '.exe'):
+			continue
+		added = list_in_app_deps(deps_path, names)
+		if added:
+			logger.info('Listed %d unsigned Source assemblies in %s: %s' % (
+				len(added), os.path.basename(deps_path), ', '.join(added)))
+
 # --- Per-version build/harvest ---
 
 def build_version(branch_key, fullpath, version, custom, solution, effective_refpath,
-		effective_source, destination, worktree, extra_refs, args):
+		effective_source, destination, worktree, extra_refs, args, always_keep=()):
 	"""Stage references, build, and harvest one Source version inside `worktree`.
 	Returns the build process returncode."""
 	is_custom = True if hasattr(custom, '__len__') else custom
@@ -484,7 +640,7 @@ def build_version(branch_key, fullpath, version, custom, solution, effective_ref
 		# all referenced assemblies to the output, including Source DLLs. We skip
 		# files identical to Source references (same name AND size) but keep files
 		# where Veneer needs a different version than Source ships.
-		ref_sizes = build_reference_sizes(references, effective_refpath) if branch_key == 'corewcf' else {}
+		ref_sizes = build_reference_sizes(references, effective_refpath, always_keep) if branch_key == 'corewcf' else {}
 
 		for artifact in glob(effective_source + os.path.sep + "*"):
 			basename = os.path.basename(artifact)
@@ -494,8 +650,8 @@ def build_version(branch_key, fullpath, version, custom, solution, effective_ref
 					if not os.path.isdir(artifact) and is_same_as_reference(artifact, ref_sizes):
 						continue
 				else:
-					# WCF: original basename-only filter
-					if basename in references:
+					# WCF: original basename-only filter, less the always-keep names
+					if basename in references and not (always_keep and matches_any(basename, always_keep)):
 						continue
 			try:
 				the_dest = version_dest + os.path.sep + basename
@@ -514,12 +670,43 @@ def build_version(branch_key, fullpath, version, custom, solution, effective_ref
 		# deployment structure matches the legacy WCF layout.
 		if branch_key == 'corewcf':
 			flatten_subdirectory(version_dest, 'Veneer', ref_sizes=ref_sizes)
+			list_unsigned_source_assemblies(version_dest, main_ref_dir)
 
 		if custom and args.copy_to_source:
 			for artifact in [fn for fn in glob(effective_source + os.path.sep + "*")]:
 				copyfile(artifact, os.path.join(fullpath, os.path.basename(artifact)))
 
 	return returncode, build_errors
+
+# --- Results summary ---
+
+def report_results(results, build_failures, fails_fn=LAST_FAILS_FN):
+	"""Log the per-version results and return the process exit code: 1 if any
+	version failed, else 0, so CI can fail the run. Failures are recorded in
+	fails_fn for the next run to retry first; a run with no failures removes it,
+	so a retry pass that fixes everything leaves no stale list behind."""
+	failures = sorted([k for (k, v) in results.items() if v != 0])
+	successes = sorted([k for (k, v) in results.items() if v == 0])
+	logger.info("\n*** RESULTS ***")
+	logger.info("%d successful builds out of %d versions" % (len(successes), len(results)))
+	if not failures:
+		if os.path.exists(fails_fn):
+			os.remove(fails_fn)
+		return 0
+	logger.info("FAILED TO BUILD AGAINST %d VERSIONS" % (len(failures)))
+	logger.info("\n".join(failures))
+	with open(fails_fn, 'w') as f:
+		f.write('\n'.join(failures))
+	logger.info("\n*** FAILURE DETAILS ***")
+	for v in failures:
+		excerpt = build_failures.get(v)
+		logger.info("--- %s ---" % v)
+		if excerpt:
+			for line in excerpt:
+				logger.info("    %s" % line)
+		else:
+			logger.info("    (no error lines captured; see full build log above)")
+	return 1
 
 def main():
 	logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -534,6 +721,17 @@ def main():
 	parser.add_argument('--source','-s',
 			  help="Specify the folder that the Projects, in the Solution will compile to.",
 			  default='.\\..\\Output\\Plugins\\CommunityPlugins')
+	parser.add_argument('--always-keep',
+			  help="Comma-separated glob patterns (matched against the file name, case "
+			       "insensitively) that are always harvested into the destination, even "
+			       "when Source ships an identical copy. Use for runtime files the plugin "
+			       "must carry beside its own executable, such as native libraries the OS "
+			       "loader will only find in the application directory.",
+			  default='')
+	parser.add_argument('--corewcf-source',
+			  help="Overrides --source for CoreWCF builds only, for branches whose output "
+			       "directory differs from the WCF branch. Empty = use --source.",
+			  default='')
 	parser.add_argument('--ewater','-e',
 			  help="Specify the base installation folder for all versions of eWater Source",
 			  default='C:\\Program Files\\eWater')
@@ -550,6 +748,9 @@ def main():
 	parser.add_argument('--reference-subdir', default='',
 		help='Subdirectory inside each version dir holding the main Source DLLs. Empty = flat (installed layout); pass e.g. "Source" for a binaries-repo layout.')
 	parser.add_argument('--fail','-f',help="Fail fast: Stop after first failure",action='store_true',default=False)
+	parser.add_argument('--only', action='append', default=[], metavar='GLOB',
+			  help='Build only the versions whose short name matches GLOB (repeatable, e.g. --only Veneer_for_Source_6.10.0). '
+			       'Leaves that version\'s references staged in --refpath, so dotnet build/test work directly afterwards.')
 	parser.add_argument('--keep','-k',help='Keep references in output directory',action='store_true',default=False)
 	parser.add_argument('--copy_to_source','-c',help='Copy outputs to Source directory WHEN COMPILING AGAINST CUSTOM VERSION OF SOURCE',action='store_true',default=False)
 	parser.add_argument('--wcf-branch',help='Git branch for WCF (legacy) builds',default='legacy_ci')
@@ -580,6 +781,11 @@ def main():
 	#if 'Veneer' in args.solution:
 	#	args.source = '.'+args.source
 	logger.info('Expect compiled assemblies in %s (%s)'%(args.source,os.path.abspath(args.source)))
+	if args.corewcf_source:
+		logger.info('  CoreWCF builds instead compile to %s (%s)'%(args.corewcf_source,os.path.abspath(args.corewcf_source)))
+	always_keep = [p.strip() for p in args.always_keep.split(',') if p.strip()]
+	if always_keep:
+		logger.info('Always harvesting, even when Source has an identical copy: %s' % ', '.join(always_keep))
 	all_versions = discover_versions(args.ewater, args.source_dir_prefix)
 	logger.info("*** FOUND %d INSTALLED VERSIONS OF SOURCE" % (len(all_versions)))
 	logger.info("\n".join(all_versions))
@@ -608,6 +814,14 @@ def main():
 	shortnames = [os.path.basename(v) for v in versions_to_compile]
 	version_info = list(zip(versions_to_compile,shortnames,[False]*len(versions_to_compile)))
 	version_info += include_patterns
+
+	if args.only:
+		version_info = select_versions(version_info, args.only)
+		logger.info("*** --only SELECTED %d VERSION(S) ***" % len(version_info))
+		logger.info("\n".join(v[1] for v in version_info))
+		if not version_info:
+			logger.error("No Source version matches --only %s" % ' '.join(args.only))
+			raise SystemExit(1)
 
 	previous_fails = [v for v in version_info if v[1] in fails_previous_run]
 	previous_success = [v for v in version_info if not v[1] in fails_previous_run]
@@ -652,7 +866,9 @@ def main():
 				carry_dirty_changes(wt)
 			solution = resolve_in_worktree(wt, args.solution)
 			effective_refpath = resolve_in_worktree(wt, args.refpath)
-			effective_source = resolve_in_worktree(wt, args.source)
+			# The CoreWCF and WCF branches can compile to different output directories.
+			branch_source = args.corewcf_source if (g['branch_key'] == 'corewcf' and args.corewcf_source) else args.source
+			effective_source = resolve_in_worktree(wt, branch_source)
 			if g['branch_key'] == 'corewcf':
 				ensure_stub_build_imports(solution)
 				for pkgs in glob(os.path.join(wt, '*', 'Packages')):
@@ -661,7 +877,7 @@ def main():
 				returncode, build_errors = build_version(
 					g['branch_key'], fullpath, version, custom,
 					solution, effective_refpath, effective_source, destination, wt,
-					extra_refs, args)
+					extra_refs, args, always_keep)
 				results[version] = returncode
 				if returncode != 0:
 					build_failures[version] = build_errors
@@ -671,25 +887,7 @@ def main():
 			if created_temp and not args.keep_temp_worktrees:
 				subprocess.run(['git', 'worktree', 'remove', '--force', wt])
 
-	# --- Results summary ---
-	failures = sorted([k for (k, v) in results.items() if v > 0])
-	successes = sorted([k for (k, v) in results.items() if v == 0])
-	logger.info("\n*** RESULTS ***")
-	logger.info("%d successful builds out of %d versions" % (len(successes), len(results)))
-	if failures:
-		logger.info("FAILED TO BUILD AGAINST %d VERSIONS" % (len(failures)))
-		logger.info("\n".join(failures))
-		open(LAST_FAILS_FN, 'w').writelines('\n'.join(failures))
-		logger.info("\n*** FAILURE DETAILS ***")
-		for v in failures:
-			excerpt = build_failures.get(v)
-			logger.info("--- %s ---" % v)
-			if excerpt:
-				for line in excerpt:
-					logger.info("    %s" % line)
-			else:
-				logger.info("    (no error lines captured; see full build log above)")
-
+	return report_results(results, build_failures)
 
 if __name__ == '__main__':
-	main()
+	sys.exit(main())

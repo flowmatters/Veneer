@@ -66,10 +66,31 @@ GET /dataSources/Climate HTTP/1.1
 Create a data source group (or replace one with the same name).
 
 - **Request body**: [`SimpleDataGroupItem`](schemas.md#simpledatagroupitem). Items can carry
-  inline data via `DetailsAsCSV` plus `UnitsForNewTS`, or reference a file via `Filename` /
-  `FilenameIsRelative` / `ReloadOnRun`.
-- **Response**: none (`200 OK`). If a group with the same name exists it is **replaced**.
+  inline data via `DetailsAsCSV` plus `UnitsForNewTS`, or load a file, named by the item's
+  `Filename` (or, if it has none, by the group's `Name`), with `ReloadOnRun`.
+- **Name**: the group is named as Source keeps it — `DataManager.RestrictName(Name)`: `.`, `@`,
+  `>`, `,` and `\` become `_`, the name is cut to 200 characters and trimmed. (With its
+  interface open, Source renames every data source it shows that way.) A blank `Name` is a
+  `400`.
+- **Replacing**: a group already of that name (or, from an older Veneer, of `Name` exactly as
+  given) is **replaced**. Usages (assignments) of its columns move to the columns of the same
+  name in the new group; usages of a column the new group lacks are dropped, with a warning in
+  Veneer's log.
+- **Response**: the group created, as the summary `GET /dataSources/{dataSourceGroup}` returns
+  ([`SimpleDataGroupItem`](schemas.md#simpledatagroupitem)): its final `Name`, `id`, `FullName`
+  and `Items`.
+- **Errors**: a `SimulationFault` JSON body (`Message`, `StackTrace`) — `400` for an invalid
+  request, `500` if the group could not be created (a file that will not load, say). A failed
+  request leaves no group behind.
 - **veneer-py**: `v.create_data_source(name, data, units, precision)`
+- **Protocol**: `Filename` on create, the restricted name, the response body and the faults are
+  **added in protocol `20261027`**. Before that, a file item loaded from the group's `Name` (so
+  the name *was* the path), names were kept as given (and renamed by Source's interface), and
+  the response was empty. A client must check `Version` before sending a `Name` that is not the
+  file: an older server would try to load `Name` as the file.
+
+In the Source GUI, the change to the model is made on Source's UI thread (from protocol
+`20261027`; before that, a POST failed in the Source 6.x GUI).
 
 ```http
 POST /dataSources HTTP/1.1
@@ -88,6 +109,31 @@ Content-Type: application/json
 }
 ```
 
+A file-based group, named apart from its file:
+
+```http
+POST /dataSources HTTP/1.1
+Content-Type: application/json
+
+{
+  "Name": "inflow_series",
+  "Items": [
+    {
+      "Name": "Item for inflow_series",
+      "InputSets": ["Default Input Set"],
+      "Filename": "C:\\inputs\\inflow_series.csv",
+      "ReloadOnRun": true
+    }
+  ]
+}
+```
+
+```json
+{ "Name": "inflow_series", "id": "/dataSources/inflow_series", "FullName": "/inflow_series",
+  "Path": "/", "Items": [ { "Name": "Item for inflow_series", "Filename": "C:\\inputs\\inflow_series.csv",
+  "ReloadOnRun": true, "Details": [ ... ] } ] }
+```
+
 ---
 
 ## `PUT /dataSources/{dataSourceGroup}`
@@ -96,7 +142,8 @@ Update (create or replace) the named group. The server forces the group's `Name`
 segment, then applies the same create-or-replace logic as `POST /dataSources`.
 
 - **Request body**: [`SimpleDataGroupItem`](schemas.md#simpledatagroupitem)
-- **Response**: none (`200 OK`)
+- **Response**: as for `POST /dataSources` — the group created (from protocol `20261027`;
+  none before).
 
 ```http
 PUT /dataSources/Climate HTTP/1.1
@@ -114,6 +161,7 @@ Delete a group.
 
 - **Response**: none (`200 OK` on success)
 - **`404 Not Found`** if the group doesn't exist.
+- **Errors**: a `SimulationFault` JSON body, `500` (from protocol `20261027`).
 - **veneer-py**: `v.delete_data_source(group)`
 
 ```http

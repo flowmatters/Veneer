@@ -2,83 +2,54 @@
   <PropertyGroup>
     <TargetFramework>net8.0-windows</TargetFramework>
     <OutputType>Exe</OutputType>
-    <RootNamespace>FlowMatters.Source.VeneerCmd</RootNamespace>
-    <AssemblyName>FlowMatters.Source.VeneerCmd</AssemblyName>
-    <LangVersion>9.0</LangVersion>
-    <RootPath>$(MSBuildThisFileDirectory)..\..\</RootPath>
-    <OutputPath>$(RootPath)Output\Plugins\CommunityPlugins\Veneer</OutputPath>
-    <NoWarn>1591,1587</NoWarn>
-    <WarningLevel>4</WarningLevel>
-    <PlatformTarget>x64</PlatformTarget>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <UseWindowsForms>true</UseWindowsForms>
-    <UseWPF>true</UseWPF>
-    <ImportWindowsDesktopTargets>true</ImportWindowsDesktopTargets>
-    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-    <Title>FlowMatters.Source.VeneerCmd</Title>
-    <Product>FlowMatters.Source.VeneerCmd</Product>
-    <Copyright>FlowMatters @ 2013</Copyright>
   </PropertyGroup>
-	<Import Project="$(RootPath)RiverSystem\Solutions\SDK.build.props" />
-	<Import Project="$(RootPath)RiverSystem\Solutions\SDK.build.targets" />
-	<Import Project="$(RootPath)RiverSystem\Solutions\NormalisePdbBuildRoot.targets" />
   <ItemGroup>
-    <PackageReference Include="CommandLineParser" Version="2.9.1" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
-    <PackageReference Include="System.Text.Encoding.CodePages" Version="4.0.1" />
-    <PackageReference Include="FirebirdSql.Data.FirebirdClient" Version="10.3.1" />
-    <PackageReference Include="Nito.AsyncEx" Version="5.1.2" />
+    <!-- Don't copy local: both projects build to the same shared OutDir, so the file is
+         already there. Runtime assets must stay INCLUDED so the reference is recorded in
+         VeneerCmd's deps.json: a framework-dependent host builds its assembly list from
+         deps.json, not by scanning the app directory. -->
+    <ProjectReference Include="..\FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj">
+      <CopyLocalSatelliteAssemblies>False</CopyLocalSatelliteAssemblies>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\FlowMatters.Source.Veneer\FlowMatters.Source.Veneer.csproj" />
+    <Reference Include="RiverSystem" Private="False" />
+    <Reference Include="RiverSystem.ApplicationLayer" Private="False" />
+    <Reference Include="RiverSystem.ApplicationLayer.Interfaces" Private="False" />
+    <Reference Include="RiverSystem.Persistence" Private="False" />
+    <Reference Include="RiverSystem.PluginManager" Private="False" />
+    <Reference Include="TIME" Private="False" />
+    <Reference Include="TIME.ScenarioManagement" Private="False" />
+    <Reference Include="TIME.Tools" Private="False" />
   </ItemGroup>
   <ItemGroup>
-    <Reference Include="RiverSystem">
-      <HintPath>..\..\Output\RiverSystem.dll</HintPath>
-    </Reference>
-    <Reference Include="RiverSystem.ApplicationLayer">
-      <HintPath>..\..\Output\RiverSystem.ApplicationLayer.dll</HintPath>
-    </Reference>
-    <Reference Include="RiverSystem.ApplicationLayer.Interfaces">
-      <HintPath>..\..\Output\RiverSystem.ApplicationLayer.Interfaces.dll</HintPath>
-    </Reference>
-    <Reference Include="RiverSystem.Persistence">
-      <HintPath>..\..\Output\RiverSystem.Persistence.dll</HintPath>
-    </Reference>
-    <Reference Include="RiverSystem.PluginManager">
-      <HintPath>..\..\Output\RiverSystem.PluginManager.dll</HintPath>
-    </Reference>
-    <Reference Include="TIME">
-      <HintPath>..\..\Output\TIME.dll</HintPath>
-    </Reference>
-    <Reference Include="TIME.ScenarioManagement">
-      <HintPath>..\..\Output\TIME.ScenarioManagement.dll</HintPath>
-    </Reference>
-    <Reference Include="TIME.Tools">
-      <HintPath>..\..\Output\TIME.Tools.dll</HintPath>
-    </Reference>
+    <PackageReference Include="CommandLineParser" />
+    <PackageReference Include="Nito.AsyncEx" />
   </ItemGroup>
   <ItemGroup>
-    <None Update="appsettings.json">
+     <None Update="appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
-  <!-- To run this from CommunityPlugins we need to make sure everything required is copied across -->
-  <Target Name="CopyToPlugins" AfterTargets="Build">
-    <!--<Copy SourceFiles="$(OutputPath)$(AssemblyName).dll" DestinationFolder="$(RootPath)Output\Plugins\CommunityPlugins" />
-    <Copy SourceFiles="$(OutputPath)$(AssemblyName).exe" DestinationFolder="$(RootPath)Output\Plugins\CommunityPlugins" />
-    <Copy SourceFiles="$(OutputPath)$(AssemblyName).deps.json" DestinationFolder="$(RootPath)Output\Plugins\CommunityPlugins" />
-    <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll.config" DestinationFolder="$(RootPath)Output\Plugins\CommunityPlugins" />
-    <Copy SourceFiles="$(OutputPath)$(AssemblyName).runtimeconfig.json" DestinationFolder="$(RootPath)Output\Plugins\CommunityPlugins" />-->
-
-    <!--Firebird dependencies-->
-    <Copy SourceFiles="$(RootPath)Output\fbclient.dll" DestinationFolder="$(OutputPath)" />
-    <Copy SourceFiles="$(RootPath)Output\fbembed.dll" DestinationFolder="$(OutputPath)" />
-    <Copy SourceFiles="$(RootPath)Output\icudt63.dll" DestinationFolder="$(OutputPath)" />
-    <Copy SourceFiles="$(RootPath)Output\icuin63.dll" DestinationFolder="$(OutputPath)" />
-    <Copy SourceFiles="$(RootPath)Output\icuuc63.dll" DestinationFolder="$(OutputPath)" />
-    <Copy SourceFiles="$(RootPath)Output\Plugins\engine13.dll" DestinationFolder="$(OutputPath)\Plugins" />
+  <!-- Stage the native binaries VeneerCmd needs beside the executable. Source ships these
+       next to Source.exe, but the OS native loader only searches the app directory, so
+       they have to be copied. The set varies by Source version, so ICU and the engine
+       plugin are globbed, and the two Firebird names are Exists-guarded: a literal path
+       still becomes an item when the file is missing, and Copy then fails with MSB3030.
+       Pre-6.0 releases ship none of these, and must remain a clean no-op. Uses OutDir,
+       not OutputPath, because the two diverge once Directory.Build.props sets OutDir. -->
+  <Target Name="CopyNativeDependencies" AfterTargets="Build">
+    <ItemGroup>
+      <VeneerNativeDependency Include="$(RootOutDir)fbclient.dll" Condition="Exists('$(RootOutDir)fbclient.dll')" />
+      <VeneerNativeDependency Include="$(RootOutDir)fbembed.dll" Condition="Exists('$(RootOutDir)fbembed.dll')" />
+      <VeneerNativeDependency Include="$(RootOutDir)icu*.dll" />
+      <!-- Firebird reads its configuration from the application directory. A working
+           directory assembled by copying all of Source's files already has this; copying it
+           keeps a plain build output, and the released zip, self-contained too. -->
+      <VeneerNativeDependency Include="$(RootOutDir)firebird.conf" Condition="Exists('$(RootOutDir)firebird.conf')" />
+      <VeneerNativePlugin Include="$(RootOutDir)Plugins\engine*.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(VeneerNativeDependency)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(VeneerNativePlugin)" DestinationFolder="$(OutDir)Plugins" SkipUnchangedFiles="true" />
   </Target>
 </Project>
