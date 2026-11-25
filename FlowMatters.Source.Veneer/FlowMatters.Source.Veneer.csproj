@@ -290,6 +290,7 @@
     <Compile Include="ExchangeObjects\TimeSeriesResponse.cs" />
     <Compile Include="ExchangeObjects\VeneerResponse.cs" />
     <Compile Include="ExchangeObjects\GeoJSONGeometry.cs" />
+    <Compile Include="ExchangeObjects\GeoJSONPolygonRings.cs" />
     <Compile Include="ExchangeObjects\GeoJSONNetwork.cs" />
     <Compile Include="ExchangeObjects\VeneerStatus.cs" />
     <Compile Include="Formatting\NetworkToGeographic.cs" />
@@ -348,6 +349,8 @@
     <Compile Include="UriTemplates.cs" />
     <Compile Include="VariableSummary.cs" />
     <Compile Include="Tests\SchematicNameSanitiserTests.cs" />
+    <Compile Include="Tests\GeoJSONPolygonRingsTests.cs" />
+    <Compile Include="Tests\GeoJSONGeometryRegionTests.cs" />
     <Compile Include="WebServerStatusPanel.cs">
       <SubType>UserControl</SubType>
     </Compile>
