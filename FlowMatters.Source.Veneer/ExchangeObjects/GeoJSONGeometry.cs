@@ -88,37 +88,47 @@ namespace FlowMatters.Source.WebServer
         public GeoJSONGeometry(Polygon polygon)
         {
             type = GeoJSONGeometryType.Polygon;
-            coordinates = GeoJSONPolygon(polygon);
+            var polygons = GeoJSONPolygonRings.ToMultiPolygon(new[] { GeoJSONRing(polygon) });
+            coordinates = polygons.Length > 0 ? polygons[0] : new double[0][][];
         }
 
-        private static double[][][] GeoJSONPolygon(Polygon polygon)
-        {
-            List<double[][]> coordTemp = new List<double[][]>();
-            for (int i = 0; i < polygon.lineCount(); i++)
-            {
-                PolyLineDescriptor pld = polygon.item(i);
-                if (pld.usage == PolyLineUsage.Normal)
-                    coordTemp.Add(GeoJSONLineString(pld.polyLine));
-                else
-                    coordTemp.Add(GeoJSONLineString(pld.polyLine.Reverse()));
-            }
-
-            double[][][] result = coordTemp.ToArray();
-            return result;
-        }
-
+        // A region is a set of non-crossing rings, read by the even-odd rule, so a ring
+        // nested inside another is a hole. Each ring is grouped with the exterior ring it
+        // belongs to, rather than written as a polygon of its own.
         public GeoJSONGeometry(GEORegion region)
         {
             type = GeoJSONGeometryType.MultiPolygon;
-            
-            List<double[][][]> coordTemp = new List<double[][][]>();
+
+            List<double[][]> rings = new List<double[][]>();
 #if BeforeCaseRefactor
             for(int i = 0; i < region.count(); i++)
 #else
             for (int i = 0; i < region.Count; i++)
 #endif
-                coordTemp.Add(GeoJSONPolygon(region.item(i)));
-            coordinates = coordTemp.ToArray();
+                rings.Add(GeoJSONRing(region.item(i)));
+            coordinates = GeoJSONPolygonRings.ToMultiPolygon(rings);
+        }
+
+        // A Polygon is one closed ring, which may be built from several polylines (each
+        // possibly reversed). point(i) walks them all in order, omitting the repeated
+        // closing point.
+        private static double[][] GeoJSONRing(Polygon polygon)
+        {
+            var coords = new List<double[]>();
+            double[] last = null;
+            int nPoints = polygon.pointCount;
+            for (int i = 0; i < nPoints; i++)
+            {
+                var newPoint = GeoJSONPoint(polygon.point(i));
+                if ((last == null) ||
+                    (last[0] != newPoint[0]) ||
+                    (last[1] != newPoint[1]))
+                {
+                    coords.Add(newPoint);
+                }
+                last = newPoint;
+            }
+            return coords.ToArray();
         }
 
         private static double[] GeoJSONPoint(Coordinate c)
